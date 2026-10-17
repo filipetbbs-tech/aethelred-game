@@ -20,6 +20,7 @@ canvas{display:block}
 #vida{color:var(--bone);transition:color .1s}
 #combo{color:var(--bone);min-height:1.5em}
 #glbBtn{right:18px;top:calc(14px + env(safe-area-inset-top,0px));bottom:auto}
+#foesBtn{right:18px;top:calc(76px + env(safe-area-inset-top,0px));bottom:auto}
 #glbMsg{margin-top:8px;font-size:13px;color:var(--bone);opacity:.85}
 #pad{position:fixed;left:22px;bottom:calc(26px + env(safe-area-inset-bottom,0px));width:120px;height:120px;border-radius:50%;border:1px solid #6b5a4a;background:rgba(20,16,16,.45);display:none}
 #knob{position:absolute;left:40px;top:40px;width:40px;height:40px;border-radius:50%;background:#6b5a4a}
@@ -29,7 +30,7 @@ canvas{display:block}
 <body>
 <div id="hud">
   <h1>Aethelred, protótipo de blocos</h1>
-  <p>WASD move, Shift corre, Espaço pula.<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera.</p>
+  <p>WASD move, Shift corre, Espaço pula.<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos.</p>
   <p id="state">Forma normal</p>
   <p id="vida">Vida 100   Abatidos 0</p>
   <p id="combo"></p>
@@ -39,6 +40,7 @@ canvas{display:block}
 <button class="btn" id="jump">Pular</button>
 <button class="btn" id="atk">Atacar</button>
 <button class="btn" id="glbBtn">Carregar modelo GLB</button>
+<button class="btn" id="foesBtn">Inimigos: ligados</button>
 <input type="file" id="glbIn" accept=".glb" hidden>
 <button class="btn" id="morph">Transformar</button>
 
@@ -175,7 +177,7 @@ const arms=[-1,1].map(s=>{
 /* estado */
 const st={x:0,z:8,y:0,vy:0,rot:Math.PI,rotT:Math.PI,yaw:0,pitch:.35,camD:6.5,t:0,speed:0,morph:0,morphOn:false};
 const keys={};const joy={x:0,y:0};
-addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;});
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 const stateEl=document.getElementById('state');
 function toggle(){st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
@@ -200,6 +202,13 @@ addEventListener('pointerup',e=>{
     drag=null;
   }
 });
+
+/* zoom pela rodinha do mouse */
+renderer.domElement.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const k=e.deltaMode===1?e.deltaY*16:e.deltaY;
+  st.camD=Math.max(1.4,Math.min(16,st.camD*Math.exp(k*.0012)));
+},{passive:false});
 
 /* joystick de toque */
 const pad=document.getElementById('pad'),knob=document.getElementById('knob');
@@ -347,7 +356,7 @@ function updateComboState(dt){
 }
 
 /* combate */
-const enemies=[];let hp=100,kills=0,hurt=0,spawnT=2,msgT=0,hitStop=0,shake=0;
+const enemies=[];let foesOn=true,hp=100,kills=0,hurt=0,spawnT=2,msgT=0,hitStop=0,shake=0;
 const vidaEl=document.getElementById('vida');
 function makeEnemy(){
   const g=new THREE.Group();g.rotation.order='YXZ';
@@ -366,6 +375,15 @@ function spawnEnemy(){
   scene.add(e.g);enemies.push(e);
 }
 for(let i=0;i<3;i++)spawnEnemy();
+/* liga e desliga os inimigos, para testar a personagem sozinha */
+const foesBtn=document.getElementById('foesBtn');
+function toggleFoes(){
+  foesOn=!foesOn;
+  enemies.forEach(function(e){scene.remove(e.g);});enemies.length=0;
+  if(foesOn){for(let i=0;i<3;i++)spawnEnemy();spawnT=2;}
+  foesBtn.textContent='Inimigos: '+(foesOn?'ligados':'desligados');
+}
+foesBtn.onclick=function(){toggleFoes();foesBtn.blur();};
 function pushOut(p,R){circles.forEach(function(c){const dx=p.x-c.x,dz=p.z-c.z,d=Math.hypot(dx,dz),m=c.r+R;if(d<m&&d>0){p.x=c.x+dx/d*m;p.z=c.z+dz/d*m;}});}
 function hitEnemies(A){
   const fx=Math.sin(st.rot),fz=Math.cos(st.rot),dmg=A.dmg*(st.morphOn?2:1),R=A.range+(st.morphOn?.8:0),cosArc=Math.cos(A.arc/2);
@@ -385,7 +403,7 @@ function updateCombat(dt){
   hurt-=dt;msgT-=dt;
   spawnT-=dt;
   const alive=enemies.filter(function(e){return !e.dead;}).length;
-  if(alive<6&&spawnT<=0){spawnEnemy();spawnT=2.5;}
+  if(foesOn&&alive<6&&spawnT<=0){spawnEnemy();spawnT=2.5;}
   for(let i=enemies.length-1;i>=0;i--){
     const e=enemies[i],p=e.g.position;
     if(e.dead){e.dead+=dt;e.g.rotation.x=-Math.min(e.dead/.4,1)*1.5;p.x+=e.vx*dt;p.z+=e.vz*dt;const f=Math.max(0,1-dt*6);e.vx*=f;e.vz*=f;if(e.dead>3){scene.remove(e.g);enemies.splice(i,1);}continue;}
@@ -413,7 +431,7 @@ function updateCombat(dt){
   if(hp<=0){
     hp=100;kills=0;enemies.forEach(function(e){scene.remove(e.g);});enemies.length=0;
     st.x=0;st.z=8;spawnT=2;msgT=2.5;combo.active=false;combo.i=-1;
-    for(let i=0;i<3;i++)spawnEnemy();
+    if(foesOn)for(let i=0;i<3;i++)spawnEnemy();
   }
   const txt=msgT>0?'Você caiu. Recomeçando.':'Vida '+Math.max(0,Math.ceil(hp))+'   Abatidos '+kills;
   if(vidaEl.textContent!==txt)vidaEl.textContent=txt;

@@ -464,18 +464,26 @@ function loadGLB(file){
   fr.onload=function(){parseGLB(fr.result,file.name);};
   fr.readAsArrayBuffer(file);
 }
-/* carrega o modelo que acompanha o jogo */
+/* carrega o modelo que acompanha o jogo; no link de teste ele vem em base64, porque lá arquivos .glb não são servidos */
 (function(){
-  const url='aethelred_rig_leve.glb';
-  const xhr=new XMLHttpRequest();
-  xhr.open('GET',url);xhr.responseType='arraybuffer';
-  xhr.onprogress=function(e){if(e.lengthComputable)say('Carregando o modelo da personagem... '+Math.round(e.loaded/e.total*100)+'%');};
-  xhr.onload=function(){
-    if(xhr.status>=200&&xhr.status<300||(xhr.status===0&&xhr.response))parseGLB(xhr.response,url);
-    else say('Não encontrei o modelo da personagem. Arraste um arquivo .glb para a tela ou toque em “Carregar modelo GLB”.');
-  };
-  xhr.onerror=function(){say('Não encontrei o modelo da personagem. Arraste um arquivo .glb para a tela ou toque em “Carregar modelo GLB”.');};
-  xhr.send();
+  const srcs=[{url:'aethelred_rig_leve.glb',type:'arraybuffer'},{url:'aethelred_rig_leve.glb.b64.txt',type:'text'}];
+  function tryLoad(i){
+    if(i>=srcs.length){say('Não encontrei o modelo da personagem. Arraste um arquivo .glb para a tela ou toque em “Carregar modelo GLB”.');return;}
+    const s=srcs[i],xhr=new XMLHttpRequest();
+    xhr.open('GET',s.url);xhr.responseType=s.type;
+    xhr.onprogress=function(e){if(e.lengthComputable)say('Carregando o modelo da personagem... '+Math.round(e.loaded/e.total*100)+'%');};
+    xhr.onload=function(){
+      if(!(xhr.status>=200&&xhr.status<300||(xhr.status===0&&xhr.response))){tryLoad(i+1);return;}
+      if(s.type==='text'){
+        const bin=atob(xhr.response.replace(/\s+/g,'')),buf=new Uint8Array(bin.length);
+        for(let k=0;k<bin.length;k++)buf[k]=bin.charCodeAt(k);
+        parseGLB(buf.buffer,'aethelred_rig_leve.glb');
+      }else parseGLB(xhr.response,s.url);
+    };
+    xhr.onerror=function(){tryLoad(i+1);};
+    xhr.send();
+  }
+  tryLoad(0);
 })();
 function useModel(gltf,name){
   if(custom)hero.remove(custom);

@@ -32,3 +32,11 @@ Analisado quadro a quadro a 10 fps.
 - Golpes 1–4: ~0,7 s cada, preparação ~0,27 s, golpe + continuação ~0,12 s; encadeados ficam a ~0,4 s um do outro.
 - Golpe 2 com rodopio de 360° (spin) acertando em volta; golpe 5 é o salto girando do Mixamo.
 - Guarda (GUARD) mantida por 3 s depois de um golpe; andar ou pular sai dela.
+
+## Coesão do combo (combo B)
+
+- Problema do combo A: o golpe final do Mixamo é lento e gracioso, de espadachim, e começa de uma postura ereta neutra,
+  quebrando o fluxo dos golpes curvados e rápidos; e os golpes 1-4 tinham todos o mesmo ritmo, sem crescendo.
+- Combo B: escalada de ritmo e peso (0,55 s → 0,55 → 0,7 → 0,85 → 1,2 s; dano 1, 1, 1, 2, 4), tudo no mesmo estilo,
+  e o fim de cada golpe deixa o tronco torcido para o lado do braço seguinte (continuidade de yaw entre golpes).
+- Final: bote com as duas garras, com a preparação longa (agacha e segura) antes de um golpe rápido, para dar peso.

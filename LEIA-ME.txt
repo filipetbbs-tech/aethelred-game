@@ -15,11 +15,15 @@ arraste para girar a câmera, rodinha do mouse dá zoom. No celular: joystick à
 esquerda e botões à direita.
 
 Testes: I (ou o botão "Inimigos") liga e desliga os inimigos; T coloca a
-personagem na posição T, com dedos esticados, e T de novo volta ao jogo.
+personagem na posição T, com dedos esticados, e T de novo volta ao jogo;
+C alterna entre o combo B (atual) e o combo A (anterior).
 
-Combate: combo de 5 golpes de garra alternando mão direita e esquerda
-(direita→esquerda, de baixo para cima, de cima para baixo, esquerda→direita e
-golpe final em diagonal). Os golpes são animados por código sobre o esqueleto,
+Combate: dois combos de 5 golpes, alternados com a tecla C.
+- Combo B (atual, tabela ATT_B): abertura rápida, revés de baixo para cima,
+  varrida pesada, rodopio de 360° e bote com as duas garras. Ritmo e peso crescem
+  a cada golpe, e cada golpe termina na pose em que o próximo começa.
+- Combo A (anterior, tabela ATT_A): golpes baseados nas referências e o salto do
+  Mixamo como golpe final. Os golpes são animados por código sobre o esqueleto,
 com IK de braços e pernas que respeita a dobra natural do cotovelo e do joelho.
 Os valores de cada golpe ficam na tabela ATT do index.html: dur é a duração em
 segundos, tw é a fração do tempo gasta na preparação e tf a fração em que o golpe

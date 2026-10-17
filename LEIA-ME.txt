@@ -28,3 +28,12 @@ e a continuação terminam (o resto é recuperação).
 Modelo: os pesos de skinning de alguns vértices da capa estavam presos aos ossos
 das mãos e esticavam quando os braços se mexiam. Esses pesos foram redistribuídos
 para os ossos do tronco (o arquivo original continua no histórico do git).
+
+Animações do Mixamo (pasta animacoes/):
+- Baixe no mixamo.com em FBX Binary, Without Skin, 30 fps, e suba o .fbx nesta pasta.
+- O .fbx é convertido para .glb (FBX2glTF) e registrado na lista CLIPS do index.html.
+- O jogo transfere a animação para o esqueleto da personagem (retarget), mantendo os
+  dedos sob controle do jogo (garras) e transformando o avanço do quadril em
+  movimento do corpo. Um golpe do combo usa a animação quando tem clip, c0/c1
+  (recorte em segundos) e speed na tabela ATT.
+- Hoje: o golpe final usa "Sword And Shield Slash" (salto girando no ar).

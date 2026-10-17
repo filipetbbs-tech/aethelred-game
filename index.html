@@ -276,14 +276,8 @@ const ATT=[
     {t:.56,e:'l',s:[-.15,-.1,.98],o:[.85,-.2,-.2],yaw:-.45,pitch:.4,roll:.14,drop:.22,fwd:.18,side:-.06},
     {t:.70,e:'o',s:[-.68,-.45,.5],o:[.85,-.28,-.3],yaw:-.85,pitch:.46,roll:.18,drop:.24,fwd:.16,side:-.1},
     {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:-.1,pitch:.26,roll:0,drop:.14,fwd:.04,side:0}]},
-  {name:'Golpe final: garra direita em diagonal, de baixo para cima',right:true,dur:1.25,tw:.52,tf:.66,hit:.6,chain:1,kw:.42,ki:.6,kf:.76,dmg:3,range:2.9,arc:3.6,knock:13,lunge:[.95,.44,.68],finisher:true,
-   steps:[{f:'s',t0:.44,t1:.64,to:[.42,.40],lift:.18},{f:'o',t0:.62,t1:.82,to:[.38,-.24],lift:.08}],
-   keys:[
-    {t:.42,e:'io',s:[-.55,-.6,.35],o:[.6,0,.6],yaw:-.95,pitch:.55,roll:.26,drop:.34,fwd:-.04,side:-.12},
-    {t:.51,e:'i',s:[-.1,-.4,.92],o:[.7,-.15,.3],yaw:-.45,pitch:.45,roll:.15,drop:.3,fwd:.08,side:-.04},
-    {t:.6,e:'l',s:[.8,.3,.55],o:[.62,-.4,-.4],yaw:.6,pitch:.15,roll:-.25,drop:.1,fwd:.26,side:.08},
-    {t:.76,e:'o',s:[1.0,.68,-.2],o:[.5,-.5,-.3],yaw:1.0,pitch:-.06,roll:-.3,drop:.06,fwd:.2,side:.1},
-    {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:.1,pitch:.24,roll:0,drop:.12,fwd:.02,side:0}]}
+  /* golpe final com animação do Mixamo (salto girando no ar); c0 e c1 recortam a animação em segundos */
+  {name:'Golpe final: salto girando no ar',right:true,clip:'finisher',c0:.3,c1:2.2,speed:1.1,hit:.6,chain:1,kw:.47,ki:.6,kf:.71,dmg:3,range:2.9,arc:3.6,knock:13,finisher:true,keys:[],steps:[]}
 ];
 /* tempo real -> tempo da tabela: a preparação ocupa até tw do golpe, o golpe e a continuação vão até tf */
 function progA(A,t){
@@ -309,7 +303,10 @@ function evalPose(A,start,p,out){
   for(let n=0;n<POSE_N;n++)out[n]=crs(p0[n],p1[n],p2[n],p3[n],u);
   return out;
 }
-ATT.forEach(function(A){A.abs=A.keys.map(function(k){return toAbs(k,A.right);});});
+ATT.forEach(function(A){
+  A.abs=A.keys.map(function(k){return toAbs(k,A.right);});
+  if(A.clip){A.dur=(A.c1-A.c0)/A.speed;A.tw=A.kw;A.tf=A.kf;}
+});
 const comboEl=document.getElementById('combo');
 function nearestEnemy(maxD){
   let best=null,bd=maxD;
@@ -320,6 +317,7 @@ function startAttack(i){
   const A=ATT[i];
   combo.start=(combo.w>.05&&combo.pose)?combo.pose.slice():GUARD_ABS.slice();
   if(!combo.active&&combo.w<.05)plantFeet();
+  combo.prevA=combo.active?combo.cur:null;combo.rmPrev=null;
   combo.active=true;combo.i=i;combo.t=0;combo.queued=false;combo.hitDone=false;combo.cur=A;combo.stepFrom={};
   const best=nearestEnemy(7);
   if(best)st.rotT=Math.atan2(best[0],best[1]);
@@ -337,7 +335,7 @@ function attack(){
   const next=(combo.grace>0&&combo.i<ATT.length-1)?combo.i+1:0;
   startAttack(next);
 }
-function lungeAt(A,p){return A.lunge[0]*sm((p-A.lunge[1])/(A.lunge[2]-A.lunge[1]));}
+function lungeAt(A,p){if(!A.lunge)return 0;return A.lunge[0]*sm((p-A.lunge[1])/(A.lunge[2]-A.lunge[1]));}
 function updateComboState(dt){
   combo.cool-=dt;combo.grace-=dt;
   if(!combo.active){combo.w+=(0-combo.w)*Math.min(1,dt*4.5);if(combo.w<.002)combo.w=0;if(combo.grace<=0&&combo.cool<=0&&comboEl.textContent)comboEl.textContent='';return;}
@@ -357,7 +355,7 @@ function updateComboState(dt){
   if(!combo.hitDone&&p>=A.hit){combo.hitDone=true;hitEnemies(A);}
   if(combo.queued&&p>=A.chain&&combo.i<ATT.length-1){startAttack(combo.i+1);return;}
   if(combo.t>=A.dur&&!combo.paused){
-    combo.active=false;combo.pose=evalPose(A,combo.start,1,combo.pose||[]);
+    combo.active=false;if(!A.clip)combo.pose=evalPose(A,combo.start,1,combo.pose||[]);
     if(combo.i>=ATT.length-1){combo.cool=.45;combo.grace=0;combo.i=-1;}
     else combo.grace=.35;
   }
@@ -490,27 +488,31 @@ function loadGLB(file){
   fr.onload=function(){parseGLB(fr.result,file.name);};
   fr.readAsArrayBuffer(file);
 }
-/* carrega o modelo que acompanha o jogo; no link de teste ele vem em base64, porque lá arquivos .glb não são servidos */
-(function(){
-  const srcs=[{url:'aethelred_rig_leve.glb',type:'arraybuffer'},{url:'aethelred_rig_leve.glb.b64.txt',type:'text'}];
+/* lê um arquivo binário; no link de teste os .glb não são servidos, então lá eles vêm como .b64.txt */
+function loadBinary(url,onBuf,onFail,onProg){
+  const srcs=[{url:url,type:'arraybuffer'},{url:url+'.b64.txt',type:'text'}];
   function tryLoad(i){
-    if(i>=srcs.length){say('Não encontrei o modelo da personagem. Arraste um arquivo .glb para a tela ou toque em “Carregar modelo GLB”.');return;}
+    if(i>=srcs.length){onFail();return;}
     const s=srcs[i],xhr=new XMLHttpRequest();
     xhr.open('GET',s.url);xhr.responseType=s.type;
-    xhr.onprogress=function(e){if(e.lengthComputable)say('Carregando o modelo da personagem... '+Math.round(e.loaded/e.total*100)+'%');};
+    if(onProg)xhr.onprogress=function(e){if(e.lengthComputable)onProg(e.loaded/e.total);};
     xhr.onload=function(){
       if(!(xhr.status>=200&&xhr.status<300||(xhr.status===0&&xhr.response))){tryLoad(i+1);return;}
       if(s.type==='text'){
         const bin=atob(xhr.response.replace(/\s+/g,'')),buf=new Uint8Array(bin.length);
         for(let k=0;k<bin.length;k++)buf[k]=bin.charCodeAt(k);
-        parseGLB(buf.buffer,'aethelred_rig_leve.glb');
-      }else parseGLB(xhr.response,s.url);
+        onBuf(buf.buffer);
+      }else onBuf(xhr.response);
     };
     xhr.onerror=function(){tryLoad(i+1);};
     xhr.send();
   }
   tryLoad(0);
-})();
+}
+/* carrega o modelo que acompanha o jogo */
+loadBinary('aethelred_rig_leve.glb',function(buf){parseGLB(buf,'aethelred_rig_leve.glb');},
+  function(){say('Não encontrei o modelo da personagem. Arraste um arquivo .glb para a tela ou toque em “Carregar modelo GLB”.');},
+  function(f){say('Carregando o modelo da personagem... '+Math.round(f*100)+'%');});
 function useModel(gltf,name){
   if(custom)hero.remove(custom);
   custom=new THREE.Group();
@@ -537,6 +539,72 @@ function useModel(gltf,name){
   }else say(name+' carregado. O arquivo não tem animações, então o corpo só balança ao andar.');
 }
 function findAct(re){for(const k in acts){if(re.test(k))return acts[k];}return null;}
+
+/* animações do Mixamo (pasta animacoes/), transferidas para o esqueleto da personagem por retarget:
+   cada osso copia a rotação do osso de mesmo nome no esqueleto do Mixamo, no espaço do personagem,
+   descontando a diferença entre as poses de repouso dos dois esqueletos */
+const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'}};
+const clipSrc={};
+function loadClips(){
+  Object.keys(CLIPS).forEach(function(name){
+    loadBinary(CLIPS[name].file,function(buf){
+      new THREE.GLTFLoader().parse(buf,'',function(g){buildRetarget(name,g);},function(){});
+    },function(){});
+  });
+}
+const _hq=new THREE.Quaternion(),_hqi=new THREE.Quaternion();
+function heroSpace(b,out){b.getWorldQuaternion(out);return out.premultiply(_hqi);}
+function buildRetarget(name,g){
+  if(!rig||!g.animations.length)return;
+  const src=g.scene;src.visible=false;hero.add(src);
+  hero.updateMatrixWorld(true);
+  hero.getWorldQuaternion(_hq);_hqi.copy(_hq).invert();
+  const S={};src.traverse(function(o){if(/^mixamorig/.test(o.name))S[o.name.replace(/^mixamorig[:_]?/,'')]=o;});
+  const B=rig.B,R={src:src,S:S,list:[],off:{},mixer:new THREE.AnimationMixer(src),clip:g.animations[0]};
+  R.action=R.mixer.clipAction(R.clip);R.action.play();R.action.paused=true;
+  /* ossos na ordem pai antes de filho; dedos ficam de fora para as garras continuarem sob controle do jogo */
+  const order=[];rig.m.traverse(function(o){if(o.isBone)order.push(o.name.replace(/^mixamorig[:_]?/,''));});
+  const posS=function(n){return hero.worldToLocal(S[n].getWorldPosition(new THREE.Vector3()));};
+  order.forEach(function(n){
+    if(!S[n]||!B[n]||/Hand(Thumb|Index|Middle|Ring|Pinky)/.test(n))return;
+    const qs=heroSpace(S[n],new THREE.Quaternion()),qd=rig.restQ[n].clone();
+    /* alinha a direção do osso em repouso (pose T do Mixamo x pose da personagem) */
+    let C=new THREE.Quaternion();
+    const kid=B[n].children.find(function(c){const k=c.name.replace(/^mixamorig[:_]?/,'');return c.isBone&&S[k]&&rig.restP[k];});
+    if(kid){
+      const k=kid.name.replace(/^mixamorig[:_]?/,'');
+      const ds=posS(k).sub(posS(n)).normalize();
+      const dd=rig.restP[k].clone().sub(rig.restP[n]).normalize();
+      C.setFromUnitVectors(dd,ds);
+    }else if(R.off[order[order.indexOf(n)-1]])C=R.lastC||C;
+    R.lastC=C;
+    R.off[n]=qs.clone().invert().multiply(C).multiply(qd);
+    R.list.push(n);
+  });
+  R.hips0=posS('Hips');
+  R.scale=rig.restP.Hips.y/Math.max(.01,R.hips0.y);
+  clipSrc[name]=R;
+}
+/* aplica o quadro t (segundos) da animação "name" com peso w */
+const _rq=new THREE.Quaternion(),_rq2=new THREE.Quaternion();
+function applyClip(name,t,w){
+  const R=clipSrc[name];if(!R||w<=0)return null;
+  R.action.time=Math.max(0,Math.min(t,R.clip.duration));R.mixer.update(0);
+  hero.updateMatrixWorld(true);hero.getWorldQuaternion(_hq);_hqi.copy(_hq).invert();
+  R.src.updateMatrixWorld(true);
+  const B=rig.B;
+  R.list.forEach(function(n){
+    heroSpace(R.S[n],_rq).multiply(R.off[n]).premultiply(_hq);
+    B[n].getWorldQuaternion(_rq2);
+    setWorldQuat(B[n],_rq2.slerp(_rq,w));
+  });
+  /* altura do quadril (salto, agachamento); o deslocamento horizontal vira movimento do corpo inteiro */
+  const hp=hero.worldToLocal(R.S.Hips.getWorldPosition(new THREE.Vector3()));
+  const dy=(hp.y-R.hips0.y)*R.scale;
+  if(!B.Hips._p){B.Hips._p=B.Hips.position.clone();touchedP.push(B.Hips);}
+  B.Hips.getWorldPosition(_v);_v.y+=dy*w;B.Hips.position.copy(B.Hips.parent.worldToLocal(_v));B.Hips.updateMatrixWorld(true);
+  return {x:(hp.x-R.hips0.x)*R.scale,z:(hp.z-R.hips0.z)*R.scale};
+}
 
 /* esqueleto: ataques de corpo inteiro com IK de braços e pernas */
 let rig=null;
@@ -578,7 +646,11 @@ function buildRig(m){
     r[s]=A;
   });
   r.hinge={};
+  hero.updateMatrixWorld(true);hero.getWorldQuaternion(_hq);_hqi.copy(_hq).invert();
+  r.restQ={};r.restP={};
+  Object.keys(B).forEach(function(n){r.restQ[n]=heroSpace(B[n],new THREE.Quaternion());r.restP[n]=hero.worldToLocal(wp(B[n]));});
   rig=r;
+  loadClips();
 }
 function twistB(b,ax,ang){if(!b||!ax)return;if(!b._o){b._o=b.quaternion.clone();touched.push(b);}_q.setFromAxisAngle(ax,ang);b.quaternion.multiply(_q);}
 function restoreRig(){
@@ -686,13 +758,46 @@ let clawBase=null,clawTip=null;
 function poseFull(){
   clawBase=null;
   if(!rig||combo.w<=0||!combo.cur)return;
-  const w=combo.w,A=combo.cur,B=rig.B;
+  const w=combo.w,A=combo.cur;
   const p=combo.active?progA(A,combo.t):1;
-  if(combo.active){evalPose(A,combo.start,p,pose);combo.pose=pose.slice();phaseWeights(A,p);}
-  else{for(let n=0;n<POSE_N;n++)pose[n]=combo.pose[n];curW.wind=curW.strike=0;}
   curW.sw=w;
   rig.m.updateMatrixWorld(true);
   updateFrame();
+  if(A.clip){poseClip(A,p,w);return;}
+  if(combo.active){evalPose(A,combo.start,p,pose);combo.pose=pose.slice();phaseWeights(A,p);}
+  else{for(let n=0;n<POSE_N;n++)pose[n]=combo.pose[n];curW.wind=curW.strike=0;}
+  applyProc(A,p,w);
+}
+/* golpe feito com animação do Mixamo: entra misturando com a pose do golpe anterior, avança o corpo
+   com o deslocamento do quadril da animação e estica os braços para as garras alcançarem mais longe */
+function poseClip(A,p,w){
+  const B=rig.B,prev=combo.prevA;
+  let bl=1;
+  if(combo.active&&prev&&!prev.clip&&combo.pose){
+    bl=sm(combo.t/.22);
+    if(bl<1){for(let n=0;n<POSE_N;n++)pose[n]=combo.pose[n];applyProc(prev,1,w);rig.m.updateMatrixWorld(true);}
+  }
+  if(combo.active)phaseWeights(A,p);else curW.wind=curW.strike=0;
+  const rm=applyClip(A.clip,A.c0+p*(A.c1-A.c0),bl<1?bl:w);
+  if(!rm)return;
+  if(combo.active){
+    if(combo.rmPrev){
+      const dx=rm.x-combo.rmPrev.x,dz=rm.z-combo.rmPrev.z,c=Math.cos(st.rot),sn=Math.sin(st.rot);
+      st.x+=dx*c+dz*sn;st.z+=-dx*sn+dz*c;
+    }
+    combo.rmPrev=rm;
+  }
+  ['Right','Left'].forEach(function(s){
+    const isS=(s==='Right')===A.right,ext=(isS?.45+.55*curW.strike:.35)*w*bl;
+    if(ext<.01)return;
+    const sh=wp(B[s+'Arm']),hd=wp(B[s+'Hand']),el=wp(B[s+'ForeArm']);
+    _tg.copy(sh).addScaledVector(hd.clone().sub(sh).normalize(),rig.armLen*.97);
+    ikHinge(B[s+'Arm'],B[s+'ForeArm'],B[s+'Hand'],_tg,el.sub(sh),ext,s+'Arm');
+    if(isS&&combo.active){const dir=wp(B[s+'Hand']).sub(wp(B[s+'ForeArm'])).normalize();clawBase=wp(B[s+'Hand']);clawTip=wp(B[s+'HandMiddle3']||B[s+'Hand']).addScaledVector(dir,.16);}
+  });
+}
+function applyProc(A,p,w){
+  const B=rig.B;
   B.LeftFoot.getWorldQuaternion(_fq.L);B.RightFoot.getWorldQuaternion(_fq.R);
   const yaw=pose[6],pitch=pose[7],roll=pose[8],L=rig.legLen;
   /* quadril: abaixa, avança e desloca o peso */
@@ -837,6 +942,7 @@ function updateModel(dt){
     if(tpose&&rig){mixer.update(0);hero.updateMatrixWorld(true);poseT();return;}
     mixer.update(dt);
     hero.updateMatrixWorld(true);
+    if(window.CLIP_PREVIEW&&clipSrc[CLIP_PREVIEW.name]){applyClip(CLIP_PREVIEW.name,CLIP_PREVIEW.t,1);poseHands();return;}
     poseFull();
     poseHands();
   }else{
@@ -867,7 +973,7 @@ function frame(){
   if(tpose){ix=0;iz=0;}
   if(combo.active){
     /* andar cancela o fim do golpe, para o controle não ficar preso */
-    if(Math.hypot(ix,iz)>.3&&combo.t/combo.cur.dur>.8&&!combo.queued){combo.active=false;combo.pose=pose.slice();combo.grace=.35;}
+    if(Math.hypot(ix,iz)>.3&&combo.t/combo.cur.dur>.8&&!combo.queued&&!combo.cur.clip){combo.active=false;combo.pose=pose.slice();combo.grace=.35;}
     else{ix=0;iz=0;}
   }
   if(keys.ArrowLeft)st.yaw+=raw*1.8;if(keys.ArrowRight)st.yaw-=raw*1.8;
@@ -933,7 +1039,7 @@ function frame(){
 }
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={st:st,combo:combo,ATT:ATT,startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
+window.AETH={get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,ATT:ATT,startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
 frame();
 })();
 </script>

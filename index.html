@@ -242,40 +242,45 @@ function resolve(){
    Tronco: yaw gira para o lado da mão que ataca, pitch inclina para frente, roll tomba para o lado da mão que ataca.
    Quadril: drop abaixa, fwd avança, side desloca para o lado da mão que ataca (frações do comprimento da perna).
    Golpes com right:false são espelhados para a mão esquerda. */
-const GUARD={s:[.55,-.5,.45],o:[.55,-.5,.45],yaw:0,pitch:.24,roll:0,drop:.12,fwd:.02,side:0};
+/* postura de guarda (referências: Prototype 2 e Wolverine): curvado, braços abertos à frente e abaixo, garras para fora */
+const GUARD={s:[.78,-.55,.35],o:[.78,-.55,.35],yaw:0,pitch:.34,roll:0,drop:.17,fwd:.03,side:0};
+/* Golpes 1 a 4 baseados nas referências: preparação curta enrolando o tronco, golpe de um quadro com o braço todo
+   esticado, arcos em diagonal, o tronco gira até ~80° e dobra para frente; o fim de um golpe já prepara o próximo.
+   kw/ki/kf: fim da preparação, impacto e fim da continuação (tempo da tabela); tw/tf: as mesmas marcas em tempo real. */
 const ATT=[
-  {name:'Garra direita, da direita para a esquerda',right:true,dur:.95,tw:.5,tf:.64,hit:.53,chain:.70,kw:.36,ki:.55,kf:.70,dmg:1,range:2.3,arc:2.4,knock:6,lunge:[.55,.38,.62],
-   steps:[{f:'o',t0:.36,t1:.56,to:[.32,.38],lift:.12},{f:'s',t0:.52,t1:.72,to:[.30,-.22],lift:.06}],
+  {name:'Garra direita em diagonal, de cima para baixo',right:true,dur:.7,tw:.38,tf:.55,hit:.5,chain:.62,kw:.38,ki:.52,kf:.62,dmg:1,range:2.3,arc:2.4,knock:6,lunge:[.45,.36,.6],
+   steps:[{f:'o',t0:.34,t1:.54,to:[.34,.36],lift:.12},{f:'s',t0:.5,t1:.7,to:[.32,-.24],lift:.06}],
    keys:[
-    {t:.36,e:'io',s:[.85,.1,-.45],o:[.55,-.3,.6],yaw:.8,pitch:.12,roll:-.12,drop:.14,fwd:-.06,side:.1},
-    {t:.46,e:'i',s:[.62,.02,.75],o:[.65,-.3,.3],yaw:.3,pitch:.28,roll:0,drop:.18,fwd:.08,side:.04},
-    {t:.56,e:'l',s:[-.15,-.05,.98],o:[.85,-.2,-.2],yaw:-.45,pitch:.38,roll:.12,drop:.22,fwd:.18,side:-.06},
-    {t:.70,e:'o',s:[-.7,-.28,.5],o:[.85,-.28,-.3],yaw:-.85,pitch:.42,roll:.16,drop:.22,fwd:.16,side:-.1},
-    {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:-.1,pitch:.26,roll:0,drop:.14,fwd:.04,side:0}]},
-  {name:'Garra esquerda, de baixo para cima',right:false,dur:.98,tw:.5,tf:.64,hit:.56,chain:.72,kw:.38,ki:.57,kf:.72,dmg:1,range:2.2,arc:2.0,knock:7,lunge:[.5,.42,.64],
-   steps:[{f:'s',t0:.40,t1:.60,to:[.28,.40],lift:.14},{f:'o',t0:.56,t1:.74,to:[.30,-.18],lift:.06}],
+    {t:.38,e:'io',s:[.55,.98,-.35],o:[.7,-.15,.55],yaw:1.15,pitch:-.08,roll:-.18,drop:.1,fwd:-.06,side:.08},
+    {t:.45,e:'i',s:[.45,.55,.75],o:[.8,-.2,.25],yaw:.55,pitch:.25,roll:-.05,drop:.16,fwd:.04,side:.03},
+    {t:.52,e:'l',s:[-.1,-.25,1.0],o:[.9,-.25,-.25],yaw:-.55,pitch:.68,roll:.14,drop:.27,fwd:.18,side:-.05},
+    {t:.62,e:'o',s:[-.62,-.8,.42],o:[.88,-.3,-.38],yaw:-1.0,pitch:.86,roll:.2,drop:.3,fwd:.16,side:-.08},
+    {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:-.15,pitch:.4,roll:.04,drop:.2,fwd:.05,side:0}]},
+  /* rodopio: spin gira o corpo inteiro (radianos, de t0 a t1) acompanhando a varrida; acerta tudo em volta */
+  {name:'Garra esquerda, rodopio de 360° com o braço esticado',right:false,dur:.9,tw:.36,tf:.66,hit:.6,chain:.64,kw:.38,ki:.58,kf:.64,dmg:1,range:2.5,arc:6.3,knock:7,lunge:[.35,.38,.62],spin:[Math.PI*2,.4,.62],
+   steps:[{f:'s',t0:.6,t1:.72,to:[.36,.3],lift:.1},{f:'o',t0:.64,t1:.8,to:[.32,-.24],lift:.06}],
    keys:[
-    {t:.38,e:'io',s:[.55,-.95,-.15],o:[.7,.1,.35],yaw:.4,pitch:.6,roll:.28,drop:.32,fwd:-.02,side:.12},
-    {t:.47,e:'i',s:[.4,-.65,.65],o:[.75,-.05,.1],yaw:.18,pitch:.48,roll:.18,drop:.28,fwd:.08,side:.06},
-    {t:.57,e:'l',s:[.15,.15,1.0],o:[.82,-.35,-.2],yaw:-.2,pitch:.08,roll:-.12,drop:.08,fwd:.2,side:-.02},
-    {t:.72,e:'o',s:[.05,.92,.4],o:[.85,-.42,-.3],yaw:-.32,pitch:-.2,roll:-.2,drop:.03,fwd:.12,side:-.06},
-    {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:0,pitch:.24,roll:0,drop:.12,fwd:.02,side:0}]},
-  {name:'Garra direita, de cima para baixo',right:true,dur:1.02,tw:.52,tf:.66,hit:.58,chain:.73,kw:.40,ki:.58,kf:.73,dmg:1,range:2.3,arc:1.8,knock:6,lunge:[.6,.44,.64],
-   steps:[{f:'o',t0:.44,t1:.62,to:[.30,.46],lift:.16},{f:'s',t0:.6,t1:.78,to:[.30,-.24],lift:.06}],
+    {t:.38,e:'io',s:[.95,.12,-.5],o:[.6,-.3,.6],yaw:1.35,pitch:.3,roll:-.2,drop:.26,fwd:-.04,side:.12},
+    {t:.45,e:'i',s:[.98,.05,.2],o:[.85,-.25,-.1],yaw:.5,pitch:.34,roll:-.1,drop:.24,fwd:.04,side:.04},
+    {t:.58,e:'l',s:[.9,0,.4],o:[.9,-.25,-.25],yaw:.15,pitch:.36,roll:-.05,drop:.24,fwd:.12,side:0},
+    {t:.64,e:'o',s:[-.6,-.15,.55],o:[.9,-.3,-.4],yaw:-1.0,pitch:.42,roll:.12,drop:.24,fwd:.14,side:-.1},
+    {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:-.1,pitch:.36,roll:0,drop:.18,fwd:.04,side:0}]},
+  {name:'Garra direita, gancho de baixo para cima',right:true,dur:.72,tw:.4,tf:.56,hit:.51,chain:.63,kw:.4,ki:.53,kf:.63,dmg:1,range:2.2,arc:2.0,knock:7,lunge:[.4,.38,.62],
+   steps:[{f:'s',t0:.36,t1:.56,to:[.3,.38],lift:.14},{f:'o',t0:.52,t1:.72,to:[.32,-.2],lift:.06}],
    keys:[
-    {t:.40,e:'io',s:[.42,1.0,-.22],o:[.7,-.15,.45],yaw:.45,pitch:-.28,roll:-.16,drop:.0,fwd:-.08,side:.06},
-    {t:.49,e:'i',s:[.35,.78,.7],o:[.78,-.1,.1],yaw:.25,pitch:.05,roll:-.05,drop:.08,fwd:.04,side:.03},
-    {t:.58,e:'l',s:[.15,-.08,1.0],o:[.85,0,-.3],yaw:-.1,pitch:.55,roll:.1,drop:.28,fwd:.22,side:0},
-    {t:.73,e:'o',s:[-.05,-.85,.5],o:[.85,-.1,-.35],yaw:-.25,pitch:.78,roll:.12,drop:.34,fwd:.2,side:-.02},
-    {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:0,pitch:.28,roll:0,drop:.16,fwd:.04,side:0}]},
-  {name:'Garra esquerda, da esquerda para a direita',right:false,dur:.95,tw:.5,tf:.64,hit:.53,chain:.70,kw:.36,ki:.55,kf:.70,dmg:1,range:2.3,arc:2.4,knock:6,lunge:[.55,.38,.62],
-   steps:[{f:'o',t0:.36,t1:.56,to:[.32,.38],lift:.12},{f:'s',t0:.52,t1:.72,to:[.30,-.22],lift:.06}],
+    {t:.4,e:'io',s:[.5,-.98,-.32],o:[.75,0,.45],yaw:.75,pitch:.82,roll:.3,drop:.36,fwd:-.02,side:.12},
+    {t:.47,e:'i',s:[.35,-.6,.7],o:[.8,-.1,.15],yaw:.35,pitch:.6,roll:.18,drop:.3,fwd:.08,side:.06},
+    {t:.53,e:'l',s:[.12,.35,.98],o:[.88,-.35,-.25],yaw:-.2,pitch:.1,roll:-.12,drop:.08,fwd:.2,side:-.02},
+    {t:.63,e:'o',s:[-.05,1.0,.32],o:[.9,-.45,-.35],yaw:-.4,pitch:-.25,roll:-.22,drop:.02,fwd:.12,side:-.06},
+    {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:0,pitch:.34,roll:0,drop:.17,fwd:.03,side:0}]},
+  {name:'Garra esquerda por cima, avançando com o corpo inteiro',right:false,dur:.78,tw:.42,tf:.58,hit:.53,chain:.65,kw:.42,ki:.55,kf:.65,dmg:2,range:2.5,arc:1.8,knock:8,lunge:[.75,.4,.64],
+   steps:[{f:'s',t0:.4,t1:.6,to:[.32,.55],lift:.18},{f:'o',t0:.56,t1:.76,to:[.32,-.3],lift:.06}],
    keys:[
-    {t:.36,e:'io',s:[.85,.4,-.4],o:[.55,-.3,.6],yaw:.8,pitch:.1,roll:-.16,drop:.12,fwd:-.06,side:.1},
-    {t:.46,e:'i',s:[.62,.25,.75],o:[.65,-.3,.3],yaw:.3,pitch:.26,roll:-.04,drop:.16,fwd:.08,side:.04},
-    {t:.56,e:'l',s:[-.15,-.1,.98],o:[.85,-.2,-.2],yaw:-.45,pitch:.4,roll:.14,drop:.22,fwd:.18,side:-.06},
-    {t:.70,e:'o',s:[-.68,-.45,.5],o:[.85,-.28,-.3],yaw:-.85,pitch:.46,roll:.18,drop:.24,fwd:.16,side:-.1},
-    {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:-.1,pitch:.26,roll:0,drop:.14,fwd:.04,side:0}]},
+    {t:.42,e:'io',s:[.35,1.05,-.28],o:[.72,-.1,.5],yaw:.45,pitch:-.35,roll:-.18,drop:.0,fwd:-.1,side:.06},
+    {t:.49,e:'i',s:[.3,.75,.72],o:[.8,-.1,.15],yaw:.25,pitch:.1,roll:-.06,drop:.1,fwd:.06,side:.03},
+    {t:.55,e:'l',s:[.12,-.22,1.0],o:[.88,0,-.35],yaw:-.12,pitch:.9,roll:.1,drop:.34,fwd:.3,side:0},
+    {t:.65,e:'o',s:[-.02,-.92,.55],o:[.88,-.1,-.42],yaw:-.25,pitch:1.05,roll:.12,drop:.4,fwd:.28,side:-.02},
+    {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:0,pitch:.4,roll:0,drop:.2,fwd:.05,side:0}]},
   /* golpe final com animação do Mixamo (salto girando no ar); c0 e c1 recortam a animação em segundos */
   {name:'Golpe final: salto girando no ar',right:true,clip:'finisher',c0:.3,c1:2.2,speed:1.1,hit:.6,chain:1,kw:.47,ki:.6,kf:.71,dmg:3,range:2.9,arc:3.6,knock:13,finisher:true,keys:[],steps:[]}
 ];
@@ -286,7 +291,7 @@ function progA(A,t){
   if(r<A.tf)return A.kw+(r-A.tw)/(A.tf-A.tw)*(A.kf-A.kw);
   return A.kf+(r-A.tf)/(1-A.tf)*(1-A.kf);
 }
-const combo={active:false,i:-1,t:0,queued:false,grace:0,cool:0,w:0,hitDone:false,last:null,cur:null,start:null,pose:null,paused:false};
+const combo={hold:0,holdT:0,shown:null,active:false,i:-1,t:0,queued:false,grace:0,cool:0,w:0,hitDone:false,last:null,cur:null,start:null,pose:null,paused:false};
 const POSE_N=12;
 function toAbs(k,right){
   const s=k.s,o=k.o,R=right?s:o,L=right?o:s,g=right?1:-1;
@@ -315,7 +320,8 @@ function nearestEnemy(maxD){
 }
 function startAttack(i){
   const A=ATT[i];
-  combo.start=(combo.w>.05&&combo.pose)?combo.pose.slice():GUARD_ABS.slice();
+  combo.start=(combo.w>.05&&combo.shown)?combo.shown.slice():GUARD_ABS.slice();
+  combo.hold=0;
   if(!combo.active&&combo.w<.05)plantFeet();
   combo.prevA=combo.active?combo.cur:null;combo.rmPrev=null;
   combo.active=true;combo.i=i;combo.t=0;combo.queued=false;combo.hitDone=false;combo.cur=A;combo.stepFrom={};
@@ -335,9 +341,11 @@ function attack(){
   const next=(combo.grace>0&&combo.i<ATT.length-1)?combo.i+1:0;
   startAttack(next);
 }
+function spinAt(A,p){if(!A.spin)return 0;const u=Math.max(0,Math.min(1,(p-A.spin[1])/(A.spin[2]-A.spin[1])));return A.spin[0]*(u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2);}
 function lungeAt(A,p){if(!A.lunge)return 0;return A.lunge[0]*sm((p-A.lunge[1])/(A.lunge[2]-A.lunge[1]));}
 function updateComboState(dt){
   combo.cool-=dt;combo.grace-=dt;
+  if(!combo.active&&combo.hold>0){combo.hold-=dt;combo.holdT+=dt;combo.w+=(1-combo.w)*Math.min(1,dt*10);return;}
   if(!combo.active){combo.w+=(0-combo.w)*Math.min(1,dt*4.5);if(combo.w<.002)combo.w=0;if(combo.grace<=0&&combo.cool<=0&&comboEl.textContent)comboEl.textContent='';return;}
   combo.w+=(1-combo.w)*Math.min(1,dt*14);
   const A=combo.cur,p0=progA(A,combo.t);
@@ -352,12 +360,15 @@ function updateComboState(dt){
     enemies.forEach(function(e){if(e.dead)return;const dx=e.g.position.x-st.x,dz=e.g.position.z-st.z,d=Math.hypot(dx,dz);if(d<1.0&&(dx*fx+dz*fz)>0)block=true;});
     if(!block){st.x+=fx*dl;st.z+=fz*dl;}
   }
+  const dsp=(spinAt(A,p)-spinAt(A,p0))*(A.right?1:-1);
+  if(dsp){st.rot+=dsp;st.rotT+=dsp;pivotFeet(dsp);}
   if(!combo.hitDone&&p>=A.hit){combo.hitDone=true;hitEnemies(A);}
   if(combo.queued&&p>=A.chain&&combo.i<ATT.length-1){startAttack(combo.i+1);return;}
   if(combo.t>=A.dur&&!combo.paused){
     combo.active=false;if(!A.clip)combo.pose=evalPose(A,combo.start,1,combo.pose||[]);
     if(combo.i>=ATT.length-1){combo.cool=.45;combo.grace=0;combo.i=-1;}
     else combo.grace=.35;
+    if(!A.clip){combo.hold=3;combo.holdT=0;}
   }
 }
 
@@ -403,7 +414,7 @@ function hitEnemies(A){
     const k=d>0?1/d:0;e.vx=dx*k*A.knock;e.vz=dz*k*A.knock;
     if(e.hp<=0){e.dead=.001;kills++;}
   });
-  if(any){hitStop=A.finisher?.14:.075;shake=A.finisher?.32:.14;}
+  if(any){hitStop=A.finisher?.15:.09;shake=A.finisher?.34:.19;}
 }
 function updateCombat(dt){
   hurt-=dt;msgT-=dt;
@@ -765,7 +776,14 @@ function poseFull(){
   updateFrame();
   if(A.clip){poseClip(A,p,w);return;}
   if(combo.active){evalPose(A,combo.start,p,pose);combo.pose=pose.slice();phaseWeights(A,p);}
-  else{for(let n=0;n<POSE_N;n++)pose[n]=combo.pose[n];curW.wind=curW.strike=0;}
+  else{
+    /* depois do golpe, vai para a guarda e respira, até o tempo de guarda acabar */
+    const k=sm(combo.holdT/.3),br=Math.sin(st.t*2.2);
+    for(let n=0;n<POSE_N;n++)pose[n]=combo.pose[n]+(GUARD_ABS[n]-combo.pose[n])*k;
+    pose[7]+=br*.025*k;pose[9]+=br*.012*k;
+    curW.wind=curW.strike=0;
+  }
+  combo.shown=pose.slice();
   applyProc(A,p,w);
 }
 /* golpe feito com animação do Mixamo: entra misturando com a pose do golpe anterior, avança o corpo
@@ -971,9 +989,10 @@ function frame(){
   let ix=(keys.KeyD?1:0)-(keys.KeyA?1:0)+joy.x;
   let iz=(keys.KeyW?1:0)-(keys.KeyS?1:0)-joy.y;
   if(tpose){ix=0;iz=0;}
+  if(!combo.active&&combo.hold>0&&(Math.hypot(ix,iz)>.3||keys.Space))combo.hold=0;
   if(combo.active){
     /* andar cancela o fim do golpe, para o controle não ficar preso */
-    if(Math.hypot(ix,iz)>.3&&combo.t/combo.cur.dur>.8&&!combo.queued&&!combo.cur.clip){combo.active=false;combo.pose=pose.slice();combo.grace=.35;}
+    if(Math.hypot(ix,iz)>.3&&combo.t/combo.cur.dur>.8&&!combo.queued&&!combo.cur.clip){combo.active=false;combo.pose=pose.slice();combo.grace=.35;combo.hold=0;}
     else{ix=0;iz=0;}
   }
   if(keys.ArrowLeft)st.yaw+=raw*1.8;if(keys.ArrowRight)st.yaw-=raw*1.8;

@@ -710,12 +710,13 @@ function poseFull(){
   });
 }
 /* mãos: abertas e relaxadas o tempo todo, dedos se movendo devagar; no golpe fecham em garra */
+const SPREAD={Thumb:.18,Index:.04,Middle:0,Ring:-.1,Pinky:-.2};
 function poseHands(){
   if(!rig)return;
   const t=st.t,hit=combo.active,S=combo.cur&&combo.cur.right?'Right':'Left',wd=curW.wind,sk=curW.strike,sw=curW.sw;
   ['Left','Right'].forEach(function(s){
     const A=rig[s],isS=hit&&s===S,off=(s==='Left')?0:1.7,calm=1-(isS?sk:0);
-    const openAmt=Math.min(1.5,1.2+sw*.2+(isS?wd*.3:0))*calm;
+    const openAmt=Math.min(1,.7+sw*.15+(isS?wd*.2:0))*calm;
     const c=(isS?sk*.9:0)-openAmt;
     A.fingers.forEach(function(fg,fi){
       const th=fg.f==='Thumb'?.5:1;
@@ -724,7 +725,9 @@ function poseHands(){
         const wave=Math.sin(t*1.1+fi*.9+i*.55+off)*[.12,.3,.22][i]*calm*th;
         twistB(fg.b[i],fg.ax[i],c*kk*th+wave);
       }
-      twistB(fg.b[0],fg.sax,fg.spl*(.35*openAmt+Math.sin(t*.8+fi*.7+off)*.12*calm)*th);
+      /* abertura lateral: polegar abre, anelar e mínimo vêm para junto do médio */
+      const spread=SPREAD[fg.f]+(fg.f==='Ring'||fg.f==='Pinky'?-.06*sk:0);
+      twistB(fg.b[0],fg.sax,fg.spl*(spread*(fg.f==='Thumb'?openAmt:1)+Math.sin(t*.8+fi*.7+off)*.04*calm));
     });
   });
 }

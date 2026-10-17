@@ -1,0 +1,15 @@
+AETHELRED — PROTÓTIPO 3D
+
+Este pacote contém o protótipo Three.js e o modelo rigado otimizado.
+
+Como executar no computador:
+1. Extraia todos os arquivos para uma pasta.
+2. Abra um terminal dentro dessa pasta.
+3. Execute: python -m http.server 8000
+4. Abra http://localhost:8000 no navegador.
+
+No celular, o jogo precisa estar hospedado em um servidor HTTPS. Os controles virtuais foram adicionados nesta versão: direcional à esquerda, botão de corrida e botão de salto. Arraste o cenário para girar a câmera.
+
+O modelo foi otimizado de cerca de 116,5 MB para cerca de 78,9 MB, reduzindo as texturas para 2048x2048 e recomprimindo-as. O esqueleto e os seis clipes de animação foram preservados no arquivo GLB.
+
+Observação: o projeto ainda precisa de teste visual em navegador real. Three.js é carregado de um CDN e exige internet.

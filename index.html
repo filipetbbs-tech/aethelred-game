@@ -1,0 +1,66 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aethelred 3D</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#171b20;color:#eee;font-family:system-ui;touch-action:none}#hud{position:fixed;top:16px;left:16px;background:#111c;padding:14px 16px;border:1px solid #766b57;border-radius:9px;max-width:300px;z-index:2}h1{font-size:15px;letter-spacing:.16em;margin:0 0 6px}p{font-size:12px;line-height:1.5;color:#d0cbc1;margin:4px 0}#status{font-size:12px;color:#d8ad7b;margin-top:8px}#help{position:fixed;bottom:15px;left:50%;transform:translateX(-50%);background:#111d;border:1px solid #766b57;border-radius:8px;padding:10px 14px;font-size:12px;white-space:nowrap;z-index:2}#intro{position:fixed;inset:0;background:#0b0e12dd;display:grid;place-items:center;z-index:4}#intro div{background:#1c2228;padding:26px;border:1px solid #766b57;border-radius:14px;max-width:420px;margin:20px}button{background:#873b35;color:white;border:0;border-radius:7px;padding:11px 18px;font-weight:bold;cursor:pointer}#mobile{display:none;position:fixed;inset:0;pointer-events:none;z-index:3}#pad{position:absolute;left:20px;bottom:24px;width:150px;height:150px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:5px;pointer-events:auto}#pad button,#actions button{background:#16191dbb;border:1px solid #b7a68b;border-radius:14px;color:#fff;font-size:20px;padding:0;touch-action:none;user-select:none}#pad .up{grid-column:2;grid-row:1}#pad .left{grid-column:1;grid-row:2}#pad .down{grid-column:2;grid-row:2}#pad .right{grid-column:3;grid-row:2}#actions{position:absolute;right:20px;bottom:32px;display:flex;flex-direction:column;gap:12px;pointer-events:auto}#actions button{width:76px;height:60px;font-size:12px;font-weight:800}#actions .active{background:#873b35}#help{max-width:calc(100vw - 30px);white-space:normal;text-align:center} @media (pointer:coarse){#mobile{display:block}#help{bottom:190px;font-size:10px;opacity:.85}#hud{top:8px;left:8px;padding:9px 11px;max-width:190px}#hud p{font-size:10px}h1{font-size:13px}}
+</style></head><body>
+<div id="hud"><h1>AETHELRED</h1><p>Protótipo 3D · fantasia medieval biológica</p><p>Movimento em terceira pessoa com animação procedural de caminhada e corrida.</p><div id="status">Estado: parado</div></div>
+<div id="help">WASD / setas: mover · Shift: correr · Espaço: saltar · arraste: girar câmera</div>
+<div id="mobile"><div id="pad"><button class="up" data-key="w">▲</button><button class="left" data-key="a">◀</button><button class="down" data-key="s">▼</button><button class="right" data-key="d">▶</button></div><div id="actions"><button id="runBtn">CORRER</button><button id="jumpBtn">PULAR</button></div></div>
+<div id="intro"><div><h2>AETHELRED — TESTE DE MOVIMENTO</h2><p>Um pequeno espaço de exploração para testar o modelo 3D rigado enviado, a câmera e as animações incluídas no arquivo.</p><button id="go">ENTRAR NO CENÁRIO</button></div></div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x929da4);scene.fog=new THREE.Fog(0x929da4,25,75);
+const camera=new THREE.PerspectiveCamera(52,innerWidth/innerHeight,.1,150);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;document.body.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xcbdce6,0x29201a,2.0));const sun=new THREE.DirectionalLight(0xffdfb8,3.0);sun.position.set(-12,22,9);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-30;sun.shadow.camera.right=30;sun.shadow.camera.top=30;sun.shadow.camera.bottom=-30;scene.add(sun);
+const M=(c,r=.8,m=0)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m});
+const stone=M(0x56585a),stone2=M(0x77736d),dark=M(0x303338),floorM=M(0x414648),cloth=M(0x171a1e),leather=M(0x332923),leather2=M(0x594336),red=M(0x6b292b),red2=M(0x803733),metal=M(0x615d55,.4,.5),bone=M(0xd6c5a0,.4),skin=M(0x9b7059),skin2=M(0xb4866d),eye=M(0xc6b89c);
+function mesh(parent,g,mat,pos,rot=[0,0,0]){const o=new THREE.Mesh(g,mat);o.position.set(...pos);o.rotation.set(...rot);o.castShadow=true;o.receiveShadow=true;parent.add(o);return o}
+function box(p,mat,size,pos,rot=[0,0,0]){return mesh(p,new THREE.BoxGeometry(...size),mat,pos,rot)}
+function ball(p,mat,pos,sc,seg=18){const o=mesh(p,new THREE.SphereGeometry(1,seg,Math.floor(seg*.7)),mat,pos);o.scale.set(...sc);return o}
+function rod(p,mat,a,b,ra,rb,seg=12){const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),d=B.clone().sub(A);const o=mesh(p,new THREE.CylinderGeometry(rb,ra,d.length(),seg),mat,[...A.clone().add(B).multiplyScalar(.5).toArray()]);o.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());return o}
+const ground=mesh(scene,new THREE.PlaneGeometry(100,100),floorM,[0,-.05,0],[-Math.PI/2,0,0]);
+const grid=new THREE.GridHelper(80,48,0x81786a,0x5d5e5a);grid.position.y=-.02;grid.material.transparent=true;grid.material.opacity=.2;scene.add(grid);
+function wall(x,y,z,w,h,d,mat=dark){box(scene,mat,[w,h,d],[x,y,z])}
+wall(0,4,-17,38,8,1.4);wall(-19,4,0,1.4,8,36);wall(19,4,0,1.4,8,36);wall(0,4,18,38,8,1.4);
+for(let x=-17;x<=17;x+=3.1){box(scene,stone2,[1.2,1.15,.15],[x,7.7,-16.2]);box(scene,dark,[1.5,1.1,1.3],[x,8.4,-17])}
+for(let x of [-14,-7,0,7,14]){box(scene,stone,[1.35,8,1.5],[x,4,-16.1]);box(scene,stone2,[1.9,.8,1.9],[x,7.7,-16.1])}
+for(let i=0;i<32;i++){const x=(Math.random()-.5)*34,z=(Math.random()-.5)*31;if(Math.abs(x)<3&&z>2)continue;box(scene,i%2?stone:stone2,[.3+Math.random()*.5,.1+Math.random()*.24,.2+Math.random()*.45],[x,.05,z],[Math.random(),Math.random(),Math.random()])}
+function brazier(x,z){mesh(scene,new THREE.CylinderGeometry(.24,.4,.65,10),metal,[x,.65,z]);for(let j=0;j<3;j++)rod(scene,metal,[x+Math.cos(j*2.1)*.27,.45,z+Math.sin(j*2.1)*.27],[x,.8,z],.04,.03,7);const f=mesh(scene,new THREE.ConeGeometry(.22,.75,7),new THREE.MeshBasicMaterial({color:0xff8b38}),[x,1.35,z]);const l=new THREE.PointLight(0xff6a28,2.3,9);l.position.set(x,1.5,z);scene.add(l);return{f,l}}
+const fires=[brazier(-8,3),brazier(8,-5),brazier(13,8)];
+// Import the user's rigged GLB model and use it as the gameplay root.
+const root=new THREE.Group();scene.add(root);
+let character=null, mixer=null, actions={}, activeAction=null, modelReady=false;
+const loader=new GLTFLoader();
+loader.load('./rigged-model.glb',(gltf)=>{
+  character=gltf.scene;
+  character.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material)o.material.side=THREE.DoubleSide;}});
+  const b0=new THREE.Box3().setFromObject(character), size=b0.getSize(new THREE.Vector3());
+  const maxDim=Math.max(size.x,size.y,size.z);
+  if(maxDim>0) character.scale.setScalar(2.15/maxDim);
+  const b1=new THREE.Box3().setFromObject(character);
+  character.position.y-=b1.min.y;
+  root.add(character);
+  mixer=new THREE.AnimationMixer(character);
+  for(const clip of gltf.animations) actions[clip.name.toLowerCase()]=mixer.clipAction(clip);
+  const idle=actions['idle']||actions['walk']||Object.values(actions)[0];
+  if(idle){idle.play();activeAction=idle;}
+  modelReady=true;
+  document.getElementById('status').textContent='Estado: personagem 3D carregado';
+},undefined,(err)=>{
+  console.error(err);
+  document.getElementById('status').textContent='Erro ao carregar rigged-model.glb. Confira se o arquivo está na mesma pasta.';
+});
+function setAnimation(name,fade=.22){
+  if(!mixer||!actions[name])return;
+  const next=actions[name];if(activeAction===next)return;
+  next.reset().fadeIn(fade).play();if(activeAction)activeAction.fadeOut(fade);activeAction=next;
+}
+const keys={};addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.code==='Space')e.preventDefault()});addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+document.querySelectorAll('[data-key]').forEach(btn=>{const k=btn.dataset.key;const down=e=>{e.preventDefault();keys[k]=true;btn.setPointerCapture?.(e.pointerId)};const up=e=>{e.preventDefault();keys[k]=false};btn.addEventListener('pointerdown',down);btn.addEventListener('pointerup',up);btn.addEventListener('pointercancel',up);btn.addEventListener('lostpointercapture',up)});const runBtn=document.querySelector('#runBtn');runBtn.addEventListener('pointerdown',e=>{e.preventDefault();keys.shift=true;runBtn.classList.add('active')});const stopRun=()=>{keys.shift=false;runBtn.classList.remove('active')};runBtn.addEventListener('pointerup',stopRun);runBtn.addEventListener('pointercancel',stopRun);runBtn.addEventListener('lostpointercapture',stopRun);document.querySelector('#jumpBtn').addEventListener('pointerdown',e=>{e.preventDefault();keys.space=true});document.querySelector('#jumpBtn').addEventListener('pointerup',()=>keys.space=false);document.querySelector('#jumpBtn').addEventListener('pointercancel',()=>keys.space=false);
+let camYaw=0,camPitch=.18,drag=false,lx=0,ly=0;renderer.domElement.addEventListener('pointerdown',e=>{drag=true;lx=e.clientX;ly=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)});renderer.domElement.addEventListener('pointerup',()=>drag=false);renderer.domElement.addEventListener('pointermove',e=>{if(!drag)return;camYaw-=(e.clientX-lx)*.005;camPitch=Math.max(-.08,Math.min(.75,camPitch+(e.clientY-ly)*.003));lx=e.clientX;ly=e.clientY});
+document.querySelector('#go').onclick=()=>document.querySelector('#intro').style.display='none';
+const clock=new THREE.Clock(),status=document.querySelector('#status');let jumpV=0,grounded=true,t=0;
+function loop(){requestAnimationFrame(loop);let dt=Math.min(clock.getDelta(),.04);t+=dt;let f=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0),side=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),moving=!!(f||side),run=!!keys.shift&&moving,speed=run?6:3.1;let dir=new THREE.Vector3(side,0,f);if(dir.lengthSq())dir.normalize().applyAxisAngle(new THREE.Vector3(0,1,0),camYaw);root.position.addScaledVector(dir,speed*dt);root.position.x=THREE.MathUtils.clamp(root.position.x,-16.2,16.2);root.position.z=THREE.MathUtils.clamp(root.position.z,-14.5,15.5);if(moving){let target=Math.atan2(dir.x,dir.z),d=((target-root.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI;root.rotation.y+=d*Math.min(1,dt*10)}if((keys[' ']||keys.space)&&grounded){jumpV=6.3;grounded=false}if(!grounded){root.position.y+=jumpV*dt;jumpV-=16*dt;if(root.position.y<=0){root.position.y=0;jumpV=0;grounded=true}}if(mixer){mixer.update(dt);if(moving){setAnimation(run?'sprint':'walk');if(activeAction)activeAction.timeScale=run?1:0.78;}else{setAnimation('idle');if(activeAction)activeAction.timeScale=1;}if(!grounded&&actions['jump'])setAnimation('jump');}for(const fire of fires){fire.f.scale.y=.8+Math.sin(t*14+fire.f.position.x)*.2;fire.l.intensity=2.1+Math.sin(t*11+fire.l.position.z)*.45}let target=new THREE.Vector3(root.position.x,root.position.y+1.65,root.position.z),dist=7.5,cp=Math.cos(camPitch);let pos=new THREE.Vector3(target.x+Math.sin(camYaw)*dist*cp,target.y+2.4+Math.sin(camPitch)*dist,target.z+Math.cos(camYaw)*dist*cp);camera.position.lerp(pos,.12);camera.lookAt(target);status.textContent='Estado: '+(!moving?'parado':run?'correndo':'caminhando')+(grounded?'':' · no ar');renderer.render(scene,camera)}
+loop();addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+</script></body></html>

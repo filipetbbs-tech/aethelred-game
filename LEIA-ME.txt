@@ -1,15 +1,23 @@
 AETHELRED — PROTÓTIPO 3D
 
-Este pacote contém o protótipo Three.js e o modelo rigado otimizado.
+Conteúdo:
+- index.html: o jogo (Three.js r128 carregado de CDN, precisa de internet).
+- aethelred_rig_leve.glb: modelo rigado (esqueleto Mixamo + cauda, 6 clipes:
+  Idle, Walk, Sprint, Jump, Jump Start, Jump Land). Carrega sozinho ao abrir o jogo.
 
 Como executar no computador:
-1. Extraia todos os arquivos para uma pasta.
-2. Abra um terminal dentro dessa pasta.
-3. Execute: python -m http.server 8000
-4. Abra http://localhost:8000 no navegador.
+1. Abra um terminal na pasta do projeto.
+2. Execute: python -m http.server 8000
+3. Abra http://localhost:8000 no navegador.
 
-No celular, o jogo precisa estar hospedado em um servidor HTTPS. Os controles virtuais foram adicionados nesta versão: direcional à esquerda, botão de corrida e botão de salto. Arraste o cenário para girar a câmera.
+Controles: WASD move, Shift corre, Espaço pula, J ou clique ataca, F transforma,
+arraste para girar a câmera. No celular: joystick à esquerda e botões à direita.
 
-O modelo foi otimizado de cerca de 116,5 MB para cerca de 78,9 MB, reduzindo as texturas para 2048x2048 e recomprimindo-as. O esqueleto e os seis clipes de animação foram preservados no arquivo GLB.
+Combate: combo de 5 golpes de garra alternando mão direita e esquerda
+(direita→esquerda, de baixo para cima, de cima para baixo, esquerda→direita e
+golpe final em diagonal). Os golpes são animados por código sobre o esqueleto,
+com IK de braços e pernas; os valores de cada golpe ficam na tabela ATT do index.html.
 
-Observação: o projeto ainda precisa de teste visual em navegador real. Three.js é carregado de um CDN e exige internet.
+Modelo: os pesos de skinning de alguns vértices da capa estavam presos aos ossos
+das mãos e esticavam quando os braços se mexiam. Esses pesos foram redistribuídos
+para os ossos do tronco (o arquivo original continua no histórico do git).

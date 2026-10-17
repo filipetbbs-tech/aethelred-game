@@ -11,12 +11,19 @@ Como executar no computador:
 3. Abra http://localhost:8000 no navegador.
 
 Controles: WASD move, Shift corre, Espaço pula, J ou clique ataca, F transforma,
-arraste para girar a câmera. No celular: joystick à esquerda e botões à direita.
+arraste para girar a câmera, rodinha do mouse dá zoom. No celular: joystick à
+esquerda e botões à direita.
+
+Testes: I (ou o botão "Inimigos") liga e desliga os inimigos; T coloca a
+personagem na posição T, com dedos esticados, e T de novo volta ao jogo.
 
 Combate: combo de 5 golpes de garra alternando mão direita e esquerda
 (direita→esquerda, de baixo para cima, de cima para baixo, esquerda→direita e
 golpe final em diagonal). Os golpes são animados por código sobre o esqueleto,
-com IK de braços e pernas; os valores de cada golpe ficam na tabela ATT do index.html.
+com IK de braços e pernas que respeita a dobra natural do cotovelo e do joelho.
+Os valores de cada golpe ficam na tabela ATT do index.html: dur é a duração em
+segundos, tw é a fração do tempo gasta na preparação e tf a fração em que o golpe
+e a continuação terminam (o resto é recuperação).
 
 Modelo: os pesos de skinning de alguns vértices da capa estavam presos aos ossos
 das mãos e esticavam quando os braços se mexiam. Esses pesos foram redistribuídos

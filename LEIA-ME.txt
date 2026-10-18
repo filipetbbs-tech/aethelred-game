@@ -34,7 +34,9 @@ primeira metade da esquiva; ela corta o golpe em andamento. Só no chão. Os par
 na tabela DODGES do index.html (trecho da animação, velocidade, distância, imunidade).
 Botão "Esquiva" (ou tecla L): alterna entre a esquiva nova e a original, para comparar.
 Regra: a original (DODGES_V1: rolamentos em 1,2 s, lateral de 2,75 m) fica congelada; todo
-ajuste pedido na esquiva vai só na nova (DODGES_V2: hoje rolamentos em 0,8 s, lateral de 5 m).
+ajuste pedido na esquiva vai só na nova (DODGES_V2). Hoje a nova usa o rolamento (Quick Roll
+To Run, 0,8 s) nas quatro direções: frente; trás invertido, com os passos finais andando mais;
+lados com o corpo virado para o lado e voltando a olhar para a frente ao levantar.
 Run To Rolling foi convertida (run_to_rolling.glb) mas não está em uso.
 
 Controle de PlayStation 5 (DualSense) ou outro controle: conecte por USB ou Bluetooth e aperte

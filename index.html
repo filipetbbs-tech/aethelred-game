@@ -694,9 +694,11 @@ function takeHit(fx,fz,dmg){
    As duas se comparam pelo botão "Esquiva" ou pela tecla L */
 const DODGES_V2={
   fwd:{name:'qroll',c0:0,c1:1.38,speed:1.75,dist:.75,inv:.55},
-  back:{name:'qroll',c0:1.38,c1:0,speed:1.75,dist:.6,inv:.55},
-  right:{name:'aerial',c0:.62,c1:3.2,speed:1.75,dist:1.8,inv:.6,turn:.42},
-  left:{name:'aerial',c0:.62,c1:3.2,speed:1.75,dist:1.8,inv:.6,mirror:true,turn:-.42}
+  /* distEnd/endFrom: no trecho final (os passos para trás) a distância sobe de dist para distEnd */
+  back:{name:'qroll',c0:1.38,c1:0,speed:1.75,dist:.6,distEnd:1.05,endFrom:.68,inv:.55},
+  /* roll: o mesmo rolamento da frente, com o corpo virado para o lado; ao levantar volta a olhar para onde olhava */
+  right:{name:'qroll',c0:0,c1:1.38,speed:1.75,dist:.75,inv:.55,roll:true},
+  left:{name:'qroll',c0:0,c1:1.38,speed:1.75,dist:.75,inv:.55,roll:true}
 };
 const DODGES_V1={
   fwd:{name:'qroll',c0:0,c1:1.38,speed:1.15,dist:.75,inv:.55},
@@ -727,11 +729,12 @@ function startDodge(ix,iz){
   const q=Math.round(rel/(Math.PI/2));const key=[ 'fwd','left','back','right'][((q%4)+4)%4];
   const D=DODGES[key];if(!clipSrc[D.name])return false;
   /* turn: as esquivas laterais também recuam um pouco; o corpo vira um pouco para o caminho sair na direção pedida */
-  st.rot=st.rotT=want-q*Math.PI/2+(D.turn||0);
+  const face0=st.rot;
+  st.rot=st.rotT=D.roll?want:want-q*Math.PI/2+(D.turn||0);
   const yawFix=(clipYaw(D.name,D.c1)-clipYaw(D.name,D.c0))*(D.mirror?-1:1);
   const snap=baseBones?snapBones():null;
   combo.active=false;combo.queued=false;combo.i=-1;combo.grace=0;combo.snap=null;landT=0;
-  dodge={D:D,key:key,t:0,rmPrev:null,rot0:st.rot,yawFix:yawFix,I:{snap:snap,off:null,t:0}};
+  dodge={D:D,key:key,t:0,rmPrev:null,rot0:st.rot,face0:face0,yawFix:D.roll?0:yawFix,I:{snap:snap,off:null,t:0}};
   SOUND.whoosh&&SOUND.whoosh(1.1);
   return true;
 }
@@ -742,7 +745,10 @@ function poseDodge(dt){
   const rm=applyClip(D.name,ct,1,D.mirror);
   /* o giro que a animação acumula é desfeito aos poucos no próprio corpo, para terminar olhando para onde começou */
   if(T.yawFix)rotAxis(rig.B.Hips,UPV,normAng(T.yawFix)*sm(k));
-  if(rm&&T.rmPrev){const dx=(rm.x-T.rmPrev.x)*D.dist,dz=(rm.z-T.rmPrev.z)*D.dist,c=Math.cos(st.rot),sn=Math.sin(st.rot);st.x+=dx*c+dz*sn;st.z+=-dx*sn+dz*c;}
+  /* rolamento lateral: no fim, enquanto levanta, o corpo gira de volta para a direção de antes */
+  if(D.roll){T.phi=normAng(T.face0-T.rot0)*sm((k-.62)/.38);rotAxis(rig.B.Hips,UPV,T.phi);}
+  const dm=D.distEnd?D.dist+(D.distEnd-D.dist)*sm((k-D.endFrom)/(1-D.endFrom)):D.dist;
+  if(rm&&T.rmPrev){const dx=(rm.x-T.rmPrev.x)*dm,dz=(rm.z-T.rmPrev.z)*dm,c=Math.cos(st.rot),sn=Math.sin(st.rot);st.x+=dx*c+dz*sn;st.z+=-dx*sn+dz*c;}
   if(rm)T.rmPrev=rm;
   T.I.t+=dt;inertBlend(T.I,.12);
 }
@@ -1753,7 +1759,9 @@ function tick(raw){
   if(dodgeKey){dodgeKey=false;if(!climb)startDodge(ix,iz);}
   if(dodge){
     dodge.t+=dt;ix=0;iz=0;
-    if(dodge.t>=dodgeDur()){climbOut={snap:snapBones(),off:null,t:0};dodge=null;plantFeet();}
+    if(dodge.t>=dodgeDur()){if(dodge.D.roll&&rig){
+      /* passa o giro do quadril para a direção da personagem sem mudar a pose vista */
+      rotAxis(rig.B.Hips,UPV,-(dodge.phi||0));st.rot=st.rotT=st.rot+(dodge.phi||0);hero.rotation.y=st.rot;hero.updateMatrixWorld(true);}climbOut={snap:snapBones(),off:null,t:0};dodge=null;plantFeet();}
   }
   /* recuperação da aterrissagem: parado até a animação de pouso terminar */
   const landing=landT>0&&!climb;

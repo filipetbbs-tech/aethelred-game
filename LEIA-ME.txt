@@ -17,7 +17,14 @@ esquerda e botões à direita.
 Testes: I (ou o botão "Inimigos") liga e desliga os inimigos; T coloca a
 personagem na posição T, com dedos esticados, e T de novo volta ao jogo;
 M alterna entre o combo B (atual) e o combo A (anterior); P (ou o botão
-"Pausar") congela a personagem e os inimigos, com a câmera livre para girar e dar zoom.
+"Pausar") congela a personagem e os inimigos, com a câmera livre para girar e dar zoom;
+O (ou o botão "Som") liga e desliga o som.
+
+Som: todo sintetizado na hora (Web Audio), sem arquivos de áudio. Whoosh no início de
+cada golpe, impacto ao acertar (mais grave nos golpes pesados), passos quando o pé
+toca o chão (andando, correndo, nos golpes e na aterrissagem), pulo e aterrissagem, e
+vocalizações (esforço em parte dos golpes, rosnado no golpe final, gemido ao levar
+dano). Os parâmetros ficam no objeto SOUND do index.html.
 
 Combate: dois combos de 5 golpes, alternados com a tecla M.
 - Combo B (atual, tabela ATT_B): abertura rápida, revés de baixo para cima,

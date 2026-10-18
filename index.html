@@ -22,6 +22,7 @@ canvas{display:block}
 #glbBtn{right:18px;top:calc(14px + env(safe-area-inset-top,0px));bottom:auto}
 #foesBtn{right:18px;top:calc(76px + env(safe-area-inset-top,0px));bottom:auto}
 #pauseBtn{right:18px;top:calc(138px + env(safe-area-inset-top,0px));bottom:auto}
+#soundBtn{right:18px;top:calc(200px + env(safe-area-inset-top,0px));bottom:auto}
 #glbMsg{margin-top:8px;font-size:13px;color:var(--bone);opacity:.85}
 #pad{position:fixed;left:22px;bottom:calc(26px + env(safe-area-inset-bottom,0px));width:120px;height:120px;border-radius:50%;border:1px solid #6b5a4a;background:rgba(20,16,16,.45);display:none}
 #knob{position:absolute;left:40px;top:40px;width:40px;height:40px;border-radius:50%;background:#6b5a4a}
@@ -31,7 +32,7 @@ canvas{display:block}
 <body>
 <div id="hud">
   <h1>Aethelred, protótipo de blocos</h1>
-  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador.<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. M alterna entre o combo novo (B) e o anterior (A). P pausa a personagem (a câmera continua livre).</p>
+  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador.<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. M alterna entre o combo novo (B) e o anterior (A). P pausa a personagem (a câmera continua livre). O liga e desliga o som.</p>
   <p id="state">Forma normal</p>
   <p id="vida">Vida 100   Abatidos 0</p>
   <p id="combo"></p>
@@ -43,6 +44,7 @@ canvas{display:block}
 <button class="btn" id="glbBtn">Carregar modelo GLB</button>
 <button class="btn" id="foesBtn">Inimigos: ligados</button>
 <button class="btn" id="pauseBtn">Pausar</button>
+<button class="btn" id="soundBtn">Som: ligado</button>
 <input type="file" id="glbIn" accept=".glb" hidden>
 <button class="btn" id="morph">Transformar</button>
 
@@ -176,16 +178,75 @@ const arms=[-1,1].map(s=>{
   return {g:a,normal,blight,claws,blade,s};
 });
 
+/* som: tudo sintetizado na hora com Web Audio (sem arquivos) */
+const SFX={ctx:null,out:null,noise:null,on:true,lastVoice:-9};
+function audioInit(){
+  if(SFX.ctx){if(SFX.ctx.state==='suspended')SFX.ctx.resume();return;}
+  try{
+    const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
+    const ctx=new C(),comp=ctx.createDynamicsCompressor(),out=ctx.createGain();
+    comp.threshold.value=-14;comp.ratio.value=4;out.gain.value=.7;out.connect(comp);comp.connect(ctx.destination);
+    const nb=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate),d=nb.getChannelData(0);
+    for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+    SFX.ctx=ctx;SFX.out=out;SFX.noise=nb;
+  }catch(e){SFX.ctx=null;}
+}
+addEventListener('pointerdown',audioInit);addEventListener('keydown',audioInit);
+function sfxOK(){return SFX.on&&SFX.ctx&&SFX.ctx.state==='running';}
+function env(g,t,a,peak,dur){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);}
+/* ruído filtrado com varredura de frequência */
+function noiseHit(type,f0,f1,q,peak,a,dur,delay){
+  const c=SFX.ctx,t=c.currentTime+(delay||0),src=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain();
+  src.buffer=SFX.noise;src.loop=true;src.playbackRate.value=.8+Math.random()*.4;
+  f.type=type;f.Q.value=q;f.frequency.setValueAtTime(f0,t);f.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  env(g,t,a,peak,dur);src.connect(f);f.connect(g);g.connect(SFX.out);
+  src.start(t,Math.random()*.5);src.stop(t+dur+.05);
+}
+/* tom com queda de frequência (baques) */
+function toneDrop(type,f0,f1,peak,dur,delay,dist){
+  const c=SFX.ctx,t=c.currentTime+(delay||0),o=c.createOscillator(),g=c.createGain();
+  o.type=type;o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  env(g,t,.005,peak,dur);
+  if(dist){const w=c.createWaveShaper(),cv=new Float32Array(256);for(let i=0;i<256;i++){const x=i/128-1;cv[i]=Math.tanh(x*3);}w.curve=cv;o.connect(w);w.connect(g);}else o.connect(g);
+  g.connect(SFX.out);o.start(t);o.stop(t+dur+.05);
+}
+const SOUND={
+  whoosh:function(power){if(!sfxOK())return;const p=power||1;
+    noiseHit('bandpass',350,2600*(.8+.2*p),1.1,.28*p,.06,.2+.06*p);noiseHit('bandpass',2400,500,1.3,.18*p,.03,.26+.06*p,.08);},
+  impact:function(heavy){if(!sfxOK())return;
+    toneDrop('sine',150,45,.9,.2);noiseHit('highpass',2200,1400,.7,.45,.003,.07);noiseHit('bandpass',3200,1100,2,.32,.005,.14,.01);
+    if(heavy){toneDrop('sine',95,32,.9,.38,0,true);noiseHit('lowpass',600,120,.8,.5,.005,.3);}},
+  step:function(power){if(!sfxOK())return;const p=power||1;
+    noiseHit('lowpass',260+Math.random()*80,120,1,.22*p,.004,.08);noiseHit('highpass',3500,2500,.7,.035*p,.002,.03);},
+  land:function(){if(!sfxOK())return;toneDrop('sine',110,40,.6,.2);noiseHit('lowpass',450,120,.8,.4,.004,.16);},
+  /* voz: onda dente de serra passando por dois formantes, mais um sopro de ar */
+  voice:function(kind){if(!sfxOK())return;const c=SFX.ctx,now=c.currentTime;
+    if(now-SFX.lastVoice<.35)return;SFX.lastVoice=now;
+    const V={effort:{f0:118,f1:92,dur:.2,F:[640,1150],g:.32},growl:{f0:82,f1:62,dur:.62,F:[480,980],g:.42,rough:31},pain:{f0:165,f1:112,dur:.32,F:[720,1250],g:.3},jump:{f0:130,f1:115,dur:.12,F:[600,1100],g:.18}}[kind];
+    const t=now,o=c.createOscillator(),g=c.createGain(),mix=c.createGain();
+    const jit=.92+Math.random()*.16;
+    o.type='sawtooth';o.frequency.setValueAtTime(V.f0*jit,t);o.frequency.exponentialRampToValueAtTime(V.f1*jit,t+V.dur);
+    env(g,t,.012,V.g,V.dur);o.connect(mix);
+    if(V.rough){const lfo=c.createOscillator(),lg=c.createGain(),am=c.createGain();lfo.frequency.value=V.rough;lg.gain.value=.5;am.gain.value=.6;lfo.connect(lg);lg.connect(am.gain);mix.connect(am);am.connect(g);lfo.start(t);lfo.stop(t+V.dur+.05);}
+    else mix.connect(g);
+    V.F.forEach(function(f,i){const b=c.createBiquadFilter();b.type='bandpass';b.frequency.value=f*jit;b.Q.value=5;const bg=c.createGain();bg.gain.value=i?.6:1;g.connect(b);b.connect(bg);bg.connect(SFX.out);});
+    o.start(t);o.stop(t+V.dur+.05);
+    noiseHit('bandpass',1200,700,1.5,V.g*.35,.01,V.dur*.8);}
+};
+const soundBtn=document.getElementById('soundBtn');
+function toggleSound(){audioInit();SFX.on=!SFX.on;soundBtn.textContent='Som: '+(SFX.on?'ligado':'desligado');soundBtn.blur();}
+soundBtn.onclick=toggleSound;
+
 /* estado */
 let tpose=false;
 const st={x:0,z:8,y:0,vy:0,rot:Math.PI,rotT:Math.PI,yaw:0,pitch:.35,camD:6.5,t:0,speed:0,morph:0,morphOn:false};
 const keys={};const joy={x:0,y:0};
-addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyM')toggleCombo();if(e.code==='KeyP')togglePause();});
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyM')toggleCombo();if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 const stateEl=document.getElementById('state');
 function toggle(){st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
 document.getElementById('morph').onclick=toggle;
-function jump(){if(st.y<=0.001&&!combo.active&&!tpose)st.vy=8;}
+function jump(){if(st.y<=0.001&&!combo.active&&!tpose){st.vy=8;SOUND.voice('jump');}}
 document.getElementById('jump').onpointerdown=jump;
 document.getElementById('atk').onpointerdown=function(){attack();};
 
@@ -381,7 +442,7 @@ function startAttack(i,A){
   combo.prevA=combo.active?combo.cur:null;combo.rmPrev=null;
   combo.snapOff=null;
   combo.snap=(combo.prevA&&(combo.prevA.clip||A.clip)&&baseBones)?baseBones.map(function(b){return [b.quaternion.clone(),b.position.clone()];}):null;
-  combo.active=true;combo.i=i;combo.t=0;combo.queued=false;combo.hitDone=false;combo.cur=A;combo.stepFrom={};
+  combo.active=true;combo.i=i;combo.t=0;combo.swung=false;combo.queued=false;combo.hitDone=false;combo.cur=A;combo.stepFrom={};
   /* na corrida só mira em quem já está à frente, para não quebrar o embalo */
   let best=nearestEnemy(A.run?6:7);
   if(best&&A.run){const d=Math.hypot(best[0],best[1]);if((best[0]*Math.sin(st.rot)+best[1]*Math.cos(st.rot))/d<.7)best=null;}
@@ -441,6 +502,7 @@ function updateComboState(dt){
   }
   const dsp=(spinAt(A,p)-spinAt(A,p0))*(A.right?1:-1);
   if(dsp){st.rot+=dsp;st.rotT+=dsp;pivotFeet(dsp);}
+  if(!combo.swung&&p>=A.kw){combo.swung=true;const pw=A.finisher?1.5:A.dmg>=2?1.25:1;SOUND.whoosh(pw);if(A.finisher||A.both)SOUND.voice('growl');else if(A.dmg>=2||Math.random()<.5)SOUND.voice('effort');}
   if(!combo.hitDone&&p>=A.hit){combo.hitDone=true;hitEnemies(A);}
   if(combo.queued&&p>=A.chain&&combo.i<ATT.length-1){startAttack(combo.i+1);return;}
   if(combo.t>=A.dur&&!combo.paused){
@@ -493,6 +555,7 @@ function hitEnemies(A){
     const k=d>0?1/d:0;e.vx=dx*k*A.knock;e.vz=dz*k*A.knock;
     if(e.hp<=0){e.dead=.001;kills++;}
   });
+  if(any)SOUND.impact(A.finisher||A.dmg>=2);
   if(any){hitStop=A.finisher?.15:.09;shake=A.finisher?.34:.19;}
 }
 function updateCombat(dt){
@@ -508,7 +571,7 @@ function updateCombat(dt){
     if(e.stun<=0){
       e.g.rotation.y=Math.atan2(dx,dz);e.g.rotation.x=0;
       if(d>1){p.x+=dx/d*e.sp*dt;p.z+=dz/d*e.sp*dt;}
-      else{e.cd-=dt;if(e.cd<=0&&hurt<=0){hp-=8;hurt=.6;e.cd=1;}}
+      else{e.cd-=dt;if(e.cd<=0&&hurt<=0){hp-=8;hurt=.6;e.cd=1;SOUND.voice('pain');}}
     }else e.g.rotation.x=Math.min(e.stun,.4)*.6;
     p.x+=e.vx*dt;p.z+=e.vz*dt;
     const f=Math.max(0,1-dt*8);e.vx*=f;e.vz*=f;
@@ -1105,6 +1168,19 @@ function poseT(){
     dirTo(B[s+'Leg'],B[s+'Foot'],legDir);
   });
 }
+/* passos: toca quando o pé desce até perto do chão (vale para andar, correr, passos dos golpes e aterrissagem) */
+const stepState={L:{armed:false,cd:0},R:{armed:false,cd:0}};
+function detectSteps(dt){
+  if(!rig||st.y>.02)return;
+  const moving=st.speed>.6||combo.active;
+  ['Left','Right'].forEach(function(s){
+    const S=stepState[s[0]];S.cd-=dt;
+    const y=hero.worldToLocal(wp(rig.B[s+'Foot'])).y,thr=rig.restP[s+'Foot'].y+.07;
+    /* o pé só rearma depois de subir de verdade, para não repetir o passo quando ele mal sai do chão */
+    if(y>thr+.06)S.armed=true;
+    if(moving&&S.armed&&S.cd<=0&&y<thr){SOUND.step(st.speed>5.5?1.35:combo.active?1.15:1);S.cd=.18;S.armed=false;}
+  });
+}
 function playAct(a,once){
   if(!a||a===curAct)return;
   a.reset();
@@ -1141,6 +1217,7 @@ function updateModel(dt){
     if(window.CLIP_PREVIEW&&clipSrc[CLIP_PREVIEW.name]){applyClip(CLIP_PREVIEW.name,CLIP_PREVIEW.t,1);poseHands();return;}
     poseFull();
     poseHands();
+    detectSteps(dt);
   }else{
     custom.rotation.x=Math.min(st.speed/9,.5)*.25;
     custom.position.y=Math.abs(Math.sin(st.t*(4+st.speed*1.2)))*Math.min(st.speed/5,1)*.05;
@@ -1204,7 +1281,7 @@ function tick(raw){
     st.rot+=diff*Math.min(1,dt*12);st.rotT=st.rot;
   }
   st.speed+=(target-st.speed)*Math.min(1,dt*10);
-  st.vy-=22*dt;st.y+=st.vy*dt;if(st.y<0){st.y=0;st.vy=0;}
+  st.vy-=22*dt;st.y+=st.vy*dt;if(st.y<0){if(st.vy<-4)SOUND.land();st.y=0;st.vy=0;}
   updateComboState(dt);
   resolve();
   updateCombat(dt);
@@ -1245,7 +1322,7 @@ function tick(raw){
 }
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
+window.AETH={SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
 frame();
 })();
 </script>

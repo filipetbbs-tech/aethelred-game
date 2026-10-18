@@ -221,8 +221,8 @@ const SOUND={
   land:function(){if(!sfxOK())return;toneDrop('sine',110,40,.6,.2);noiseHit('lowpass',450,120,.8,.4,.004,.16);},
   /* voz: onda dente de serra passando por dois formantes, mais um sopro de ar */
   voice:function(kind){if(!sfxOK())return;const c=SFX.ctx,now=c.currentTime;
-    if(now-SFX.lastVoice<.35)return;SFX.lastVoice=now;
-    const V={effort:{f0:118,f1:92,dur:.2,F:[640,1150],g:.32},growl:{f0:82,f1:62,dur:.62,F:[480,980],g:.42,rough:31},pain:{f0:165,f1:112,dur:.32,F:[720,1250],g:.3},jump:{f0:130,f1:115,dur:.12,F:[600,1100],g:.18}}[kind];
+    if(now-SFX.lastVoice<.35&&kind!=='death')return;SFX.lastVoice=now;
+    const V={effort:{f0:118,f1:92,dur:.2,F:[640,1150],g:.32},growl:{f0:82,f1:62,dur:.62,F:[480,980],g:.42,rough:31},pain:{f0:165,f1:112,dur:.32,F:[720,1250],g:.3},death:{f0:150,f1:62,dur:1.0,F:[680,1150],g:.4,rough:23},jump:{f0:130,f1:115,dur:.12,F:[600,1100],g:.18}}[kind];
     const t=now,o=c.createOscillator(),g=c.createGain(),mix=c.createGain();
     const jit=.92+Math.random()*.16;
     o.type='sawtooth';o.frequency.setValueAtTime(V.f0*jit,t);o.frequency.exponentialRampToValueAtTime(V.f1*jit,t+V.dur);
@@ -246,7 +246,7 @@ addEventListener('keyup',e=>{keys[e.code]=false;});
 const stateEl=document.getElementById('state');
 function toggle(){st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
 document.getElementById('morph').onclick=toggle;
-function jump(){if(st.y<=0.001&&!combo.active&&!tpose){st.vy=8;SOUND.voice('jump');}}
+function jump(){if(st.y<=0.001&&!combo.active&&!tpose&&!death){st.vy=8;SOUND.voice('jump');}}
 document.getElementById('jump').onpointerdown=jump;
 document.getElementById('atk').onpointerdown=function(){attack();};
 
@@ -462,7 +462,7 @@ function toggleCombo(){
   combo.cool=.3;msgHold=2.5;
 }
 function attack(){
-  if(paused)return;
+  if(paused||death)return;
   if(st.y>.03||tpose)return;
   if(combo.active){if(combo.t/combo.cur.dur>.15)combo.queued=true;return;}
   if(combo.cool>0)return;
@@ -571,7 +571,7 @@ function updateCombat(dt){
     if(e.stun<=0){
       e.g.rotation.y=Math.atan2(dx,dz);e.g.rotation.x=0;
       if(d>1){p.x+=dx/d*e.sp*dt;p.z+=dz/d*e.sp*dt;}
-      else{e.cd-=dt;if(e.cd<=0&&hurt<=0){hp-=8;hurt=.6;e.cd=1;SOUND.voice('pain');}}
+      else if(!death){e.cd-=dt;if(e.cd<=0&&hurt<=0){hp-=8;hurt=.6;e.cd=1;SOUND.voice('pain');}}
     }else e.g.rotation.x=Math.min(e.stun,.4)*.6;
     p.x+=e.vx*dt;p.z+=e.vz*dt;
     const f=Math.max(0,1-dt*8);e.vx*=f;e.vz*=f;
@@ -587,14 +587,48 @@ function updateCombat(dt){
     const dx=b.x-a.x,dz=b.z-a.z,d=Math.hypot(dx,dz);
     if(d<.7&&d>0){const m=(.7-d)/2;a.x-=dx/d*m;a.z-=dz/d*m;b.x+=dx/d*m;b.z+=dz/d*m;}
   }
-  if(hp<=0){
-    hp=100;kills=0;enemies.forEach(function(e){scene.remove(e.g);});enemies.length=0;
-    st.x=0;st.z=8;spawnT=2;msgT=2.5;combo.active=false;combo.i=-1;
-    if(foesOn)for(let i=0;i<3;i++)spawnEnemy();
-  }
-  const txt=msgT>0?'Você caiu. Recomeçando.':'Vida '+Math.max(0,Math.ceil(hp))+'   Abatidos '+kills;
+  if(hp<=0&&!death){if(!startDeath())respawn();}
+  if(death){death.t+=dt;if(death.t>death.dur+1.6)respawn();}
+  const txt=death?'Você caiu.':msgT>0?'Recomeçando.':'Vida '+Math.max(0,Math.ceil(hp))+'   Abatidos '+kills;
   if(vidaEl.textContent!==txt)vidaEl.textContent=txt;
   vidaEl.style.color=hurt>0?'#ff6a6a':'';
+}
+
+/* morte da personagem: as cinco animações saem em ordem sorteada, como um baralho, sem repetir em seguida */
+const DEATHS=['die1','die2','die3','die4','die5'];
+let death=null,deathBag=[],lastDeath=null;
+function nextDeath(){
+  const ok=DEATHS.filter(function(n){return clipSrc[n];});
+  if(!ok.length)return null;
+  if(!deathBag.length){deathBag=ok.slice().sort(function(){return Math.random()-.5;});if(deathBag[0]===lastDeath&&deathBag.length>1)deathBag.push(deathBag.shift());}
+  return lastDeath=deathBag.shift();
+}
+function startDeath(){
+  const n=nextDeath();if(!n||!rig||!baseBones)return false;
+  death={name:n,t:0,dur:clipSrc[n].clip.duration,rmPrev:null,thud:false,snap:baseBones.map(function(b){return [b.quaternion.clone(),b.position.clone()];}),off:null};
+  combo.active=false;combo.hold=0;combo.w=0;combo.i=-1;combo.outDur=0;
+  SOUND.voice('death');
+  return true;
+}
+function respawn(){
+  death=null;hp=100;kills=0;enemies.forEach(function(e){scene.remove(e.g);});enemies.length=0;
+  st.x=0;st.z=8;st.y=0;st.vy=0;spawnT=2;msgT=2.5;combo.active=false;combo.i=-1;combo.w=0;combo.hold=0;
+  if(foesOn)for(let i=0;i<3;i++)spawnEnemy();
+}
+/* aplica a animação de morte; a queda começa de onde a personagem estava (diferença de pose que some em 0,3 s) */
+function poseDeath(){
+  const D=death,rm=applyClip(D.name,Math.min(D.t,D.dur),1);
+  if(!rm)return;
+  if(D.rmPrev){const dx=rm.x-D.rmPrev.x,dz=rm.z-D.rmPrev.z,c=Math.cos(st.rot),sn=Math.sin(st.rot);st.x+=dx*c+dz*sn;st.z+=-dx*sn+dz*c;}
+  D.rmPrev=rm;
+  const k=sm(D.t/.3);
+  if(k<1){
+    if(!D.off)D.off=baseBones.map(function(b,i){return [D.snap[i][0].clone().multiply(b.quaternion.clone().invert()),D.snap[i][1].clone().sub(b.position)];});
+    baseBones.forEach(function(b,i){b.quaternion.premultiply(_iq.copy(D.off[i][0]).slerp(_q.set(0,0,0,1),k));b.position.addScaledVector(D.off[i][1],1-k);});
+    rig.m.updateMatrixWorld(true);
+  }
+  /* baque quando o quadril chega perto do chão */
+  if(!D.thud&&hero.worldToLocal(wp(rig.B.Hips)).y<rig.restP.Hips.y*.35){D.thud=true;SOUND.land();SOUND.impact(true);}
 }
 
 /* rastro das garras */
@@ -709,7 +743,7 @@ function findAct(re){for(const k in acts){if(re.test(k))return acts[k];}return n
 /* animações do Mixamo (pasta animacoes/), transferidas para o esqueleto da personagem por retarget:
    cada osso copia a rotação do osso de mesmo nome no esqueleto do Mixamo, no espaço do personagem,
    descontando a diferença entre as poses de repouso dos dois esqueletos */
-const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'}};
+const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'},die1:{file:'animacoes/dying_1.glb'},die2:{file:'animacoes/dying_2.glb'},die3:{file:'animacoes/dying_3.glb'},die4:{file:'animacoes/dying_4.glb'},die5:{file:'animacoes/dying_5.glb'}};
 const clipSrc={};
 function loadClips(){
   Object.keys(CLIPS).forEach(function(name){
@@ -1214,6 +1248,7 @@ function updateModel(dt){
     mixer.update(dt);
     if(rig)saveBase();
     hero.updateMatrixWorld(true);
+    if(death&&clipSrc[death.name]){poseDeath();return;}
     if(window.CLIP_PREVIEW&&clipSrc[CLIP_PREVIEW.name]){applyClip(CLIP_PREVIEW.name,CLIP_PREVIEW.t,1);poseHands();return;}
     poseFull();
     poseHands();
@@ -1259,7 +1294,7 @@ function tick(raw){
   /* entrada */
   let ix=(keys.KeyD?1:0)-(keys.KeyA?1:0)+joy.x;
   let iz=(keys.KeyW?1:0)-(keys.KeyS?1:0)-joy.y;
-  if(tpose){ix=0;iz=0;}
+  if(tpose||death){ix=0;iz=0;}
   if(!combo.active&&combo.hold>0&&(Math.hypot(ix,iz)>.3||keys.Space))fadeOut(.35);
   if(combo.active){
     /* andar cancela o fim do golpe, para o controle não ficar preso */
@@ -1322,7 +1357,7 @@ function tick(raw){
 }
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
+window.AETH={get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
 frame();
 })();
 </script>

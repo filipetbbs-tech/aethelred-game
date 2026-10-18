@@ -52,3 +52,5 @@ Animações do Mixamo (pasta animacoes/):
   (recorte em segundos) e speed na tabela ATT.
 - Hoje: o golpe final do combo A usa "Sword And Shield Slash" (salto girando no ar)
   e o ataque em corrida usa "Flying Kick" (tabela RUN_ATT).
+- Morte: cinco animações "Dying" (dying_1 a dying_5, lista DEATHS), sorteadas como um
+  baralho: todas saem antes de repetir e nunca a mesma duas vezes seguidas.

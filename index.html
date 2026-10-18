@@ -243,6 +243,14 @@ function toneDrop(type,f0,f1,peak,dur,delay,dist){
   if(dist){const w=c.createWaveShaper(),cv=new Float32Array(256);for(let i=0;i<256;i++){const x=i/128-1;cv[i]=Math.tanh(x*3);}w.curve=cv;o.connect(w);w.connect(g);}else o.connect(g);
   g.connect(SFX.out);o.start(t);o.stop(t+dur+.05);
 }
+/* estalos irregulares filtrados: fibras de carne rasgando */
+function tear(dur,peak,delay){
+  const c=SFX.ctx,sr=c.sampleRate,n=Math.floor(sr*dur),b=c.createBuffer(1,n,sr),d=b.getChannelData(0);
+  for(let i=0;i<n;i++){const u=i/n,dens=.012*Math.sin(Math.PI*Math.min(1,u*1.4));if(Math.random()<dens){const a=(Math.random()*.8+.2)*(Math.random()<.5?-1:1),L=8+Math.floor(Math.random()*30);for(let k=0;k<L&&i+k<n;k++)d[i+k]+=a*Math.exp(-k/6);}}
+  const t=c.currentTime+(delay||0),src=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain();
+  src.buffer=b;f.type='bandpass';f.frequency.value=1900+Math.random()*500;f.Q.value=1.2;g.gain.value=peak;
+  src.connect(f);f.connect(g);g.connect(SFX.out);src.start(t);
+}
 /* tons senoidais com decaimento (o "tilintar" metálico das garras) */
 function ring(freqs,gains,decay,delay){
   const c=SFX.ctx,t=c.currentTime+(delay||0);
@@ -268,14 +276,16 @@ const SOUND={
     o.type='sine';o.frequency.setValueAtTime(1700,t);o.frequency.exponentialRampToValueAtTime(3100,tp);o.frequency.exponentialRampToValueAtTime(1300,t+dur);
     g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(.025*p,tp);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
     o.connect(g);g.connect(SFX.out);o.start(t);o.stop(t+dur+.05);},
-  /* garras acertando: três raspadas metálicas, tilintar curto e o impacto abafado na carne */
-  slash:function(heavy){if(!sfxOK())return;
-    for(let k=0;k<3;k++)noiseHit('bandpass',6500-k*400,2300,3,.32*(1-k*.15),.002,.09,k*.014);
-    noiseHit('highpass',5000,3500,.7,.12,.002,.05);
-    ring([2250,3380,4960,7120],[.1,.07,.05,.035],.26);
-    noiseHit('lowpass',900,180,.8,.45,.003,.11,.004);toneDrop('sine',125,52,.55,.13,.004);
-    noiseHit('bandpass',700,400,2,.18,.004,.07,.01);
-    if(heavy){toneDrop('sine',85,32,.85,.34,.006,true);noiseHit('lowpass',500,100,.8,.4,.006,.26);ring([1650,2480,3720],[.08,.05,.03],.4,.01);}},
+  /* garras acertando carne: sem nenhum tilintar metálico (é ele que soa como lata ou pedra). Entrada curta do fio,
+     "squelch" úmido (ressonância que desce rápido), estalos de fibras rasgando, baque grave macio e um respingo abafado */
+  slash:function(heavy){if(!sfxOK())return;const H=heavy?1:0;
+    noiseHit('highpass',4500,3000,.7,.05,.001,.03);
+    noiseHit('bandpass',1400-H*400,260-H*80,4,.5+H*.1,.004,.16+H*.1);
+    noiseHit('lowpass',700,150,.9,.5+H*.15,.008,.14+H*.08,.002);
+    toneDrop('sine',95-H*25,45-H*15,.55+H*.25,.16+H*.16,.004);
+    tear(.14+H*.08,.35+H*.1,.01);
+    noiseHit('bandpass',620,300,3,.14+H*.06,.02,.22+H*.1,.05);
+    if(heavy)tear(.12,.25,.08);},
   whoosh:function(power){if(!sfxOK())return;const p=power||1;
     noiseHit('bandpass',350,2600*(.8+.2*p),1.1,.28*p,.06,.2+.06*p);noiseHit('bandpass',2400,500,1.3,.18*p,.03,.26+.06*p,.08);},
   impact:function(heavy){if(!sfxOK())return;

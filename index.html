@@ -1466,15 +1466,19 @@ function applyProc(A,p,w,mv){
       const tip=wp(tipB);clawTip=tip.addScaledVector(dir,.16);
     }
   });
-  /* pernas: IK para os pés plantados, joelhos abertos em postura arqueada */
+  /* pernas: IK para os pés plantados, joelhos abertos em postura arqueada. Só no chão: no ar as pernas ficam
+     com a animação e os pés são replantados onde ela os põe, para a aterrissagem começar do lugar certo */
+  const gnd=1-sm((aboveGround()-.02)/.2),wl=w*gnd;
   ['Left','Right'].forEach(function(s){
     const k=s[0],sg=s==='Right'?1:-1;
+    if(gnd<.999&&feet[k]){feet[k].copy(_animFoot[k]);feet[k].y=st.y+feet.y;}
+    if(wl<.001)return;
     footTarget(k,A,p,_ft);
     if(mv>0)_ft.lerp(_animFoot[k],mv);
     _pole.copy(fr.fwd).addScaledVector(fr.right,.45*sg);
-    ikHinge(B[s+'UpLeg'],B[s+'Leg'],B[s+'Foot'],_ft,_pole,w,s+'Leg');
+    ikHinge(B[s+'UpLeg'],B[s+'Leg'],B[s+'Foot'],_ft,_pole,wl,s+'Leg');
     B[s+'Foot'].getWorldQuaternion(_cq);
-    setWorldQuat(B[s+'Foot'],_cq.slerp(_fq[k],w));
+    setWorldQuat(B[s+'Foot'],_cq.slerp(_fq[k],wl));
   });
   if(!combo.snap)groundFeet();
 }
@@ -1651,7 +1655,10 @@ function tick(raw){
     hitR.t+=dt;
     if(hitR.t<HIT_LOCK){ix=0;iz=0;}
     /* recuo de ~0,45 m nos primeiros 0,22 s */
-    if(hitR.t<.22&&!climb){const v=4.2*(1-hitR.t/.22);st.x+=hitR.px*v*dt;st.z+=hitR.pz*v*dt;}
+    if(hitR.t<.22&&!climb){const v=4.2*(1-hitR.t/.22),dx=hitR.px*v*dt,dz=hitR.pz*v*dt;st.x+=dx;st.z+=dz;
+      /* os pés plantados derrapam junto com o corpo, senão as pernas esticam para trás */
+      [feet.L,feet.R].forEach(function(f){if(f){f.x+=dx;f.z+=dz;}});
+      if(combo.stepFrom)for(const k in combo.stepFrom){combo.stepFrom[k].x+=dx;combo.stepFrom[k].z+=dz;}}
     if(hitR.t>=HIT_DUR&&!hitR.I){hitR=null;}
   }
   const jh=jumpHeld()&&!landing&&!(hitR&&hitR.t<HIT_LOCK),spaceDown=jh&&!st.spacePrev;st.spacePrev=jumpHeld();

@@ -31,7 +31,7 @@ canvas{display:block}
 <body>
 <div id="hud">
   <h1>Aethelred, protótipo de blocos</h1>
-  <p>WASD move, Shift corre, Espaço pula.<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. M alterna entre o combo novo (B) e o anterior (A). P pausa a personagem (a câmera continua livre).</p>
+  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador.<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. M alterna entre o combo novo (B) e o anterior (A). P pausa a personagem (a câmera continua livre).</p>
   <p id="state">Forma normal</p>
   <p id="vida">Vida 100   Abatidos 0</p>
   <p id="combo"></p>
@@ -335,6 +335,8 @@ const ATT_B=[
     {t:.76,e:'o',s:[-.5,-.95,.5],o:[-.5,-.95,.5],yaw:0,pitch:1.1,roll:0,drop:.46,fwd:.28,side:0},
     {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:0,pitch:.4,roll:0,drop:.2,fwd:.05,side:0}]}
 ];
+/* ataque em corrida: correndo (Shift), o ataque sai como um chute voador (Mixamo) e pode emendar no golpe 1 */
+const RUN_ATT={name:'Ataque em corrida: chute voador',right:true,run:true,noReach:true,clip:'kick',c0:0,c1:1.05,speed:1.15,hit:.43,chain:.66,kw:.24,ki:.43,kf:.6,dmg:2,range:2.4,arc:1.6,knock:12,keys:[],steps:[]};
 /* combo em uso: a tecla M alterna entre o B (atual) e o A (anterior) */
 let ATT=ATT_B,msgHold=0;
 /* tempo real -> tempo da tabela: a preparação ocupa até tw do golpe, o golpe e a continuação vão até tf */
@@ -361,7 +363,7 @@ function evalPose(A,start,p,out){
   for(let n=0;n<POSE_N;n++)out[n]=crs(p0[n],p1[n],p2[n],p3[n],u);
   return out;
 }
-ATT_A.concat(ATT_B).forEach(function(A){
+ATT_A.concat(ATT_B,[RUN_ATT]).forEach(function(A){
   A.abs=A.keys.map(function(k){return toAbs(k,A.right);});
   if(A.clip){A.dur=(A.c1-A.c0)/A.speed;A.tw=A.kw;A.tf=A.kf;}
 });
@@ -371,21 +373,24 @@ function nearestEnemy(maxD){
   enemies.forEach(function(e){if(e.dead)return;const dx=e.g.position.x-st.x,dz=e.g.position.z-st.z,d=Math.hypot(dx,dz);if(d<bd){bd=d;best=[dx,dz];}});
   return best;
 }
-function startAttack(i){
-  const A=ATT[i];
+function startAttack(i,A){
+  A=A||ATT[i];
   combo.start=(combo.w>.05&&combo.shown)?combo.shown.slice():GUARD_ABS.slice();
   combo.hold=0;combo.outDur=0;
   if(!combo.active&&combo.w<.05)plantFeet();
   combo.prevA=combo.active?combo.cur:null;combo.rmPrev=null;
   combo.active=true;combo.i=i;combo.t=0;combo.queued=false;combo.hitDone=false;combo.cur=A;combo.stepFrom={};
-  const best=nearestEnemy(7);
+  /* na corrida só mira em quem já está à frente, para não quebrar o embalo */
+  let best=nearestEnemy(A.run?6:7);
+  if(best&&A.run){const d=Math.hypot(best[0],best[1]);if((best[0]*Math.sin(st.rot)+best[1]*Math.cos(st.rot))/d<.7)best=null;}
   if(best)st.rotT=Math.atan2(best[0],best[1]);
+  else if(A.run)st.rotT=st.rot;
   else{
     const ix=(keys.KeyD?1:0)-(keys.KeyA?1:0)+joy.x,iz=(keys.KeyW?1:0)-(keys.KeyS?1:0)-joy.y;
     if(Math.hypot(ix,iz)>.2){const fx=-Math.sin(st.yaw),fz=-Math.cos(st.yaw),rx=Math.cos(st.yaw),rz=-Math.sin(st.yaw);st.rotT=Math.atan2(fx*iz+rx*ix,fz*iz+rz*ix);}
     else st.rotT=st.rot;
   }
-  comboEl.textContent='Golpe '+(i+1)+' de '+ATT.length+': '+A.name;
+  comboEl.textContent=A.run?A.name:'Golpe '+(i+1)+' de '+ATT.length+': '+A.name;
 }
 function toggleCombo(){
   ATT=ATT===ATT_B?ATT_A:ATT_B;
@@ -398,6 +403,8 @@ function attack(){
   if(st.y>.03||tpose)return;
   if(combo.active){if(combo.t/combo.cur.dur>.15)combo.queued=true;return;}
   if(combo.cool>0)return;
+  /* correndo, o ataque vira o chute voador */
+  if((keys.ShiftLeft||keys.ShiftRight)&&st.speed>5.5&&clipSrc.kick){startAttack(-1,RUN_ATT);return;}
   const next=(combo.grace>0&&combo.i<ATT.length-1)?combo.i+1:0;
   startAttack(next);
 }
@@ -637,7 +644,7 @@ function findAct(re){for(const k in acts){if(re.test(k))return acts[k];}return n
 /* animações do Mixamo (pasta animacoes/), transferidas para o esqueleto da personagem por retarget:
    cada osso copia a rotação do osso de mesmo nome no esqueleto do Mixamo, no espaço do personagem,
    descontando a diferença entre as poses de repouso dos dois esqueletos */
-const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'}};
+const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'}};
 const clipSrc={};
 function loadClips(){
   Object.keys(CLIPS).forEach(function(name){
@@ -925,7 +932,7 @@ function poseClip(A,p,w){
     }
     combo.rmPrev=rm;
   }
-  ['Right','Left'].forEach(function(s){
+  if(!A.noReach)['Right','Left'].forEach(function(s){
     const isS=(s==='Right')===A.right,ext=(isS?.45+.55*curW.strike:.35)*w*bl;
     if(ext<.01)return;
     const sh=wp(B[s+'Arm']),hd=wp(B[s+'Hand']),el=wp(B[s+'ForeArm']);
@@ -1190,7 +1197,7 @@ function tick(raw){
 }
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
+window.AETH={attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
 frame();
 })();
 </script>

@@ -10,7 +10,7 @@ Como executar no computador:
 2. Execute: python -m http.server 8000
 3. Abra http://localhost:8000 no navegador.
 
-Controles: WASD move, Shift corre, Espaço pula, J ou clique ataca, F transforma,
+Controles: WASD move, Shift corre (correndo, o ataque vira um chute voador), Espaço pula, J ou clique ataca, F transforma,
 arraste para girar a câmera, rodinha do mouse dá zoom. No celular: joystick à
 esquerda e botões à direita.
 
@@ -41,4 +41,5 @@ Animações do Mixamo (pasta animacoes/):
   dedos sob controle do jogo (garras) e transformando o avanço do quadril em
   movimento do corpo. Um golpe do combo usa a animação quando tem clip, c0/c1
   (recorte em segundos) e speed na tabela ATT.
-- Hoje: o golpe final usa "Sword And Shield Slash" (salto girando no ar).
+- Hoje: o golpe final do combo A usa "Sword And Shield Slash" (salto girando no ar)
+  e o ataque em corrida usa "Flying Kick" (tabela RUN_ATT).

@@ -26,7 +26,7 @@ vermelho no corpo e nas bordas da tela, tremor de câmera, som de impacto e vibr
 
 Esquiva (K no teclado, Círculo no controle), na direção apertada em relação à personagem:
 - frente: Quick Roll To Run (rolamento para a frente)
-- direita: Aerial Evade (passo e giro acrobático no ar, 2,75 m para o lado)
+- direita: Aerial Evade (passo e giro acrobático no ar, 5 m para o lado)
 - esquerda: Aerial Evade espelhada
 - trás (ou sem direção): Quick Roll To Run tocada de trás para frente (rolamento para trás)
 Diagonais vão para a esquiva mais próxima, com o corpo girando o resto. Imune a dano na

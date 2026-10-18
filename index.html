@@ -688,10 +688,10 @@ function takeHit(fx,fz,dmg){
    trás = Quick Roll To Run de trás para frente (rolamento para trás). Sem direção: para trás.
    Imune a dano no começo da esquiva; corta o golpe em andamento. */
 const DODGES={
-  fwd:{name:'qroll',c0:0,c1:1.38,speed:1.15,dist:.75,inv:.55},
-  back:{name:'qroll',c0:1.38,c1:0,speed:1.25,dist:.6,inv:.55},
-  right:{name:'aerial',c0:.62,c1:3.2,speed:1.75,dist:1,inv:.6,turn:.42},
-  left:{name:'aerial',c0:.62,c1:3.2,speed:1.75,dist:1,inv:.6,mirror:true,turn:-.42}
+  fwd:{name:'qroll',c0:0,c1:1.38,speed:1.75,dist:.75,inv:.55},
+  back:{name:'qroll',c0:1.38,c1:0,speed:1.75,dist:.6,inv:.55},
+  right:{name:'aerial',c0:.62,c1:3.2,speed:1.75,dist:1.8,inv:.6,turn:.42},
+  left:{name:'aerial',c0:.62,c1:3.2,speed:1.75,dist:1.8,inv:.6,mirror:true,turn:-.42}
 };
 let dodge=null;
 /* direção para onde o quadril aponta num quadro da animação (para desfazer o giro que sobra no fim) */

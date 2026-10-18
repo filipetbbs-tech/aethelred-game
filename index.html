@@ -32,7 +32,7 @@ canvas{display:block}
 <body>
 <div id="hud">
   <h1>Aethelred, protótipo de blocos</h1>
-  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador.<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. M alterna entre o combo novo (B) e o anterior (A). P pausa a personagem (a câmera continua livre). O liga e desliga o som. V troca a versão da voz (original, tratada, criatura).</p>
+  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador. Pule perto de uma pilastra ou parede para escalar (W/S/A/D na parede, Espaço salta dela).<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. M alterna entre o combo novo (B) e o anterior (A). P pausa a personagem (a câmera continua livre). O liga e desliga o som. V troca a versão da voz (original, tratada, criatura).</p>
   <p id="state">Forma normal</p>
   <p id="vida">Vida 100   Abatidos 0</p>
   <p id="combo"></p>
@@ -86,7 +86,7 @@ const boxes=[],circles=[];
 function block(x,z,w,h,d,m,solid){
   const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m||M.stone);
   b.position.set(x,h/2,z);b.castShadow=b.receiveShadow=true;scene.add(b);
-  if(solid)boxes.push({x:x,z:z,hw:w/2,hd:d/2});return b;
+  if(solid)boxes.push({x:x,z:z,hw:w/2,hd:d/2,h:h});return b;
 }
 /* muralhas com ameias */
 block(0,-22,60,9,3,M.stone,true);
@@ -100,14 +100,14 @@ for(let i=-14;i<=14;i++){
 /* torre */
 const tower=new THREE.Mesh(new THREE.CylinderGeometry(3.4,3.8,20,12),M.stone);
 tower.position.set(-24,10,-17);tower.castShadow=true;scene.add(tower);
-circles.push({x:-24,z:-17,r:3.8});
+circles.push({x:-24,z:-17,r:3.8,h:20});
 const spire=new THREE.Mesh(new THREE.ConeGeometry(4,7,12),mat(0x1d1b1f));
 spire.position.set(-24,23.5,-17);scene.add(spire);
 /* pilares e entulho */
 [[-8,-8],[8,-8],[-8,6],[8,6]].forEach(p=>{
   const c=new THREE.Mesh(new THREE.CylinderGeometry(.9,1,7,10),M.stone);
   c.position.set(p[0],3.5,p[1]);c.castShadow=c.receiveShadow=true;scene.add(c);
-  circles.push({x:p[0],z:p[1],r:1.1});
+  circles.push({x:p[0],z:p[1],r:1.1,vr:.95,h:7});
 });
 for(let i=0;i<40;i++){
   const s=.2+Math.random()*.5;
@@ -323,7 +323,7 @@ addEventListener('keyup',e=>{keys[e.code]=false;});
 const stateEl=document.getElementById('state');
 function toggle(){st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
 document.getElementById('morph').onclick=toggle;
-function jump(){if(st.y<=0.001&&!combo.active&&!tpose&&!death){st.vy=8;SOUND.voice('jump');}}
+function jump(){if(st.y<=groundY(st.x,st.z)+.001&&st.vy<=0&&!combo.active&&!tpose&&!death&&!climb){st.vy=8;SOUND.voice('jump');}}
 document.getElementById('jump').onpointerdown=jump;
 document.getElementById('atk').onpointerdown=function(){attack();};
 
@@ -367,10 +367,11 @@ pad.addEventListener('pointerup',padEnd);pad.addEventListener('pointercancel',pa
 
 /* colisão */
 function resolve(){
-  const R=.4;
-  st.x=Math.max(-27,Math.min(27,st.x));
-  st.z=Math.max(-19.5,Math.min(27,st.z));
+  const R=.4,high=st.y>8.5;
+  st.x=Math.max(high?-30.5:-27,Math.min(high?30.5:27,st.x));
+  st.z=Math.max(high?-23.4:-19.5,Math.min(27,st.z));
   circles.forEach(c=>{
+    if(st.y>c.h-.15)return;
     const dx=st.x-c.x,dz=st.z-c.z,d=Math.hypot(dx,dz),m=c.r+R;
     if(d<m&&d>0){st.x=c.x+dx/d*m;st.z=c.z+dz/d*m;}
   });
@@ -459,7 +460,7 @@ const ATT_B=[
      arcL.other: pose da mão direita (contrapeso) durante o golpe. */
   {name:'Salto girando: garra esquerda em arco aberto',right:false,clip:'finisher',c0:.45,c1:1.85,speed:1.25,hit:.68,chain:.8,kw:.5,ki:.68,kf:.76,dmg:2,range:2.7,arc:2.8,knock:9,noReach:true,openClaw:true,keys:[],steps:[],
    arcL:{in:[1.0,1.15],out:[1.55,1.78],
-     keys:[{t:1.15,p:[.5,1.0,-.4]},{t:1.28,p:[.85,.55,.45]},{t:1.4,p:[-.05,-.35,1.0]},{t:1.52,p:[-.55,-.8,.5]},{t:1.7,p:[-.35,-.6,.55]}],
+     keys:[{t:1.15,p:[.5,1.0,-.4]},{t:1.28,p:[.85,.55,.45]},{t:1.4,p:[.05,-.3,1.0]},{t:1.52,p:[-.15,-.55,.92]},{t:1.7,p:[.0,-.45,.9]}],
      other:{p:[.72,-.3,-.45],w:.75}}},
   /* bote: agacha segurando a preparação, salta para frente com as duas garras erguidas e crava as duas em X */
   {name:'Golpe final: bote com as duas garras',right:true,both:true,dur:1.2,tw:.48,tf:.7,hit:.66,chain:1,kw:.52,ki:.66,kf:.76,dmg:4,range:3.0,arc:6.3,knock:14,finisher:true,lunge:[1.3,.48,.66],
@@ -544,7 +545,7 @@ function toggleCombo(){
   combo.cool=.3;msgHold=2.5;
 }
 function attack(){
-  if(paused||death)return;
+  if(paused||death||climb)return;
   if(st.y>.03||tpose)return;
   if(combo.active){if(combo.t/combo.cur.dur>.15)combo.queued=true;return;}
   if(combo.cool>0)return;
@@ -658,7 +659,7 @@ function updateCombat(dt){
     if(e.stun<=0){
       e.g.rotation.y=Math.atan2(dx,dz);e.g.rotation.x=0;
       if(d>1){p.x+=dx/d*e.sp*dt;p.z+=dz/d*e.sp*dt;}
-      else if(!death){e.cd-=dt;if(e.cd<=0&&hurt<=0){hp-=8;hurt=.6;e.cd=1;SOUND.voice('pain');}}
+      else if(!death&&!climb&&st.y<1.2){e.cd-=dt;if(e.cd<=0&&hurt<=0){hp-=8;hurt=.6;e.cd=1;SOUND.voice('pain');}}
     }else e.g.rotation.x=Math.min(e.stun,.4)*.6;
     p.x+=e.vx*dt;p.z+=e.vz*dt;
     const f=Math.max(0,1-dt*8);e.vx*=f;e.vz*=f;
@@ -716,6 +717,112 @@ function poseDeath(){
   }
   /* baque quando o quadril chega perto do chão */
   if(!D.thud&&hero.worldToLocal(wp(rig.B.Hips)).y<rig.restP.Hips.y*.35){D.thud=true;SOUND.land();SOUND.impact(true);}
+}
+
+/* escalada: pulando perto de uma pilastra ou parede, a personagem gruda na superfície e usa a Running Crawl
+   como se a parede fosse o chão. W sobe, S desce, A/D vão para os lados; Espaço salta para longe da parede. */
+let climb=null;
+const CLIMB_SPEED=2.2,CRAWL_STRIDE=1.49,UPV=new THREE.Vector3(0,1,0);
+/* superfície mais próxima: posição na parede, normal (para fora) e altura */
+function nearestWall(px,pz,py,maxD){
+  let best=null;
+  circles.forEach(function(c){
+    if(py>c.h-.4)return;const r=c.vr||c.r,dx=px-c.x,dz=pz-c.z,d=Math.hypot(dx,dz);if(d<1e-4)return;
+    const dist=d-r;if(dist<maxD&&(!best||dist<best.dist))best={o:c,cyl:true,dist:dist,u:Math.atan2(dz,dx),nx:dx/d,nz:dz/d};
+  });
+  boxes.forEach(function(b){
+    if(py>b.h-.4)return;const qx=Math.max(b.x-b.hw,Math.min(b.x+b.hw,px)),qz=Math.max(b.z-b.hd,Math.min(b.z+b.hd,pz));
+    const dx=px-qx,dz=pz-qz,dist=Math.hypot(dx,dz);if(dist<1e-4)return;
+    if(dist<maxD&&(!best||dist<best.dist)){const ax=Math.abs(dx)>Math.abs(dz);best={o:b,cyl:false,dist:dist,nx:ax?Math.sign(dx):0,nz:ax?0:Math.sign(dz),u:ax?qz:qx};}
+  });
+  return best;
+}
+/* altura do chão sob um ponto (topo das pilastras e das muralhas) */
+function groundY(x,z){
+  let g=0;
+  circles.forEach(function(c){if(Math.hypot(x-c.x,z-c.z)<(c.vr||c.r)-.05&&st.y>c.h-.6)g=Math.max(g,c.h);});
+  boxes.forEach(function(b){if(Math.abs(x-b.x)<b.hw&&Math.abs(z-b.z)<b.hd&&st.y>b.h-.6)g=Math.max(g,b.h);});
+  return g;
+}
+function wallFrame(C){
+  const o=C.o;let px,pz,nx,nz;
+  if(C.cyl){const r=o.vr||o.r;nx=Math.cos(C.u);nz=Math.sin(C.u);px=o.x+nx*r;pz=o.z+nz*r;}
+  else{nx=C.nx;nz=C.nz;if(nx){px=o.x+nx*o.hw;pz=C.u;}else{pz=o.z+nz*o.hd;px=C.u;}}
+  const n=new THREE.Vector3(nx,0,nz),R=new THREE.Vector3().crossVectors(UPV,n);
+  return {p:new THREE.Vector3(px,C.y,pz),n:n,R:R};
+}
+function wallQuat(F,psi){
+  const Z=UPV.clone().multiplyScalar(Math.cos(psi)).addScaledVector(F.R,Math.sin(psi)).normalize(),Y=F.n,X=new THREE.Vector3().crossVectors(Y,Z);
+  return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(X,Y,Z));
+}
+function snapBones(){return baseBones?baseBones.map(function(b){return [b.quaternion.clone(),b.position.clone()];}):null;}
+function tryClimb(ix,iz){
+  if(climb||death||combo.active||tpose||!clipSrc.crawl||!rig)return false;
+  const W=nearestWall(st.x,st.z,st.y,.95);if(!W)return false;
+  const fx=Math.sin(st.rot),fz=Math.cos(st.rot),toward=-(fx*W.nx+fz*W.nz);
+  if(toward<.45)return false;
+  combo.hold=0;combo.w=0;combo.outDur=0;combo.i=-1;
+  climb={o:W.o,cyl:W.cyl,u:W.u,nx:W.nx,nz:W.nz,y:Math.max(.35,st.y+.45),psi:0,phase:0,moving:0,t:0,
+    q0:hero.quaternion.clone(),p0:hero.position.clone(),snap:snapBones(),off:null,mantle:null};
+  st.vy=0;st.speed=0;
+  return true;
+}
+function endClimb(pos,rot,snap){
+  climb=null;st.x=pos.x;st.z=pos.z;st.y=pos.y;st.rot=st.rotT=rot;hero.quaternion.set(0,0,0,1);
+  climbOut={snap:snap,off:null,t:0};
+}
+let climbOut=null;
+function updateClimb(dt,ix,iz,spaceDown){
+  const C=climb;C.t+=dt;
+  const F=wallFrame(C);
+  if(C.mantle){
+    /* passando para o topo: gira para ficar de pé e avança por cima da borda */
+    const M=C.mantle;M.t+=dt;const k=sm(M.t/.45);
+    const top=F.p.clone().addScaledVector(F.n,-.55);top.y=C.o.h;
+    hero.position.copy(M.p0).lerp(top,k);hero.position.y=M.p0.y+(top.y-M.p0.y)*Math.min(1,k*1.4);
+    hero.quaternion.copy(M.q0).slerp(M.q1,k);
+    st.x=hero.position.x;st.y=hero.position.y;st.z=hero.position.z;
+    if(M.t>=.45)endClimb(top,Math.atan2(-F.n.x,-F.n.z),snapBones());
+    return;
+  }
+  if(spaceDown&&C.t>.2){
+    /* salta para longe da parede */
+    const out=F.p.clone().addScaledVector(F.n,.45);out.y=Math.max(0,C.y-.4);
+    endClimb(out,Math.atan2(F.n.x,F.n.z),snapBones());
+    st.vy=6.5;st.vx=F.n.x*5.5;st.vz=F.n.z*5.5;SOUND.voice('jump');
+    return;
+  }
+  const run=keys.ShiftLeft||keys.ShiftRight,sp=CLIMB_SPEED*(run?1.4:1);
+  const len=Math.hypot(ix,iz),vr=len>.1?ix/Math.max(1,len)*sp:0,vy=len>.1?iz/Math.max(1,len)*sp:0;
+  if(len>.1){let a=Math.atan2(vr,vy),d=a-C.psi;while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;C.psi+=d*Math.min(1,dt*9);}
+  C.y+=vy*dt;
+  if(C.cyl)C.u-=vr/(C.o.vr||C.o.r)*dt;
+  else{const o=C.o,lim=(C.nx?o.hd:o.hw)-.4,c0=C.nx?o.z:o.x,dir=C.nx?-C.nx:C.nz;C.u=Math.max(c0-lim,Math.min(c0+lim,C.u+vr*dir*dt));}
+  const v=Math.hypot(vr,vy);C.moving+=((v>.1?1:0)-C.moving)*Math.min(1,dt*8);
+  C.phase+=v*dt/CRAWL_STRIDE;
+  /* topo: passa para cima */
+  if(C.y>=C.o.h-.25&&vy>0){C.y=C.o.h-.25;const F2=wallFrame(C);C.mantle={t:0,p0:hero.position.clone(),q0:hero.quaternion.clone(),q1:new THREE.Quaternion().setFromAxisAngle(UPV,Math.atan2(-F2.n.x,-F2.n.z))};return;}
+  /* embaixo: solta e fica de pé */
+  if(C.y<=.3&&vy<0){const out=F.p.clone().addScaledVector(F.n,.45);out.y=0;endClimb(out,Math.atan2(-F.n.x,-F.n.z),snapBones());return;}
+  const F3=wallFrame(C),q=wallQuat(F3,C.psi),k=sm(C.t/.25);
+  hero.quaternion.copy(C.q0).slerp(q,k);
+  hero.position.copy(C.p0).lerp(F3.p.addScaledVector(F3.n,.03),k);
+  st.x=hero.position.x;st.y=hero.position.y;st.z=hero.position.z;st.speed=0;
+}
+/* pose na parede: Running Crawl no ritmo do deslocamento, mistura de entrada e pés encostados na parede */
+function inertBlend(I,dur){
+  if(!I||!I.snap)return;
+  const k=sm(I.t/dur);if(k>=1){I.snap=null;return;}
+  if(!I.off)I.off=baseBones.map(function(b,i){return [I.snap[i][0].clone().multiply(b.quaternion.clone().invert()),I.snap[i][1].clone().sub(b.position)];});
+  baseBones.forEach(function(b,i){b.quaternion.premultiply(_iq.copy(I.off[i][0]).slerp(_q.set(0,0,0,1),k));b.position.addScaledVector(I.off[i][1],1-k);});
+  rig.m.updateMatrixWorld(true);
+}
+function poseClimb(){
+  const C=climb,R=clipSrc.crawl,d=R.clip.duration;
+  applyClip('crawl',(C.phase%1+1)%1*d,1);
+  groundFeet();
+  inertBlend(C,C.mantle?.45:.25);
+  if(C.mantle&&!C.mantle.snapped){C.mantle.snapped=true;}
 }
 
 /* rastro das garras */
@@ -830,7 +937,7 @@ function findAct(re){for(const k in acts){if(re.test(k))return acts[k];}return n
 /* animações do Mixamo (pasta animacoes/), transferidas para o esqueleto da personagem por retarget:
    cada osso copia a rotação do osso de mesmo nome no esqueleto do Mixamo, no espaço do personagem,
    descontando a diferença entre as poses de repouso dos dois esqueletos */
-const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'},die1:{file:'animacoes/dying_1.glb'},die2:{file:'animacoes/dying_2.glb'},die3:{file:'animacoes/dying_3.glb'},die4:{file:'animacoes/dying_4.glb'},die5:{file:'animacoes/dying_5.glb'}};
+const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'},die1:{file:'animacoes/dying_1.glb'},die2:{file:'animacoes/dying_2.glb'},die3:{file:'animacoes/dying_3.glb'},die4:{file:'animacoes/dying_4.glb'},die5:{file:'animacoes/dying_5.glb'},crawl:{file:'animacoes/running_crawl.glb'},climbup:{file:'animacoes/climbing_up_wall.glb'}};
 const clipSrc={};
 function loadClips(){
   Object.keys(CLIPS).forEach(function(name){
@@ -889,7 +996,7 @@ function applyClip(name,t,w){
   const hp=hero.worldToLocal(R.S.Hips.getWorldPosition(new THREE.Vector3()));
   const dy=(hp.y-R.hips0.y)*R.scale;
   if(!B.Hips._p){B.Hips._p=B.Hips.position.clone();touchedP.push(B.Hips);}
-  B.Hips.getWorldPosition(_v);_v.y+=dy*w;B.Hips.position.copy(B.Hips.parent.worldToLocal(_v));B.Hips.updateMatrixWorld(true);
+  B.Hips.getWorldPosition(_v);_v.addScaledVector(_dn.set(0,1,0).applyQuaternion(_hq),dy*w);B.Hips.position.copy(B.Hips.parent.worldToLocal(_v));B.Hips.updateMatrixWorld(true);
   return {x:(hp.x-R.hips0.x)*R.scale,z:(hp.z-R.hips0.z)*R.scale};
 }
 
@@ -1316,8 +1423,8 @@ function poseT(){
 /* passos: toca quando o pé desce até perto do chão (vale para andar, correr, passos dos golpes e aterrissagem) */
 const stepState={L:{armed:false,cd:0},R:{armed:false,cd:0}};
 function detectSteps(dt){
-  if(!rig||st.y>.02)return;
-  const moving=st.speed>.6||combo.active;
+  if(!rig||(!climb&&st.y>groundY(st.x,st.z)+.02))return;
+  const moving=st.speed>.6||combo.active||(climb&&climb.moving>.5);
   ['Left','Right'].forEach(function(s){
     const S=stepState[s[0]];S.cd-=dt;
     const y=hero.worldToLocal(wp(rig.B[s+'Foot'])).y,thr=rig.restP[s+'Foot'].y+.07;
@@ -1361,9 +1468,11 @@ function updateModel(dt){
     if(rig)saveBase();
     hero.updateMatrixWorld(true);
     if(death&&clipSrc[death.name]){poseDeath();return;}
+    if(climb&&clipSrc.crawl){poseClimb();detectSteps(dt);return;}
     if(window.CLIP_PREVIEW&&clipSrc[CLIP_PREVIEW.name]){applyClip(CLIP_PREVIEW.name,CLIP_PREVIEW.t,1);poseHands();return;}
     poseFull();
     poseHands();
+    if(climbOut){climbOut.t+=dt;inertBlend(climbOut,.35);if(!climbOut.snap)climbOut=null;}
     detectSteps(dt);
   }else{
     custom.rotation.x=Math.min(st.speed/9,.5)*.25;
@@ -1382,7 +1491,7 @@ const slash=new THREE.Group();slash.position.y=1.1;slash.rotation.y=-Math.PI/2;h
 /* animação */
 const clock=new THREE.Clock();
 /* pausa: congela a personagem e os inimigos; a câmera continua livre */
-let paused=false;
+let paused=false,camDist=6.5;
 const pauseBtn=document.getElementById('pauseBtn');
 function togglePause(){paused=!paused;pauseBtn.textContent=paused?'Continuar':'Pausar';pauseBtn.blur();}
 pauseBtn.onclick=togglePause;
@@ -1391,10 +1500,19 @@ function frame(){
   const raw=Math.min(clock.getDelta(),.05);
   if(!paused)tick(raw);
   if(keys.ArrowLeft)st.yaw+=raw*1.8;if(keys.ArrowRight)st.yaw-=raw*1.8;
+  if(climb&&!drag){const F=wallFrame(climb);let a=Math.atan2(F.n.x,F.n.z),dd=a-st.yaw;while(dd>Math.PI)dd-=Math.PI*2;while(dd<-Math.PI)dd+=Math.PI*2;st.yaw+=dd*Math.min(1,raw*3);}
   /* câmera, com tremor no impacto */
   shake=Math.max(0,shake-raw*1.6);
   const d=st.camD,tx=st.x,ty=st.y+1.6,tz=st.z,sk=paused?0:shake*shake;
-  cam.position.set(tx+Math.sin(st.yaw)*Math.cos(st.pitch)*d+(Math.random()-.5)*sk,Math.max(.6,ty+Math.sin(st.pitch)*d)+(Math.random()-.5)*sk,tz+Math.cos(st.yaw)*Math.cos(st.pitch)*d);
+  /* câmera desvia de pilastras e muralhas: se algo estiver entre ela e a personagem, ela se aproxima */
+  const cdx=Math.sin(st.yaw)*Math.cos(st.pitch),cdy=Math.sin(st.pitch),cdz=Math.cos(st.yaw)*Math.cos(st.pitch);
+  let cd=d;
+  for(let k=1;k<=24;k++){const r=d*k/24,qx=tx+cdx*r,qy=ty+cdy*r,qz=tz+cdz*r;
+    const own=climb?climb.o:null;
+    let hit=circles.some(function(c){return c!==own&&qy<c.h+.2&&Math.hypot(qx-c.x,qz-c.z)<(c.vr||c.r)+.25;})||boxes.some(function(b){return b!==own&&qy<b.h+.2&&Math.abs(qx-b.x)<b.hw+.25&&Math.abs(qz-b.z)<b.hd+.25;});
+    if(hit){cd=Math.max(.8,r-d/24);break;}}
+  camDist+=(cd-camDist)*Math.min(1,raw*(cd<camDist?20:4));
+  cam.position.set(tx+cdx*camDist+(Math.random()-.5)*sk,Math.max(.6,ty+cdy*camDist)+(Math.random()-.5)*sk,tz+cdz*camDist);
   cam.lookAt(tx,ty,tz);
   renderer.render(scene,cam);
 }
@@ -1412,6 +1530,9 @@ function tick(raw){
     if(Math.hypot(ix,iz)>.3&&combo.t/combo.cur.dur>.8&&!combo.queued&&!combo.cur.clip){combo.active=false;combo.pose=pose.slice();combo.grace=.35;combo.hold=0;}
     else{ix=0;iz=0;}
   }
+  const spaceDown=keys.Space&&!st.spacePrev;st.spacePrev=keys.Space;
+  if(climb){updateClimb(dt,ix,iz,spaceDown);updateComboState(dt);updateCombat(dt);updateModel(dt);updateTrail(dt,null,null,false);return;}
+  if(spaceDown&&tryClimb(ix,iz)){updateModel(dt);return;}
   if(keys.Space)jump();
   const len=Math.hypot(ix,iz);
   let target=0;
@@ -1428,7 +1549,9 @@ function tick(raw){
   }
   st.speed+=(target-st.speed)*Math.min(1,dt*10);
   walkPhase+=st.speed*dt;
-  st.vy-=22*dt;st.y+=st.vy*dt;if(st.y<0){if(st.vy<-4)SOUND.land();st.y=0;st.vy=0;}
+  st.vy-=22*dt;st.y+=st.vy*dt;
+  if(st.vx||st.vz){st.x+=st.vx*dt;st.z+=st.vz*dt;const f=st.y>groundY(st.x,st.z)+.02?Math.max(0,1-dt*.6):0;st.vx*=f;st.vz*=f;if(Math.abs(st.vx)+Math.abs(st.vz)<.05)st.vx=st.vz=0;}
+  {const g=groundY(st.x,st.z);if(st.y<g){if(st.vy<-4)SOUND.land();st.y=g;st.vy=0;}}
   updateComboState(dt);
   resolve();
   updateCombat(dt);
@@ -1469,7 +1592,7 @@ function tick(raw){
 }
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
+window.AETH={get climb(){return climb;},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
 frame();
 })();
 </script>

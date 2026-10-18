@@ -10,6 +10,10 @@ Como executar no computador:
 2. Execute: python -m http.server 8000
 3. Abra http://localhost:8000 no navegador.
 
+Escalada: pule (Espaço) perto de uma pilastra ou parede, de frente para ela, para grudar
+na superfície (Running Crawl). Na parede: W sobe, S desce, A/D vão para os lados, Shift
+acelera, Espaço salta para longe. No topo ela passa para cima e fica de pé; embaixo, solta.
+
 Controles: WASD move, Shift corre (correndo, o ataque vira um chute voador), Espaço pula, J ou clique ataca, F transforma,
 arraste para girar a câmera, rodinha do mouse dá zoom. No celular: joystick à
 esquerda e botões à direita.

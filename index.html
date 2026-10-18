@@ -225,7 +225,7 @@ function playVoice(k,rate,gain){
   return true;
 }
 addEventListener('pointerdown',audioInit);addEventListener('keydown',audioInit);
-function sfxOK(){return SFX.on&&SFX.ctx&&SFX.ctx.state==='running';}
+function sfxOK(){return SFX.on&&SFX.ctx&&(SFX.ctx.state==='running'||SFX.offline);}
 function env(g,t,a,peak,dur){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);}
 /* ruído filtrado com varredura de frequência */
 function noiseHit(type,f0,f1,q,peak,a,dur,delay){
@@ -243,7 +243,39 @@ function toneDrop(type,f0,f1,peak,dur,delay,dist){
   if(dist){const w=c.createWaveShaper(),cv=new Float32Array(256);for(let i=0;i<256;i++){const x=i/128-1;cv[i]=Math.tanh(x*3);}w.curve=cv;o.connect(w);w.connect(g);}else o.connect(g);
   g.connect(SFX.out);o.start(t);o.stop(t+dur+.05);
 }
+/* tons senoidais com decaimento (o "tilintar" metálico das garras) */
+function ring(freqs,gains,decay,delay){
+  const c=SFX.ctx,t=c.currentTime+(delay||0);
+  freqs.forEach(function(f,i){const o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.value=f*(.97+Math.random()*.06);
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(gains[i],t+.002);g.gain.exponentialRampToValueAtTime(0.0001,t+decay*(1-i*.12));
+    o.connect(g);g.connect(SFX.out);o.start(t);o.stop(t+decay+.05);});
+}
+/* ruído de banda estreita que sobe até o pico e cai: uma lâmina passando perto */
+function bladePass(f0,fpk,f1,q,peak,dur,delay){
+  const c=SFX.ctx,t=c.currentTime+(delay||0),src=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain(),tp=t+dur*.55;
+  src.buffer=SFX.noise;src.loop=true;
+  f.type='bandpass';f.Q.value=q;f.frequency.setValueAtTime(f0,t);f.frequency.exponentialRampToValueAtTime(fpk,tp);f.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,tp);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  src.connect(f);f.connect(g);g.connect(SFX.out);src.start(t,Math.random()*.5);src.stop(t+dur+.05);
+}
 const SOUND={
+  /* garras cortando o ar: três lâminas finas defasadas, assobio metálico sutil e um pouco de corpo grave */
+  swish:function(power){if(!sfxOK())return;const p=power||1,dur=.2+.05*p;
+    for(let k=0;k<3;k++){const r=.92+Math.random()*.16;bladePass(900*r,4200*r*(1+.08*k),1700*r,5.5,.2*p*(1-k*.18),dur,k*.012);}
+    bladePass(2600,7000,3000,1.2,.07*p,dur*.9,.01);
+    bladePass(260,600,240,1,.12*p,dur*1.1);
+    const c=SFX.ctx,t=c.currentTime,o=c.createOscillator(),g=c.createGain(),tp=t+dur*.55;
+    o.type='sine';o.frequency.setValueAtTime(1700,t);o.frequency.exponentialRampToValueAtTime(3100,tp);o.frequency.exponentialRampToValueAtTime(1300,t+dur);
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(.025*p,tp);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(g);g.connect(SFX.out);o.start(t);o.stop(t+dur+.05);},
+  /* garras acertando: três raspadas metálicas, tilintar curto e o impacto abafado na carne */
+  slash:function(heavy){if(!sfxOK())return;
+    for(let k=0;k<3;k++)noiseHit('bandpass',6500-k*400,2300,3,.32*(1-k*.15),.002,.09,k*.014);
+    noiseHit('highpass',5000,3500,.7,.12,.002,.05);
+    ring([2250,3380,4960,7120],[.1,.07,.05,.035],.26);
+    noiseHit('lowpass',900,180,.8,.45,.003,.11,.004);toneDrop('sine',125,52,.55,.13,.004);
+    noiseHit('bandpass',700,400,2,.18,.004,.07,.01);
+    if(heavy){toneDrop('sine',85,32,.85,.34,.006,true);noiseHit('lowpass',500,100,.8,.4,.006,.26);ring([1650,2480,3720],[.08,.05,.03],.4,.01);}},
   whoosh:function(power){if(!sfxOK())return;const p=power||1;
     noiseHit('bandpass',350,2600*(.8+.2*p),1.1,.28*p,.06,.2+.06*p);noiseHit('bandpass',2400,500,1.3,.18*p,.03,.26+.06*p,.08);},
   impact:function(heavy){if(!sfxOK())return;
@@ -537,7 +569,7 @@ function updateComboState(dt){
   }
   const dsp=(spinAt(A,p)-spinAt(A,p0))*(A.right?1:-1);
   if(dsp){st.rot+=dsp;st.rotT+=dsp;pivotFeet(dsp);}
-  if(!combo.swung&&p>=A.kw){combo.swung=true;const pw=A.finisher?1.5:A.dmg>=2?1.25:1;SOUND.whoosh(pw);if(A.finisher||A.both)SOUND.voice('growl');else if(A.dmg>=2||Math.random()<.5)SOUND.voice('effort');}
+  if(!combo.swung&&p>=A.kw){combo.swung=true;const pw=A.finisher?1.5:A.dmg>=2?1.25:1;SOUND.swish(pw);if(A.finisher||A.both)SOUND.voice('growl');else if(A.dmg>=2||Math.random()<.5)SOUND.voice('effort');}
   if(!combo.hitDone&&p>=A.hit){combo.hitDone=true;hitEnemies(A);}
   if(combo.queued&&p>=A.chain&&combo.i<ATT.length-1){startAttack(combo.i+1);return;}
   if(combo.t>=A.dur&&!combo.paused){
@@ -590,7 +622,7 @@ function hitEnemies(A){
     const k=d>0?1/d:0;e.vx=dx*k*A.knock;e.vz=dz*k*A.knock;
     if(e.hp<=0){e.dead=.001;kills++;}
   });
-  if(any)SOUND.impact(A.finisher||A.dmg>=2);
+  if(any)SOUND.slash(A.finisher||A.dmg>=2);
   if(any){hitStop=A.finisher?.15:.09;shake=A.finisher?.34:.19;}
 }
 function updateCombat(dt){

@@ -487,10 +487,11 @@ const ATT_B=[
    /* pernas da Jump Attack (legClip): agacha, se ergue um pouco (quase sem sair do chão), desce com o bote caindo
       agachado com um pé à frente e, desequilibrado pela força, dá um passo à frente ao se levantar (stumble);
       legMap liga o progresso do golpe ao tempo da animação, legDy limita a altura do quadril */
-   legClip:'jumpatk',legMap:[[0,0],[.3,.25],[.46,.5],[.57,.545],[.65,1.52,'cut'],[.72,1.75],[.75,2.6],[.88,3.08],[1,3.2]],legDy:[-.62,.14],
-   stumble:[.55,.75,.88],
-   /* endStance: no fim, passos curtos até a base da guarda (pé esquerdo, pé direito: [lado, frente]); endSteps: [pé, início, fim] */
-   endStance:{L:[-.24,.39],R:[.25,-.29]},endSteps:[['R',.88,.95],['L',.93,1]],
+   legClip:'jumpatk',legMap:[[0,0],[.3,.25],[.46,.5],[.57,.545],[.65,1.52,'cut'],[.72,1.75],[.75,2.6],[.88,2.86],[1,2.95]],legDy:[-.62,.14],
+   stumble:[.45,.75,.88],
+   /* endStance: base da guarda (pé esquerdo, pé direito: [lado, frente]); depois do golpe, já em guarda, os pés vão até
+      ela em passos lentos (endStep: velocidade e atraso do segundo pé) */
+   endStance:{L:[-.24,.39],R:[.25,-.29]},endStep:{speed:5,delayL:.22},
    steps:[],
    keys:[
     {t:.18,e:'io',s:[.88,-.3,.12],o:[.88,-.3,.12],yaw:.15,pitch:.3,roll:0,drop:.22,fwd:-.02,side:0},
@@ -624,6 +625,10 @@ function updateComboState(dt){
   if(combo.queued&&p>=A.chain&&combo.i<ATT.length-1){startAttack(combo.i+1);return;}
   if(combo.t>=A.dur&&!combo.paused){
     combo.active=false;if(!A.clip)combo.pose=evalPose(A,combo.start,1,combo.pose||[]);
+    /* golpe com base de guarda definida: os pés vão até ela em passos lentos, primeiro o direito, depois o esquerdo */
+    if(A.endStance&&feet.L){const E=A.endStance,S=A.endStep;
+      feet.R.rel=[-E.R[0],E.R[1]];feet.L.rel=[-E.L[0],E.L[1]];
+      feet.R.stepping=feet.L.stepping=true;feet.R.ss=feet.L.ss=S.speed;feet.R.stepDelay=0;feet.L.stepDelay=S.delayL;}
     if(combo.i>=ATT.length-1){combo.cool=.45;combo.grace=0;combo.i=-1;}
     else combo.grace=.35;
     combo.hold=COMBAT_HOLD;combo.holdT=0;
@@ -1916,15 +1921,8 @@ function applyProc(A,p,w,mv){
   if(lc>0){legClipLegs(A,lc);
     /* os pés plantados acompanham as pernas da animação enquanto ela manda; quando ela começa a sair, os pés ficam
        onde ela os deixou e a guarda continua dali (sem escorregar para a pose parada) */
-    if(feet.L&&lc>.985*w){feet.L.copy(wp(B.LeftFoot));feet.R.copy(wp(B.RightFoot));feet.L.y=feet.R.y=st.y+feet.y;feet.L.rel=feet.R.rel=null;A._fs=null;}
-    /* depois do passo da animação, dois passos curtos levam os pés até a base da guarda */
-    else if(feet.L&&A.endStance){
-      if(!A._fs)A._fs={L:feet.L.clone(),R:feet.R.clone()};
-      A.endSteps.forEach(function(sp){const k=sp[0],u=Math.max(0,Math.min(1,(p-sp[1])/(sp[2]-sp[1]))),es=A.endStance[k];
-        const hf=new THREE.Vector3(Math.sin(st.rot),0,Math.cos(st.rot)),hr=new THREE.Vector3().crossVectors(hf,UPV);
-        const dst=new THREE.Vector3(st.x,st.y+feet.y,st.z).addScaledVector(hr,es[0]).addScaledVector(hf,es[1]);
-        feet[k].copy(A._fs[k]).lerp(dst,sm(u));feet[k].lift=Math.sin(Math.PI*u)*.07;feet[k].rel=null;});
-    }}
+    if(feet.L&&lc>.985*w){feet.L.copy(wp(B.LeftFoot));feet.R.copy(wp(B.RightFoot));feet.L.y=feet.R.y=st.y+feet.y;feet.L.rel=feet.R.rel=null;}
+    }
   ['Left','Right'].forEach(function(s){
     const k=s[0],sg=s==='Right'?1:-1;
     if(gnd<.999&&feet[k]){feet[k].copy(_animFoot[k]);feet[k].y=st.y+feet.y;}
@@ -1939,10 +1937,11 @@ function applyProc(A,p,w,mv){
       if(!f.rel){let rx=f.x-st.x,rz=f.z-st.z;const l=Math.hypot(rx,rz);if(l>.45){rx*=.45/l;rz*=.45/l;}f.rel=[rx*c-rz*sn,rx*sn+rz*c];}
       const nx=st.x+f.rel[0]*c+f.rel[1]*sn,nz=st.z-f.rel[0]*sn+f.rel[1]*c,dx=nx-f.x,dz=nz-f.z,d=Math.hypot(dx,dz);
       if(d>.32)f.stepping=true;
-      if(f.stepping){
-        const u=1-Math.exp(-procDt*16);f.x+=dx*u;f.z+=dz*u;
-        f.lift=Math.min(.09,d*.3);
-        if(d<.05){f.stepping=false;f.lift=0;}
+      if(f.stepDelay>0){f.stepDelay-=procDt;f.lift=0;}
+      else if(f.stepping){
+        const u=1-Math.exp(-procDt*(f.ss||16));f.x+=dx*u;f.z+=dz*u;
+        f.lift=Math.min(f.ss?.05:.09,d*.3);
+        if(d<.03){f.stepping=false;f.lift=0;f.ss=0;}
       }else f.lift=0;
     }
     footTarget(k,A,p,_ft);

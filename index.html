@@ -32,7 +32,7 @@ canvas{display:block}
 <body>
 <div id="hud">
   <h1>Aethelred, protótipo de blocos</h1>
-  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador.<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. M alterna entre o combo novo (B) e o anterior (A). P pausa a personagem (a câmera continua livre). O liga e desliga o som. V troca a versão da voz (tratada, criatura, original).</p>
+  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador.<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. M alterna entre o combo novo (B) e o anterior (A). P pausa a personagem (a câmera continua livre). O liga e desliga o som. V troca a versão da voz (original, tratada, criatura).</p>
   <p id="state">Forma normal</p>
   <p id="vida">Vida 100   Abatidos 0</p>
   <p id="combo"></p>
@@ -197,7 +197,9 @@ const VOICE_FILES={golpe:['golpe_1','golpe_2','golpe_3','golpe_4'],dor:['dor_1',
 /* três versões das vozes para comparar (tecla V): tratada (compressão, corpo e presença, 2 semitons abaixo),
    criatura (5 semitons abaixo com timbre mais grave e saturação) e original */
 const VOICE_PRESETS=[{id:'tratada',dir:'sons/tratada/',name:'tratada'},{id:'criatura',dir:'sons/criatura/',name:'criatura'},{id:'original',dir:'sons/',name:'original'}];
-let voicePreset=0;
+let voicePreset=2;
+/* volume das vozes gravadas em relação aos efeitos (0,5 = metade, cerca de -6 dB) */
+const VOICE_GAIN=.5;
 const voiceBuf={},voiceLast={};
 function loadVoices(){
   const P=VOICE_PRESETS[voicePreset];if(voiceBuf[P.id])return;
@@ -218,7 +220,7 @@ function playVoice(k,rate,gain){
   const L=(voiceBuf[VOICE_PRESETS[voicePreset].id]||{})[k];if(!L||!L.length)return false;
   let i=Math.floor(Math.random()*L.length);if(L.length>1&&i===voiceLast[k])i=(i+1)%L.length;voiceLast[k]=i;
   const c=SFX.ctx,src=c.createBufferSource(),g=c.createGain();
-  src.buffer=L[i];src.playbackRate.value=(rate||1)*(.94+Math.random()*.12);g.gain.value=gain||1;
+  src.buffer=L[i];src.playbackRate.value=(rate||1)*(.94+Math.random()*.12);g.gain.value=(gain||1)*VOICE_GAIN;
   src.connect(g);g.connect(SFX.out);src.start();
   return true;
 }

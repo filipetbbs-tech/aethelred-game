@@ -769,7 +769,9 @@ function normAng(a){while(a>Math.PI)a-=Math.PI*2;while(a<-Math.PI)a+=Math.PI*2;r
    Solta se outro inimigo acertar a personagem */
 const GRAB={reach:.35,hold:.47,missEnd:.82,speed:1.25,range:1.9,arc:1.3,upEnd:1.55,upHit:1.12,upSpeed:1.2,
   walk:3.2,run:6.4,dragDmg:1.1,dragTick:.35,
-  slamDur:.5,slamHit:.27,slamDmg:.4,throwDur:.55,throwRel:.27,throwV:17,throwUp:5};
+  slamDur:.5,slamHit:.27,slamDmg:.4,throwDur:.55,throwRel:.27,throwV:17,throwUp:5,
+  /* arremesso com a Standing Melee Attack Backhand: revés da mão esquerda, solta quando a mão passa pela frente */
+  bh0:.45,bh1:1.9,bhRel:1.04,bhSpeed:1.3};
 let grab=null;
 function grabKey(){
   if(grab){if(grab.phase==='hold')releaseGrab(true);return;}
@@ -804,10 +806,7 @@ function updateGrab(dt){
     if(!G.thr&&(!G.e||G.e.dead)){releaseGrab(false);return;}
     /* arremesso (vida do inimigo acabou arrastando): solta no meio do giro do braço, na direção da corrida */
     if(G.thr){G.thr.t+=dt;
-      if(!G.thr.rel&&G.thr.t>=GRAB.throwRel){G.thr.rel=true;const e=G.e,fx=Math.sin(st.rot),fz=Math.cos(st.rot);
-        e.held=false;e.g.rotation.order='YXZ';e.g.rotation.set(Math.PI/2,st.rot,0);e.dead=.001;e.thrown=true;kills++;
-        e.vx=fx*GRAB.throwV;e.vz=fz*GRAB.throwV;e.vy=GRAB.throwUp;e.g.position.y=Math.max(e.g.position.y,.9);
-        SOUND.swish(1.6);SOUND.voice('growl');shake=Math.max(shake,.3);rumble(1,.6,200);G.e=null;}
+      if(!G.thr.rel&&G.thr.t>=GRAB.throwRel){G.thr.rel=true;launchThrown(G.e);SOUND.voice('growl');G.e=null;}
       if(G.thr.t>=GRAB.throwDur){grab.e=null;releaseGrab(false);}
       return;}
     /* pancada no chão no começo do sprint: para, bate o inimigo contra o chão com força e só então sai correndo */
@@ -816,7 +815,7 @@ function updateGrab(dt){
     if(G.slam){G.slam.t+=dt;
       if(!G.slam.hit&&G.slam.t>=GRAB.slamHit){G.slam.hit=true;const e=G.e;e.hp-=GRAB.slamDmg*(st.morphOn?2:1);e.flash=.2;
         SOUND.impact(true);SOUND.land();shake=Math.max(shake,.42);hitStop=Math.max(hitStop,.07);rumble(1,.9,230);
-        if(e.hp<=0){G.slam=null;G.thr={t:0};return;}}
+        if(e.hp<=0){G.slam=null;startThrow();return;}}
       if(G.slam.t>=GRAB.slamDur){G.slam=null;G.dragging=true;G.dw=1;}
       return;}
     if(G.dragging&&!runHeld())G.dragging=false;
@@ -825,7 +824,11 @@ function updateGrab(dt){
     if(drag&&G.dw>.6){G.dragT+=dt;G.scr=(G.scr||0)-dt;
       if(G.scr<=0){G.scr=.11;SOUND.scrape();}
       if(G.dragT>=GRAB.dragTick){G.dragT=0;const e=G.e;e.hp-=GRAB.dragDmg*GRAB.dragTick*(st.morphOn?2:1);e.flash=.12;rumble(.25,.35,90);
-        if(e.hp<=0){G.thr={t:0};G.dragging=false;}}}
+        if(e.hp<=0)startThrow();}}
+  }
+  else if(G.phase==='throw'){G.tt+=dt;G.ct=Math.min(GRAB.bh1,GRAB.bh0+G.tt*GRAB.bhSpeed);
+    if(G.e&&G.ct>=GRAB.bhRel){launchThrown(G.e);G.e=null;}
+    if(G.ct>=GRAB.bh1)releaseGrab(false);
   }
   else if(G.phase==='upper'){G.ct=Math.min(GRAB.upEnd,GRAB.hold+(G.t-G.ut0)*GRAB.upSpeed);
     if(!G.hitDone&&G.ct>=GRAB.upHit){G.hitDone=true;const e=G.e;
@@ -833,6 +836,17 @@ function updateGrab(dt){
       SOUND.slash(true);SOUND.impact(true);shake=Math.max(shake,.35);hitStop=Math.max(hitStop,.09);rumble(1,.7,220);}
     if(G.ct>=GRAB.upEnd)releaseGrab(false);
   }
+}
+function startThrow(){
+  const G=grab;G.dragging=false;
+  if(clipSrc.bh){G.phase='throw';G.tt=0;G.rmPrev=null;G.I={snap:snapBones(),off:null,t:0};SOUND.voice('growl');}
+  else G.thr={t:0};
+}
+function launchThrown(e){
+  const fx=Math.sin(st.rot),fz=Math.cos(st.rot);
+  e.held=false;e.g.rotation.order='YXZ';e.g.rotation.set(Math.PI/2,st.rot,0);e.dead=.001;e.thrown=true;kills++;
+  e.vx=fx*GRAB.throwV;e.vz=fz*GRAB.throwV;e.vy=GRAB.throwUp;e.g.position.y=Math.max(e.g.position.y,.9);
+  SOUND.swish(1.6);shake=Math.max(shake,.3);rumble(1,.6,200);
 }
 function uppercutFromGrab(){
   if(!grab||grab.phase!=='hold')return false;
@@ -843,7 +857,7 @@ function uppercutFromGrab(){
 function poseGrab(dt){
   const G=grab;
   hero.position.set(st.x,st.y,st.z);hero.rotation.set(0,st.rot,0);hero.updateMatrixWorld(true);
-  const rm=applyClip('upc',G.ct,1);
+  const rm=applyClip(G.phase==='throw'?'bh':'upc',G.ct,1);
   if(rm&&G.rmPrev){const dx=rm.x-G.rmPrev.x,dz=rm.z-G.rmPrev.z,c=Math.cos(st.rot),sn=Math.sin(st.rot);
     /* o passo à frente para ao encostar num inimigo (e depois de agarrar) */
     const fx=Math.sin(st.rot),fz=Math.cos(st.rot);let block=!!G.e;
@@ -852,6 +866,9 @@ function poseGrab(dt){
   if(rm)G.rmPrev=rm;
   groundFeet();
   G.I.t+=dt;inertBlend(G.I,.12);
+  /* arremesso: o inimigo vai preso pela cabeça na mão esquerda, com o corpo para fora, girando com o braço */
+  if(G.phase==='throw'&&G.e){const h=wp(rig.B.LeftHand),p=G.e.g.position;let dx=h.x-st.x,dz=h.z-st.z;const l=Math.hypot(dx,dz)||1;dx/=l;dz/=l;
+    G.e.g.rotation.order='YXZ';p.set(h.x+dx*1.45,Math.max(.05,h.y-.2),h.z+dz*1.45);G.e.g.rotation.set(Math.PI/2,Math.atan2(-dx,-dz),0);return;}
   /* inimigo preso: o peito dele fica na mão esquerda */
   if(G.e){const h=wp(rig.B.LeftHand),p=G.e.g.position,fx=Math.sin(st.rot),fz=Math.cos(st.rot);
     p.set(h.x+fx*.42,Math.max(0,h.y-1.15),h.z+fz*.42);G.e.g.rotation.y=st.rot+Math.PI;}
@@ -1387,7 +1404,7 @@ function findAct(re){for(const k in acts){if(re.test(k))return acts[k];}return n
 /* animações do Mixamo (pasta animacoes/), transferidas para o esqueleto da personagem por retarget:
    cada osso copia a rotação do osso de mesmo nome no esqueleto do Mixamo, no espaço do personagem,
    descontando a diferença entre as poses de repouso dos dois esqueletos */
-const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'},die1:{file:'animacoes/dying_1.glb'},die2:{file:'animacoes/dying_2.glb'},die3:{file:'animacoes/dying_3.glb'},die4:{file:'animacoes/dying_4.glb'},die5:{file:'animacoes/dying_5.glb'},crawl:{file:'animacoes/running_crawl.glb'},hang:{file:'animacoes/braced_hang_to_crouch.glb'},aerial:{file:'animacoes/aerial_evade.glb'},qroll:{file:'animacoes/quick_roll_to_run.glb'},sflip:{file:'animacoes/stylish_flip.glb'},jatk:{file:'animacoes/run_jump_attack.glb'},upc:{file:'animacoes/surprise_uppercut.glb'}};
+const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'},die1:{file:'animacoes/dying_1.glb'},die2:{file:'animacoes/dying_2.glb'},die3:{file:'animacoes/dying_3.glb'},die4:{file:'animacoes/dying_4.glb'},die5:{file:'animacoes/dying_5.glb'},crawl:{file:'animacoes/running_crawl.glb'},hang:{file:'animacoes/braced_hang_to_crouch.glb'},aerial:{file:'animacoes/aerial_evade.glb'},qroll:{file:'animacoes/quick_roll_to_run.glb'},sflip:{file:'animacoes/stylish_flip.glb'},jatk:{file:'animacoes/run_jump_attack.glb'},upc:{file:'animacoes/surprise_uppercut.glb'},bh:{file:'animacoes/melee_backhand.glb'}};
 const clipSrc={};
 function loadClips(){
   Object.keys(CLIPS).forEach(function(name){

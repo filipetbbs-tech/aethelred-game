@@ -952,13 +952,14 @@ let airAtk=null;
 function airAtkDur(){return (AIRATK.c1-AIRATK.c0)/AIRATK.speed;}
 function startAirAttack(){
   if(airAtk||!clipSrc.jatk||!rig||dodge)return;
-  /* sem mira automática: segue na direção do salto (no salto da parede, para longe dela; no pulo, para onde estava indo) */
-  if(flip&&flip.rev)st.rot=st.rotT=st.rot+Math.PI;
-  else if(Math.hypot(st.vx||0,st.vz||0)>.5)st.rot=st.rotT=Math.atan2(st.vx,st.vz);
+  /* sem mira automática: segue na direção do salto. No salto da parede continua de frente para a parede (de costas
+     para onde vai) e o avanço da animação é invertido, para seguir se afastando dela; no pulo, vira para onde estava indo */
+  const back=!!(flip&&flip.rev);
+  if(!back&&Math.hypot(st.vx||0,st.vz||0)>.5)st.rot=st.rotT=Math.atan2(st.vx,st.vz);
   const R=clipSrc.jatk;R.action.time=AIRATK.c0;R.mixer.update(0);R.src.updateMatrixWorld(true);
   const dy0=(hero.worldToLocal(R.S.Hips.getWorldPosition(new THREE.Vector3())).y-R.hips0.y)*R.scale;
   const hw=wp(rig.B.Hips);
-  airAtk={t:0,oy0:hw.y-rig.restP.Hips.y-dy0,rmPrev:null,I:{snap:snapBones(),off:null,t:0},hit:false,landed:false};
+  airAtk={t:0,back:back,oy0:hw.y-rig.restP.Hips.y-dy0,rmPrev:null,I:{snap:snapBones(),off:null,t:0},hit:false,landed:false};
   flip=null;climbOut=null;combo.active=false;combo.queued=false;combo.i=-1;landT=0;
   st.vx=st.vz=st.vy=0;
   SOUND.voice('growl');SOUND.whoosh&&SOUND.whoosh(1.3);
@@ -968,7 +969,7 @@ function poseAirAtk(dt){
   const g=groundY(st.x,st.z),kl=Math.min(1,(ct-AIRATK.c0)/(AIRATK.land-AIRATK.c0));
   st.y=T.oy0+(g-T.oy0)*sm(kl);st.vy=0;hero.position.set(st.x,st.y,st.z);hero.rotation.set(0,st.rot,0);hero.updateMatrixWorld(true);
   const rm=applyClip('jatk',ct,1);
-  if(rm&&T.rmPrev){const dx=rm.x-T.rmPrev.x,dz=rm.z-T.rmPrev.z,c=Math.cos(st.rot),sn=Math.sin(st.rot);st.x+=dx*c+dz*sn;st.z+=-dx*sn+dz*c;}
+  if(rm&&T.rmPrev){const sg=T.back?-1:1,dx=(rm.x-T.rmPrev.x)*sg,dz=(rm.z-T.rmPrev.z)*sg,c=Math.cos(st.rot),sn=Math.sin(st.rot);st.x+=dx*c+dz*sn;st.z+=-dx*sn+dz*c;}
   if(rm)T.rmPrev=rm;
   if(ct>AIRATK.land)groundFeet();
   T.I.t+=dt;inertBlend(T.I,.15);

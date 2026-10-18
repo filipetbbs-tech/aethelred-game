@@ -189,7 +189,28 @@ function audioInit(){
     const nb=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate),d=nb.getChannelData(0);
     for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
     SFX.ctx=ctx;SFX.out=out;SFX.noise=nb;
+    loadVoices();
   }catch(e){SFX.ctx=null;}
+}
+/* vozes gravadas (pasta sons/): sorteadas sem repetir em seguida; sem os arquivos, fica a voz sintetizada */
+const VOICE_FILES={golpe:['golpe_1','golpe_2','golpe_3','golpe_4'],dor:['dor_1','dor_2'],pulo:['pulo_1'],morte:['morte_1','morte_2']};
+const voiceBuf={},voiceLast={};
+function loadVoices(){
+  Object.keys(VOICE_FILES).forEach(function(k){
+    VOICE_FILES[k].forEach(function(n){
+      fetch('sons/'+n+'.mp3').then(function(r){if(!r.ok)throw 0;return r.arrayBuffer();})
+        .then(function(b){return new Promise(function(ok,no){SFX.ctx.decodeAudioData(b,ok,no);});})
+        .then(function(buf){(voiceBuf[k]=voiceBuf[k]||[]).push(buf);}).catch(function(){});
+    });
+  });
+}
+function playVoice(k,rate,gain){
+  const L=voiceBuf[k];if(!L||!L.length)return false;
+  let i=Math.floor(Math.random()*L.length);if(L.length>1&&i===voiceLast[k])i=(i+1)%L.length;voiceLast[k]=i;
+  const c=SFX.ctx,src=c.createBufferSource(),g=c.createGain();
+  src.buffer=L[i];src.playbackRate.value=(rate||1)*(.94+Math.random()*.12);g.gain.value=gain||1;
+  src.connect(g);g.connect(SFX.out);src.start();
+  return true;
 }
 addEventListener('pointerdown',audioInit);addEventListener('keydown',audioInit);
 function sfxOK(){return SFX.on&&SFX.ctx&&SFX.ctx.state==='running';}
@@ -222,6 +243,8 @@ const SOUND={
   /* voz: onda dente de serra passando por dois formantes, mais um sopro de ar */
   voice:function(kind){if(!sfxOK())return;const c=SFX.ctx,now=c.currentTime;
     if(now-SFX.lastVoice<.35&&kind!=='death')return;SFX.lastVoice=now;
+    const rec={effort:['golpe',1,1],growl:['golpe',.86,1.1],pain:['dor',1,1],jump:['pulo',1,.9],death:['morte',1,1.1]}[kind];
+    if(rec&&playVoice(rec[0],rec[1],rec[2]))return;
     const V={effort:{f0:118,f1:92,dur:.2,F:[640,1150],g:.32},growl:{f0:82,f1:62,dur:.62,F:[480,980],g:.42,rough:31},pain:{f0:165,f1:112,dur:.32,F:[720,1250],g:.3},death:{f0:150,f1:62,dur:1.0,F:[680,1150],g:.4,rough:23},jump:{f0:130,f1:115,dur:.12,F:[600,1100],g:.18}}[kind];
     const t=now,o=c.createOscillator(),g=c.createGain(),mix=c.createGain();
     const jit=.92+Math.random()*.16;

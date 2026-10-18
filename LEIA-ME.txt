@@ -25,6 +25,9 @@ cada golpe, impacto ao acertar (mais grave nos golpes pesados), passos quando o 
 toca o chão (andando, correndo, nos golpes e na aterrissagem), pulo e aterrissagem, e
 vocalizações (esforço em parte dos golpes, rosnado no golpe final, gemido ao levar
 dano). Os parâmetros ficam no objeto SOUND do index.html.
+Vozes gravadas: se existirem os arquivos sons/golpe_1..4.mp3, dor_1..2.mp3, pulo_1.mp3 e
+morte_1..2.mp3, eles substituem a voz sintetizada (sorteados, sem repetir em seguida, com
+leve variação de tom). Sem os arquivos, o jogo usa a voz sintetizada.
 
 Combate: dois combos de 5 golpes, alternados com a tecla M.
 - Combo B (atual, tabela ATT_B): abertura rápida, revés de baixo para cima,

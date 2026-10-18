@@ -1476,6 +1476,7 @@ function loadHumanArms(mesh){
       const armV=new Uint8Array(nv),gi=['getX','getY','getZ','getW'];for(let v=0;v<nv;v++){let a=0;for(let k=0;k<4;k++)if(isArm[si[gi[k]](v)])a+=sw[gi[k]](v);armV[v]=a>.75?1:0;}
       const hide=src.userData.hideOld;if(hide){armV.fill(0);hide.forEach(function(v){armV[v]=1;});}
       const full=g0.index,src2=full.array,keep=[];for(let t=0;t<src2.length;t+=3)if(!armV[src2[t]]&&!armV[src2[t+1]]&&!armV[src2[t+2]])keep.push(src2[t],src2[t+1],src2[t+2]);
+      if(src.userData.align)loadShowcase(mesh,src.userData.align);
       armForm.human={mesh:arm,full:full,noArm:new THREE.BufferAttribute(new Uint32Array(keep),1),shown:null};armForm.last=-1;applyArmForm();
     },function(){});
   },function(){});
@@ -1493,20 +1494,34 @@ function applyArmForm(){
   armForm.mesh.geometry.attributes.color.needsUpdate=true;
 }
 /* vitrine: o modelo novo inteiro (aethelred_bracos_humanos_leve.glb, sem esqueleto), parado ao lado do ponto de
-   partida, na altura do personagem e virado para a câmera, para avaliar a qualidade dele como um todo */
-function loadShowcase(){
+   partida e virado para a câmera. Usa o mesmo alinhamento calculado para encaixar os braços (extras.align: escala,
+   rotação e posição do modelo novo no espaço do modelo atual) e a mesma transformação da malha do personagem, então
+   fica exatamente na proporção do modelo atual */
+function loadShowcase(mesh,align){
   loadBinary('aethelred_bracos_humanos_leve.glb',function(buf){
     new THREE.GLTFLoader().parse(buf,'',function(g){
-      const o=g.scene,b=new THREE.Box3().setFromObject(o),sz=b.getSize(new THREE.Vector3()),k=1.9/sz.y;
-      o.scale.setScalar(k);const c=b.getCenter(new THREE.Vector3());
-      const holder=new THREE.Group();o.position.set(-c.x*k,-b.min.y*k,-c.z*k);holder.add(o);
-      holder.position.set(2.2,0,6);scene.add(holder);
-      o.traverse(function(m){if(m.isMesh){m.castShadow=true;m.receiveShadow=true;}});
+      hero.updateMatrixWorld(true);
+      /* espaço de ligação da malha do personagem levado ao mundo pelo quadril (como se a malha inteira estivesse presa
+         a ele, na pose em que foi rigada); só a escala e a rotação interessam, a posição vai para o chão da vitrine */
+      const sk=mesh.skeleton,hi=sk.bones.findIndex(function(b){return /Hips$/.test(b.name);});
+      mesh.updateMatrixWorld(true);
+      const M=new THREE.Matrix4().copy(mesh.matrixWorld).multiply(mesh.bindMatrixInverse).multiply(sk.bones[hi].matrixWorld).multiply(sk.boneInverses[hi]).multiply(mesh.bindMatrix);
+      const rel=new THREE.Matrix4().copy(hero.matrixWorld).invert().multiply(M);
+      const ps=new THREE.Vector3(),qs=new THREE.Quaternion(),ss=new THREE.Vector3();rel.decompose(ps,qs,ss);
+      /* fica de pé e virado para a frente: tira a inclinação que a pose do quadril teria no quadro atual */
+      const e=new THREE.Euler().setFromQuaternion(qs,'YXZ');
+      const o=g.scene;o.matrixAutoUpdate=false;
+      const up=new THREE.Matrix4().compose(new THREE.Vector3(),qs,ss).multiply(new THREE.Matrix4().fromArray(align));
+      o.matrix.copy(up);o.updateMatrixWorld(true);
+      const bb=new THREE.Box3().setFromObject(o),cx=(bb.min.x+bb.max.x)/2,cz=(bb.min.z+bb.max.z)/2;
+      o.matrix.premultiply(new THREE.Matrix4().makeTranslation(-cx,-bb.min.y,-cz));
+      const holder=new THREE.Group();holder.add(o);holder.position.set(2.2,0,6);scene.add(holder);
+      o.traverse(function(m){if(m.isMesh){m.castShadow=true;m.receiveShadow=true;m.frustumCulled=false;}});
     },function(){});
   },function(){});
 }
 /* carrega o modelo que acompanha o jogo */
-loadBinary('aethelred_rig_leve.glb',function(buf){parseGLB(buf,'aethelred_rig_leve.glb');loadShowcase();},
+loadBinary('aethelred_rig_leve.glb',function(buf){parseGLB(buf,'aethelred_rig_leve.glb');},
   function(){say('Não encontrei o modelo da personagem. Arraste um arquivo .glb para a tela ou toque em “Carregar modelo GLB”.');},
   function(f){say('Carregando o modelo da personagem... '+Math.round(f*100)+'%');});
 /* remove quadros-chave com tempo repetido: as animações do modelo têm alguns, e o Three.js

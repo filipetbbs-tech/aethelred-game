@@ -59,7 +59,8 @@ escondidos. Ao transformar, na metade da transição voltam os braços antigos, 
 (bracos_normais.bin, de ferramentas/gerar_bracos_normais.py: sem garras e espetos, dedos curtos) e
 terminam com as garras e os espetos crescidos. Se algum dos modelos mudar, rode os dois scripts de novo.
 Vitrine: o modelo novo inteiro (aethelred_bracos_humanos_leve.glb) fica parado ao lado do ponto de
-partida, na altura do personagem, para avaliar a qualidade dele (loadShowcase no index.html).
+partida, na mesma escala do modelo atual (usa o alinhamento calculado para os braços), para avaliar a
+qualidade dele (loadShowcase no index.html).
 Mira dos golpes: sem tocar no analógico esquerdo (ou WASD), cada golpe vira para o inimigo mais
 próximo (lock-on automático). Com o analógico apontado na hora do golpe (inclusive o próximo golpe
 do combo), ele vira para aquele lado: trava no inimigo mais próximo dentro de um cone de ~50° para

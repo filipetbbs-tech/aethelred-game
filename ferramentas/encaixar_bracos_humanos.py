@@ -70,6 +70,8 @@ for yaw in [0,180]:
 sc,s_,R_,t_,yaw,tilt=best;print('best',yaw,tilt,sc,s_,Rr.from_matrix(R_).as_euler('yxz',degrees=True))
 Q2=(s_*(R_@P2.T)).T+t_
 Ral=R_
+# alinhamento do modelo novo para o espaço do modelo atual (coluna-major, para a vitrine no jogo)
+_A=np.eye(4);_A[:3,:3]=s_*R_;_A[:3,3]=t_;ALIGN=[float(x) for x in _A.T.ravel()]
 
 # cor da textura do modelo novo em cada vértice; pele: clara, avermelhada e pouco saturada
 from PIL import Image;import io
@@ -196,7 +198,7 @@ off=sum(len(b) for b in blobs);pad=(4-len(jpg)%4)%4;blobs.append(jpg+b'\0'*pad);
 binb=b''.join(blobs)
 gl={'asset':{'version':'2.0','generator':'aethelred bracos humanos'},'scene':0,'scenes':[{'nodes':[0]}],'nodes':[{'name':'bracos_humanos','mesh':0}],
  'meshes':[{'name':'bracos_humanos','primitives':[{'attributes':{'POSITION':iP,'NORMAL':iN,'TEXCOORD_0':iU,'JOINTS_0':iJ,'WEIGHTS_0':iW},'indices':iI,'material':0}],
-   'extras':{'inverseBind':[float(x) for x in z['IB'].transpose(0,2,1).ravel()],'hideOld':[int(x) for x in z['hideOld']]}}],
+   'extras':{'inverseBind':[float(x) for x in z['IB'].transpose(0,2,1).ravel()],'hideOld':[int(x) for x in z['hideOld']],'align':ALIGN}}],
  'materials':[{'name':'pele','doubleSided':True,'pbrMetallicRoughness':{'baseColorTexture':{'index':0},'metallicFactor':0,'roughnessFactor':.8}}],
  'textures':[{'source':0}],'images':[{'bufferView':len(views)-1,'mimeType':'image/jpeg'}],
  'accessors':accs,'bufferViews':views,'buffers':[{'byteLength':len(binb)}]}

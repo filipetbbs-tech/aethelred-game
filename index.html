@@ -198,8 +198,8 @@ const VOICE_FILES={golpe:['golpe_1','golpe_2','golpe_3','golpe_4'],dor:['dor_1',
    criatura (5 semitons abaixo com timbre mais grave e saturação) e original */
 const VOICE_PRESETS=[{id:'tratada',dir:'sons/tratada/',name:'tratada'},{id:'criatura',dir:'sons/criatura/',name:'criatura'},{id:'original',dir:'sons/',name:'original'}];
 let voicePreset=2;
-/* volume das vozes gravadas em relação aos efeitos (0,5 = metade, cerca de -6 dB) */
-const VOICE_GAIN=.5;
+/* volume das vozes gravadas em relação aos efeitos (0,38 ≈ -8,4 dB) */
+const VOICE_GAIN=.38;
 const voiceBuf={},voiceLast={};
 function loadVoices(){
   const P=VOICE_PRESETS[voicePreset];if(voiceBuf[P.id])return;

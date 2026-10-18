@@ -443,6 +443,8 @@ function resolve(){
    Golpes com right:false são espelhados para a mão esquerda. */
 /* postura de guarda (referências: Prototype 2 e Wolverine): curvado, braços abertos à frente e abaixo, garras para fora */
 const GUARD={s:[.78,-.55,.35],o:[.78,-.55,.35],yaw:0,pitch:.34,roll:0,drop:.17,fwd:.03,side:0};
+/* na guarda, só a parte de cima do tronco tomba um pouco para a frente (o quadril fica onde está) */
+const GUARD_CHEST=.32;
 /* Golpes 1 a 4 baseados nas referências: preparação curta enrolando o tronco, golpe de um quadro com o braço todo
    esticado, arcos em diagonal, o tronco gira até ~80° e dobra para frente; o fim de um golpe já prepara o próximo.
    kw/ki/kf: fim da preparação, impacto e fim da continuação (tempo da tabela); tw/tf: as mesmas marcas em tempo real. */
@@ -1877,6 +1879,9 @@ function applyProc(A,p,w,mv){
     rotAxis(B[n],fr.right,-pitch*.75/ns*w);
     rotAxis(B[n],fr.fwd,roll/ns*w);
   });
+  /* guarda: peito tomba para a frente (Spine1/Spine2), a cabeça compensa para continuar olhando à frente */
+  const gc=combo.active?0:GUARD_CHEST*w;
+  if(gc>0){['Spine1','Spine2'].forEach(function(n){if(B[n])rotAxis(B[n],fr.right,-gc*.5);});rotAxis(B.Head,fr.right,gc*.6);}
   /* cabeça segura o olhar no alvo */
   rotAxis(B.Head,fr.up,yaw*.55*w);
   rotAxis(B.Head,fr.right,pitch*.55*w);

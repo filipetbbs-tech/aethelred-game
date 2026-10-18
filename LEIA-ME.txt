@@ -23,7 +23,7 @@ e dos lados também podem ser escaladas.
 
 Ataque aéreo: atacar no ar (salto da parede ou pulo normal) usa a "Standing Melee Run
 Jump Attack" (1,05 s a 2,3 s, tabela AIRATK): sem mira automática, segue na direção do salto (no
-salto da parede, continua de costas, se afastando dela);
+salto da parede, só depois que o mortal termina, e continua de costas, se afastando dela);
 sobe com as mãos abertas, desce num arco largo e as duas garras se fecham à frente no chão — dano em
 área (AIR_HIT: ~3 m em volta, dano 3, empurrão forte). A altura se ajusta para o impacto cair
 no chão; termina em guarda.

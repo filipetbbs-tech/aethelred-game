@@ -559,7 +559,9 @@ function startAttack(i,A){
 function attack(){
   if(paused||death||climb)return;
   /* no ar (pulo ou salto da parede): ataque aéreo */
-  if((aboveGround()>.3||(flip&&flip.rev))&&!tpose){startAirAttack();return;}
+  /* durante o mortal do salto da parede o ataque fica bloqueado; libera quando o mortal termina, já na queda */
+  if(flip&&flip.rev)return;
+  if(aboveGround()>.3&&!tpose){startAirAttack();return;}
   if(aboveGround()>.03||tpose)return;
   if((hitR&&hitR.t<HIT_LOCK)||dodge)return;
   landT=0;

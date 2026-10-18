@@ -40,7 +40,7 @@ canvas{display:block}
 <div id="soundHint">Som bloqueado pelo navegador: clique uma vez na tela (ou aperte uma tecla) para liberar.</div>
 <div id="hud">
   <h1>Aethelred, protótipo de blocos</h1>
-  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador. Pule perto de uma pilastra ou parede para escalar (W/S/A/D na parede, Espaço salta dela).<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. K esquiva na direção que você estiver apertando (frente, trás, lados; sem direção, para trás); L ou o botão "Esquiva" alterna entre a esquiva atual e a 1ª versão. G liga e desliga a invencibilidade (os golpes ainda empurram e atordoam, mas a vida não cai). P pausa a personagem (a câmera continua livre). O liga e desliga o som.</p>
+  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador. Pule perto de uma pilastra ou parede para escalar (W/S/A/D na parede, Espaço salta dela).<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. K esquiva na direção que você estiver apertando (frente, trás, lados; sem direção, para trás); L ou o botão "Esquiva" alterna entre a esquiva nova e a original. G liga e desliga a invencibilidade (os golpes ainda empurram e atordoam, mas a vida não cai). P pausa a personagem (a câmera continua livre). O liga e desliga o som.</p>
   <p id="state">Forma normal</p>
   <p id="vida">Vida 100   Abatidos 0</p>
   <p id="combo"></p>
@@ -54,7 +54,7 @@ canvas{display:block}
 <button class="btn" id="pauseBtn">Pausar</button>
 <button class="btn" id="soundBtn">Som: ligado</button>
 <button class="btn" id="godBtn">Invencível: não</button>
-<button class="btn" id="dodgeBtn">Esquiva: atual</button>
+<button class="btn" id="dodgeBtn">Esquiva: nova</button>
 <input type="file" id="glbIn" accept=".glb" hidden>
 <button class="btn" id="morph">Transformar</button>
 
@@ -690,7 +690,8 @@ function takeHit(fx,fz,dmg){
    frente = Quick Roll To Run; direita = Aerial Evade; esquerda = Aerial Evade espelhada;
    trás = Quick Roll To Run de trás para frente (rolamento para trás). Sem direção: para trás.
    Imune a dano no começo da esquiva; corta o golpe em andamento. */
-/* versão atual; a primeira versão (DODGES_V1) fica para comparar pelo botão "Esquiva" ou pela tecla L */
+/* REGRA: DODGES_V1 é a esquiva original e fica congelada; todo ajuste pedido na esquiva é feito só em DODGES_V2 ("nova").
+   As duas se comparam pelo botão "Esquiva" ou pela tecla L */
 const DODGES_V2={
   fwd:{name:'qroll',c0:0,c1:1.38,speed:1.75,dist:.75,inv:.55},
   back:{name:'qroll',c0:1.38,c1:0,speed:1.75,dist:.6,inv:.55},
@@ -698,15 +699,15 @@ const DODGES_V2={
   left:{name:'aerial',c0:.62,c1:3.2,speed:1.75,dist:1.8,inv:.6,mirror:true,turn:-.42}
 };
 const DODGES_V1={
-  fwd:Object.assign({},DODGES_V2.fwd,{speed:1.15}),
-  back:Object.assign({},DODGES_V2.back,{speed:1.25}),
-  right:Object.assign({},DODGES_V2.right,{dist:1}),
-  left:Object.assign({},DODGES_V2.left,{dist:1})
+  fwd:{name:'qroll',c0:0,c1:1.38,speed:1.15,dist:.75,inv:.55},
+  back:{name:'qroll',c0:1.38,c1:0,speed:1.25,dist:.6,inv:.55},
+  right:{name:'aerial',c0:.62,c1:3.2,speed:1.75,dist:1,inv:.6,turn:.42},
+  left:{name:'aerial',c0:.62,c1:3.2,speed:1.75,dist:1,inv:.6,mirror:true,turn:-.42}
 };
 let DODGES=DODGES_V2,dodge=null;
 const dodgeBtn=document.getElementById('dodgeBtn');
-function toggleDodgeVer(){DODGES=DODGES===DODGES_V2?DODGES_V1:DODGES_V2;dodgeBtn.textContent='Esquiva: '+(DODGES===DODGES_V2?'atual':'1ª versão');dodgeBtn.classList.toggle('on',DODGES===DODGES_V1);dodgeBtn.blur();
-  comboEl.textContent=DODGES===DODGES_V2?'Esquiva atual: rolamentos em 0,8 s, lateral de 5 m':'Esquiva 1ª versão: rolamentos em 1,2 s, lateral de 2,75 m';msgHold=2.5;}
+function toggleDodgeVer(){DODGES=DODGES===DODGES_V2?DODGES_V1:DODGES_V2;dodgeBtn.textContent='Esquiva: '+(DODGES===DODGES_V2?'nova':'original');dodgeBtn.classList.toggle('on',DODGES===DODGES_V1);dodgeBtn.blur();
+  comboEl.textContent=DODGES===DODGES_V2?'Esquiva nova (a que recebe os ajustes)':'Esquiva original (congelada)';msgHold=2.5;}
 dodgeBtn.onclick=toggleDodgeVer;
 /* direção para onde o quadril aponta num quadro da animação (para desfazer o giro que sobra no fim) */
 function clipYaw(name,t){

@@ -486,12 +486,13 @@ const ATT_B=[
      keys:[{t:1.15,p:[.5,1.0,-.4]},{t:1.28,p:[.85,.55,.45]},{t:1.4,p:[.05,-.3,1.0]},{t:1.52,p:[-.15,-.55,.92]},{t:1.7,p:[.0,-.45,.9]}],
      other:{p:[.72,-.3,-.45],w:.75}}},
   /* bote: agacha segurando a preparação, salta para frente com as duas garras erguidas e crava as duas em X */
-  {name:'Golpe final: bote com as duas garras',right:true,both:true,dur:1.2,tw:.48,tf:.7,hit:.66,chain:1,kw:.52,ki:.66,kf:.76,dmg:4,range:3.0,arc:6.3,knock:14,finisher:true,lunge:[1.3,.48,.66],
+  {name:'Golpe final: bote com as duas garras',right:true,both:true,dur:1.5,tw:.384,tf:.56,hit:.66,chain:1,kw:.52,ki:.66,kf:.76,dmg:4,range:3.0,arc:6.3,knock:14,finisher:true,lunge:[1.3,.48,.66],
    /* pernas da Jump Attack (legClip): agacha, se ergue um pouco (quase sem sair do chão), desce com o bote caindo
       agachado com um pé à frente e, desequilibrado pela força, dá um passo à frente ao se levantar (stumble);
       legMap liga o progresso do golpe ao tempo da animação, legDy limita a altura do quadril */
    legClip:'jumpatk',legMap:[[0,0],[.3,.25],[.46,.5],[.57,.545],[.65,1.52,'cut'],[.72,1.75],[.75,2.6],[.88,2.86],[1,2.95]],legDy:[-.62,.14],
-   stumble:[.5,.74,.92],
+   /* dur/tw/tf: preparação e impacto no mesmo tempo de antes (1,2 s), só o fim (os dois passos) ficou mais longo */
+   stumble:[.9,.74,.94],
    /* legEnd: as pernas da animação saem entre esses dois pontos; dali em diante os dois passos do desequilíbrio (steps,
       h: medidos pela direção do corpo) pousam os pés direto na base da guarda */
    legEnd:[.72,.8],

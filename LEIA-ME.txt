@@ -52,11 +52,12 @@ Caminhada em guarda: usa os passos da caminhada normal com o quadril só um pouc
 (GUARD_WALK_RISE: joelhos levemente dobrados, não agachado), passos mais rasantes (GUARD_WALK_LIFT),
 base um pouco mais larga (GUARD_WALK_WIDE), joelhos um pouco para fora (GUARD_WALK_KNEE) e a ponta
 dos pés ~20° para fora, alinhada com o joelho (GUARD_WALK_TOE). Constantes no index.html.
-Transformação (F / Triângulo): na forma normal os braços são humanos — sem garras e sem espetos de
-osso, dedos curtos e arredondados, partes de osso tingidas com o tom da pele. Ao transformar, as garras
-e os espetos crescem de volta (morph target + cor por vértice, ~0,5 s). Os dados ficam em
-bracos_normais.bin, gerado do próprio modelo por ferramentas/gerar_bracos_normais.py (rodar de novo se
-o modelo mudar). É uma edição do modelo existente: os detalhes da textura continuam, só tingidos.
+Transformação (F / Triângulo): na forma normal o personagem usa braços humanos, recortados de
+aethelred_bracos_humanos_leve.glb (o mesmo personagem gerado com braços normais) e presos ao esqueleto
+atual: bracos_humanos.glb, gerado por ferramentas/encaixar_bracos_humanos.py. Os braços antigos ficam
+escondidos. Ao transformar, na metade da transição voltam os braços antigos, que começam recolhidos
+(bracos_normais.bin, de ferramentas/gerar_bracos_normais.py: sem garras e espetos, dedos curtos) e
+terminam com as garras e os espetos crescidos. Se algum dos modelos mudar, rode os dois scripts de novo.
 Mira dos golpes: sem tocar no analógico esquerdo (ou WASD), cada golpe vira para o inimigo mais
 próximo (lock-on automático). Com o analógico apontado na hora do golpe (inclusive o próximo golpe
 do combo), ele vira para aquele lado: trava no inimigo mais próximo dentro de um cone de ~50° para

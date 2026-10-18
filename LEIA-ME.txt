@@ -12,11 +12,10 @@ Como executar no computador:
 
 Escalada: pule (Espaço) perto de uma pilastra ou parede, de frente para ela, para grudar
 na superfície (Running Crawl). Na parede: W sobe, S desce, A/D vão para os lados, Shift
-acelera, Espaço salta para longe da parede: a Stylish Flip de trás para frente (1,5 s até 1,1 s,
-tabela LEAP), com a parede no papel do chão — a pose agachada com mãos e pés no chão vira a
-personagem agarrada na parede, e a aterrissagem ao contrário vira o impulso. Ao sair da
-parede, fica de pé no ar com a animação de pulo e cai com a física (vOut/vUp). Sem o
-arquivo, usa um mortal feito por código. No meio de um pulo ela agarra sozinha a parede em que
+acelera, Espaço salta para longe da parede: a Stylish Flip inteira de trás para frente (1,2 s até
+0,38 s, tabela FLIPREV), de pé e de frente para a parede — sai do quase-pouso, sobe, dá o
+mortal para trás se afastando da parede e, no alto, cai com a física e a animação de pulo.
+Sem o arquivo, usa um mortal feito por código. No meio de um pulo ela agarra sozinha a parede em que
 encostar (indo ou olhando para ela). Assim que as mãos alcançam o fim da parede ela faz
 a Braced Hang To Crouch (puxa o corpo pela borda e sobe agachada) e fica de pé em cima;
 embaixo, solta. As muralhas do fundo

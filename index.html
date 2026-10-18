@@ -925,21 +925,23 @@ function endClimb(pos,rot,snap){
 let climbOut=null,climbCD=0;
 /* mortal para trás ao saltar da parede */
 const FLIP_DUR=.62;
-/* impulso da parede: trecho da Stylish Flip tocado de trás para frente (c0 > c1): da pose agachada no chão
-   (aqui, agarrado na parede) até sair dele; depois, animação de pulo e física (vOut para longe, vUp para cima) */
-const LEAP={c0:1.5,c1:1.1,speed:1.0,vOut:4.5,vUp:3.2};
+/* salto da parede: Stylish Flip de trás para frente (c0 > c1), de pé e de frente para a parede: sai do quase-pouso,
+   sobe, dá o mortal para trás se afastando da parede e chega no alto; dali cai com a física e a animação de pulo */
+const FLIPREV={c0:1.2,c1:.38,speed:1.15};
 let flip=null;
-function leapDur(){return Math.abs(LEAP.c1-LEAP.c0)/LEAP.speed;}
-const _qUp=new THREE.Quaternion();
-/* depois do impulso: o corpo passa da orientação da parede para de pé em 0,3 s, girando em torno do quadril */
-function flipAirFrame(dt){
-  const A=flip;A.t+=dt;const k=sm(A.t/.3);if(k>=1)return;
-  _qUp.setFromAxisAngle(UPV,st.rot);const q=A.q0.clone().slerp(_qUp,k);
-  const hip=new THREE.Vector3(st.x,st.y,st.z).add(rig.restP.Hips.clone().applyQuaternion(_qUp));
-  hero.quaternion.copy(q);hero.position.copy(hip).sub(rig.restP.Hips.clone().applyQuaternion(q));hero.updateMatrixWorld(true);
+function flipRevDur(){return Math.abs(FLIPREV.c1-FLIPREV.c0)/FLIPREV.speed;}
+function poseFlipRev(dt){
+  const T=flip,k=Math.min(1,T.t/flipRevDur()),ct=FLIPREV.c0+(FLIPREV.c1-FLIPREV.c0)*k,R=clipSrc.sflip;
+  /* altura: a origem fica onde o salto começou menos a altura do quadril no primeiro quadro; a subida e o giro vêm da animação */
+  if(T.dy0===undefined){R.action.time=FLIPREV.c0;R.mixer.update(0);R.src.updateMatrixWorld(true);T.dy0=(hero.worldToLocal(R.S.Hips.getWorldPosition(new THREE.Vector3())).y-R.hips0.y)*R.scale;}
+  st.y=T.y0-T.dy0;st.vy=0;hero.position.set(st.x,st.y,st.z);hero.rotation.y=st.rot;hero.updateMatrixWorld(true);
+  const rm=applyClip('sflip',ct,1);
+  if(rm&&T.rmPrev){const dx=rm.x-T.rmPrev.x,dz=rm.z-T.rmPrev.z,c=Math.cos(st.rot),sn=Math.sin(st.rot);st.x+=dx*c+dz*sn;st.z+=-dx*sn+dz*c;}
+  if(rm)T.rmPrev=rm;
+  if(T.I&&T.I.snap){T.I.t+=dt;inertBlend(T.I,.15);}
 }
 function poseFlip(dt){
-  if(!flip||!rig||flip.air)return;
+  if(!flip||!rig||flip.rev)return;
   const B=rig.B,k=Math.min(1,flip.t/FLIP_DUR);
   /* giro acelera no meio e desacelera para a aterrissagem; eixo lateral do corpo (o peito vai para trás) */
   const ang=Math.PI*2*(k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2);
@@ -978,25 +980,12 @@ function updateClimb(dt,ix,iz,spaceDown){
     st.x=hero.position.x;st.y=hero.position.y;st.z=hero.position.z;st.speed=0;
     return;
   }
-  if(C.leap){
-    /* impulso da parede: a Stylish Flip de trás para frente, com a parede no papel do chão (a pose agachada com
-       mãos e pés no chão vira a personagem agarrada na parede, e a "aterrissagem" ao contrário vira o impulso) */
-    const L=C.leap;L.t+=dt;
-    if(L.t>=leapDur()){
-      /* saiu da parede: fica de pé no ar (animação de pulo) e cai com a física; ver flip.air */
-      const B=rig.B,hw=wp(B.Hips),dyN=hero.worldToLocal(hw.clone()).y-rig.restP.Hips.y;
-      const q0=hero.quaternion.clone(),rot=Math.atan2(-F.n.x,-F.n.z);
-      const pos=hw.clone().addScaledVector(F.n,-dyN);pos.y-=rig.restP.Hips.y;
-      endClimb(pos,rot,snapBones());
-      st.vx=F.n.x*LEAP.vOut;st.vz=F.n.z*LEAP.vOut;st.vy=LEAP.vUp;
-      flip={air:true,t:0,q0:q0};
-      return;
-    }
-    st.x=hero.position.x;st.y=hero.position.y;st.z=hero.position.z;st.speed=0;
-    return;
-  }
   if(spaceDown&&C.t>.2&&clipSrc.sflip){
-    C.leap={t:0,rmPrev:null,I:{snap:snapBones(),off:null,t:0}};
+    /* salto da parede: a Stylish Flip inteira de trás para frente, de pé e de frente para a parede (ver poseFlipRev) */
+    const hw=wp(rig.B.Hips),pos=F.p.clone().addScaledVector(F.n,.35);pos.y=hw.y-rig.restP.Hips.y;
+    endClimb(pos,Math.atan2(-F.n.x,-F.n.z),snapBones());
+    st.vx=st.vz=st.vy=0;
+    flip={rev:true,t:0,y0:pos.y,rmPrev:null,I:climbOut?{snap:climbOut.snap,off:null,t:0}:null};climbOut=null;
     SOUND.voice('jump');SOUND.whoosh&&SOUND.whoosh(1.2);
     return;
   }
@@ -1045,14 +1034,6 @@ function inertBlend(I,dur){
 }
 function poseClimb(dt){
   const C=climb,M=C.mantle;
-  if(C.leap){
-    const L=C.leap,k=Math.min(1,L.t/leapDur()),ct=LEAP.c0+(LEAP.c1-LEAP.c0)*k;
-    const F=wallFrame(C);hero.quaternion.copy(wallQuat(F,0));hero.updateMatrixWorld(true);
-    const rm=applyClip('sflip',ct,1);
-    /* só o afastamento da parede (altura do quadril na animação) conta; o avanço ao longo da parede faria escorregar */
-    L.I.t+=dt;inertBlend(L.I,.15);
-    return;
-  }
   if(M){
     if(M.up){inertBlend(M.up,TOP_UP);return;}
     const rm=applyClip('hang',M.t*TOP_SPEED,1);
@@ -1751,9 +1732,9 @@ function updateModel(dt){
     hero.updateMatrixWorld(true);
     if(death&&clipSrc[death.name]){poseDeath();return;}
     if(dodge){poseDodge(dt);detectSteps(dt);return;}
+    if(flip&&flip.rev&&clipSrc.sflip){poseFlipRev(dt);return;}
     if(climb&&clipSrc.crawl){poseClimb(dt);detectSteps(dt);return;}
     if(window.CLIP_PREVIEW&&clipSrc[CLIP_PREVIEW.name]){applyClip(CLIP_PREVIEW.name,CLIP_PREVIEW.t,1);poseHands();return;}
-    if(flip&&flip.air&&rig)flipAirFrame(dt);
     poseFull();
     poseHands();
     if(climbOut){climbOut.t+=dt;inertBlend(climbOut,.35);if(!climbOut.snap)climbOut=null;}
@@ -1818,7 +1799,10 @@ function tick(raw){
     else{ix=0;iz=0;}
   }
   if(flip){ix=0;iz=0;
-    if(flip.air){if(flip.t>.3&&aboveGround()<.02)flip=null;}
+    if(flip.rev){flip.t+=dt;st.vx=st.vz=0;
+      /* no alto: passa para a física, com a animação de pulo, ainda se afastando da parede */
+      if(flip.t>=flipRevDur()){const c=Math.sin(st.rot),d=Math.cos(st.rot);
+        climbOut={snap:snapBones(),off:null,t:0};st.vy=-1.5;st.vx=-c*2.2;st.vz=-d*2.2;flip=null;}}
     else{flip.t+=dt;st.vx=st.vz=0;if(flip.t>=FLIP_DUR||(flip.t>.15&&aboveGround()<.02))flip=null;}}
   if(dodgeKey){dodgeKey=false;if(!climb)startDodge(ix,iz);}
   if(dodge){

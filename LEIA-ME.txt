@@ -28,6 +28,8 @@ dano). Os parâmetros ficam no objeto SOUND do index.html.
 Vozes gravadas: se existirem os arquivos sons/golpe_1..4.mp3, dor_1..2.mp3, pulo_1.mp3 e
 morte_1..2.mp3, eles substituem a voz sintetizada (sorteados, sem repetir em seguida, com
 leve variação de tom). Sem os arquivos, o jogo usa a voz sintetizada.
+A tecla V alterna entre três versões: sons/tratada/ (compressão, corpo, presença, 2 semitons
+abaixo), sons/criatura/ (5 semitons abaixo, timbre mais grave, saturação) e sons/ (original).
 
 Combate: dois combos de 5 golpes, alternados com a tecla M.
 - Combo B (atual, tabela ATT_B): abertura rápida, revés de baixo para cima,

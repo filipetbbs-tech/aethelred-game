@@ -32,7 +32,7 @@ canvas{display:block}
 <body>
 <div id="hud">
   <h1>Aethelred, protótipo de blocos</h1>
-  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador.<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. M alterna entre o combo novo (B) e o anterior (A). P pausa a personagem (a câmera continua livre). O liga e desliga o som.</p>
+  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador.<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. M alterna entre o combo novo (B) e o anterior (A). P pausa a personagem (a câmera continua livre). O liga e desliga o som. V troca a versão da voz (tratada, criatura, original).</p>
   <p id="state">Forma normal</p>
   <p id="vida">Vida 100   Abatidos 0</p>
   <p id="combo"></p>
@@ -194,18 +194,28 @@ function audioInit(){
 }
 /* vozes gravadas (pasta sons/): sorteadas sem repetir em seguida; sem os arquivos, fica a voz sintetizada */
 const VOICE_FILES={golpe:['golpe_1','golpe_2','golpe_3','golpe_4'],dor:['dor_1','dor_2'],pulo:['pulo_1'],morte:['morte_1','morte_2']};
+/* três versões das vozes para comparar (tecla V): tratada (compressão, corpo e presença, 2 semitons abaixo),
+   criatura (5 semitons abaixo com timbre mais grave e saturação) e original */
+const VOICE_PRESETS=[{id:'tratada',dir:'sons/tratada/',name:'tratada'},{id:'criatura',dir:'sons/criatura/',name:'criatura'},{id:'original',dir:'sons/',name:'original'}];
+let voicePreset=0;
 const voiceBuf={},voiceLast={};
 function loadVoices(){
+  const P=VOICE_PRESETS[voicePreset];if(voiceBuf[P.id])return;
+  const B=voiceBuf[P.id]={};
   Object.keys(VOICE_FILES).forEach(function(k){
     VOICE_FILES[k].forEach(function(n){
-      fetch('sons/'+n+'.mp3').then(function(r){if(!r.ok)throw 0;return r.arrayBuffer();})
+      fetch(P.dir+n+'.mp3').then(function(r){if(!r.ok)throw 0;return r.arrayBuffer();})
         .then(function(b){return new Promise(function(ok,no){SFX.ctx.decodeAudioData(b,ok,no);});})
-        .then(function(buf){(voiceBuf[k]=voiceBuf[k]||[]).push(buf);}).catch(function(){});
+        .then(function(buf){(B[k]=B[k]||[]).push(buf);}).catch(function(){});
     });
   });
 }
+function cycleVoice(){
+  audioInit();voicePreset=(voicePreset+1)%VOICE_PRESETS.length;if(SFX.ctx)loadVoices();
+  comboEl.textContent='Voz: '+VOICE_PRESETS[voicePreset].name;msgHold=2.5;
+}
 function playVoice(k,rate,gain){
-  const L=voiceBuf[k];if(!L||!L.length)return false;
+  const L=(voiceBuf[VOICE_PRESETS[voicePreset].id]||{})[k];if(!L||!L.length)return false;
   let i=Math.floor(Math.random()*L.length);if(L.length>1&&i===voiceLast[k])i=(i+1)%L.length;voiceLast[k]=i;
   const c=SFX.ctx,src=c.createBufferSource(),g=c.createGain();
   src.buffer=L[i];src.playbackRate.value=(rate||1)*(.94+Math.random()*.12);g.gain.value=gain||1;
@@ -264,7 +274,7 @@ soundBtn.onclick=toggleSound;
 let tpose=false;
 const st={x:0,z:8,y:0,vy:0,rot:Math.PI,rotT:Math.PI,yaw:0,pitch:.35,camD:6.5,t:0,speed:0,morph:0,morphOn:false};
 const keys={};const joy={x:0,y:0};
-addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyM')toggleCombo();if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();});
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyM')toggleCombo();if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();if(e.code==='KeyV')cycleVoice();});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 const stateEl=document.getElementById('state');
 function toggle(){st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}

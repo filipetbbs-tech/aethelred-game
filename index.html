@@ -595,6 +595,7 @@ function toggleCombo(){
 function attack(){
   if(paused||death||climb)return;
   if(aboveGround()>.03||tpose)return;
+  landT=0;
   if(combo.active){if(combo.t/combo.cur.dur>.15)combo.queued=true;return;}
   if(combo.cool>0)return;
   /* correndo, o ataque vira o chute voador */
@@ -1549,7 +1550,7 @@ function updateModel(dt){
     const air=!climb&&aboveGround()>.03;
     if(air&&!wasAir){playAct(jStart||jMid,true);}
     else if(air&&jStart&&jMid&&curAct===jStart&&jStart.time>=jStart.getClip().duration-.05){playAct(jMid,false);}
-    if(!air&&wasAir&&jLand){playAct(jLand,true);landT=jLand.getClip().duration*.8;}
+    if(!air&&wasAir&&jLand){playAct(jLand,true);landT=jLand.getClip().duration-.12;st.speed=0;st.vx=st.vz=0;}
     wasAir=air;
     if(landT>0)landT-=dt;
     if(!air&&landT<=0){
@@ -1627,7 +1628,10 @@ function tick(raw){
     if(Math.hypot(ix,iz)>.3&&combo.t/combo.cur.dur>.8&&!combo.queued&&!combo.cur.clip){combo.active=false;combo.pose=pose.slice();combo.grace=.35;combo.hold=0;}
     else{ix=0;iz=0;}
   }
-  const jh=jumpHeld(),spaceDown=jh&&!st.spacePrev;st.spacePrev=jh;
+  /* recuperação da aterrissagem: parado até a animação de pouso terminar */
+  const landing=landT>0&&!climb;
+  if(landing){ix=0;iz=0;}
+  const jh=jumpHeld()&&!landing,spaceDown=jh&&!st.spacePrev;st.spacePrev=jumpHeld();
   if(climb){updateClimb(dt,ix,iz,spaceDown);updateComboState(dt);updateCombat(dt);updateModel(dt);updateTrail(dt,null,null,false);return;}
   climbCD-=dt;
   if(spaceDown&&tryClimb(1.15,.3)){updateModel(dt);return;}
@@ -1695,7 +1699,7 @@ function tick(raw){
 }
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
+window.AETH={get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
 frame();
 })();
 </script>

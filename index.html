@@ -561,7 +561,10 @@ function startAttack(i,A){
   A=A||ATT[i];
   combo.start=(combo.w>.05&&combo.shown)?combo.shown.slice():GUARD_ABS.slice();
   combo.hold=0;combo.outDur=0;
-  if(!combo.active&&(combo.w<.05||moveW>.3))plantFeet();
+  /* replanta os pés quando a pose anterior não os manteve no lugar: vindo de golpe com animação (chute voador),
+     de movimento, ou se algum pé plantado ficou longe do corpo (senão a perna estica tentando alcançá-lo) */
+  const farFoot=feet.L&&feet.R&&Math.max(Math.hypot(feet.L.x-st.x,feet.L.z-st.z),Math.hypot(feet.R.x-st.x,feet.R.z-st.z))>.75;
+  if((!combo.active&&(combo.w<.05||moveW>.3))||(combo.active&&combo.cur&&combo.cur.clip)||farFoot||!feet.L)plantFeet();
   combo.prevA=combo.active?combo.cur:null;combo.rmPrev=null;
   combo.snapOff=null;combo.snapT=0;
   combo.snap=(combo.prevA&&(combo.prevA.clip||A.clip)&&baseBones)?baseBones.map(function(b){return [b.quaternion.clone(),b.position.clone()];}):null;
@@ -2298,7 +2301,7 @@ function tick(raw){
 }
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,get rig(){return rig;},get custom(){return custom;},cam:cam};
+window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,get rig(){return rig;},get custom(){return custom;},cam:cam};
 frame();
 })();
 </script>

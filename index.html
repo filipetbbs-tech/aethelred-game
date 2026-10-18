@@ -497,7 +497,8 @@ const ATT_B=[
       primeiro o pé direito, depois o esquerdo), com o tropeço; em cada passo o pé é guiado até a base da guarda
       (endStance: [lado, frente]; footSwing: janela de cada passo), calculada onde o corpo vai parar */
    legEnd:[.72,.76],
-   legClip2:{name:'stumble',mirror:true,map:[[.72,.08],[.97,.66]],w:[.72,.76,.97,1],dy:[-.35,.1]},
+   /* rise: o quadril sai da altura agachada do bote e vai até a do tropeço aos poucos, até esse ponto do golpe */
+   legClip2:{name:'stumble',mirror:true,map:[[.72,.08],[.97,.66]],w:[.71,.79,.97,1],dy:[-.45,-.1],rise:.93},
    endStance:{L:[-.24,.39],R:[.25,-.29]},footSwing:{R:[.74,.88],L:[.88,.97]},
    steps:[],
    keys:[
@@ -1869,8 +1870,13 @@ function legClip2Apply(A,p,w){
   R.action.time=legClip2T(A,p);R.mixer.update(0);R.src.updateMatrixWorld(true);
   hero.updateMatrixWorld(true);hero.getWorldQuaternion(_hq);_hqi.copy(_hq).invert();
   const hp=hero.worldToLocal(R.S.Hips.getWorldPosition(new THREE.Vector3()));
-  const dy=Math.max(L.dy[0],Math.min(L.dy[1],(hp.y-R.hips0.y)*R.scale));
-  B.Hips.getWorldPosition(_v);const ty=hero.localToWorld(rig.restP.Hips.clone()).y+dy;_v.y+=(ty-_v.y)*w;
+  let dy=Math.max(L.dy[0],Math.min(L.dy[1],(hp.y-R.hips0.y)*R.scale));
+  B.Hips.getWorldPosition(_v);
+  /* começa da altura agachada (a do quadro em que o tropeço entra) e sobe aos poucos */
+  if(A._dyLand===undefined){const R1=clipSrc[A.legClip],T1=legClipTime(A,L.w[0]);let d1=legClipDy(A,R1,T1.t0);if(T1.u>0)d1+=(legClipDy(A,R1,T1.t1)-d1)*T1.u;
+    A._dyLand=Math.max(A.legDy[0],Math.min(A.legDy[1],d1));R.action.time=legClip2T(A,p);R.mixer.update(0);R.src.updateMatrixWorld(true);}
+  dy=A._dyLand+(dy-A._dyLand)*sm((p-L.w[0])/(L.rise-L.w[0]));
+  const ty=hero.localToWorld(rig.restP.Hips.clone()).y+dy;_v.y+=(ty-_v.y)*w;
   B.Hips.position.copy(B.Hips.parent.worldToLocal(_v));B.Hips.updateMatrixWorld(true);
   A._l2=true;
 }
@@ -1892,7 +1898,9 @@ function applyProc(A,p,w,mv){
   const le=A.legEnd||[.88,1],lc=A.legClip&&clipSrc[A.legClip]&&combo.active?w*(1-sm((p-le[0])/(le[1]-le[0]))):0;
   if(lc>0)legClipHips(A,p,lc);
   const lc2=A.legClip2&&clipSrc[A.legClip2.name]&&combo.active?w*legClip2W(A,p):0;
-  if(lc2>0)legClip2Apply(A,p,lc2);
+  /* a altura do quadril passa para o tropeço já no primeiro quadro (partindo da agachada), só as pernas fazem a mistura */
+  const L2=A.legClip2,lh2=L2&&combo.active&&p>=L2.w[0]?w*(1-sm((p-L2.w[2])/(L2.w[3]-L2.w[2]))):0;
+  if(lh2>0)legClip2Apply(A,p,lh2);
   /* torção do quadril e da coluna; yaw positivo gira o peito para a direita */
   rotAxis(B.Hips,fr.up,-yaw*.35*w);
   rotAxis(B.Hips,fr.right,-pitch*.25*w);
@@ -2275,7 +2283,7 @@ function tick(raw){
 }
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
+window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
 frame();
 })();
 </script>

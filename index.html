@@ -487,6 +487,8 @@ function progA(A,t){
 /* duração do estado de combate depois do último golpe (s) */
 const COMBAT_HOLD=4.5;
 let stance=1,moveW=0;
+/* fase da caminhada acumulada (velocidade x tempo); com tempo total x velocidade, qualquer variação de velocidade fazia a fase saltar */
+let walkPhase=0;
 const combo={hold:0,holdT:0,shown:null,active:false,i:-1,t:0,queued:false,grace:0,cool:0,w:0,hitDone:false,last:null,cur:null,start:null,pose:null,paused:false};
 const POSE_N=12;
 function toAbs(k,right){
@@ -1097,7 +1099,7 @@ function poseFull(){
   }
   if(!combo.active&&moveW>.01){
     /* andando em guarda: balanço do tronco e dos braços no ritmo dos passos */
-    const ph=st.t*st.speed*2.4,b=Math.sin(ph)*moveW;
+    const ph=walkPhase*2.4,b=Math.sin(ph)*moveW;
     pose[6]+=b*.12;pose[8]+=b*.05;pose[1]+=Math.cos(ph)*.05*moveW;pose[4]-=Math.cos(ph)*.05*moveW;pose[2]-=b*.06;pose[5]+=b*.06;
   }
   combo.shown=pose.slice();
@@ -1365,7 +1367,7 @@ function updateModel(dt){
     detectSteps(dt);
   }else{
     custom.rotation.x=Math.min(st.speed/9,.5)*.25;
-    custom.position.y=Math.abs(Math.sin(st.t*(4+st.speed*1.2)))*Math.min(st.speed/5,1)*.05;
+    custom.position.y=Math.abs(Math.sin(st.t*4+walkPhase*1.2))*Math.min(st.speed/5,1)*.05;
   }
 }
 addEventListener('dragover',function(e){e.preventDefault();});
@@ -1425,6 +1427,7 @@ function tick(raw){
     st.rot+=diff*Math.min(1,dt*12);st.rotT=st.rot;
   }
   st.speed+=(target-st.speed)*Math.min(1,dt*10);
+  walkPhase+=st.speed*dt;
   st.vy-=22*dt;st.y+=st.vy*dt;if(st.y<0){if(st.vy<-4)SOUND.land();st.y=0;st.vy=0;}
   updateComboState(dt);
   resolve();
@@ -1443,7 +1446,7 @@ function tick(raw){
     if(a.blade)a.blade.scale.y=.3+.7*st.morph;
   });
   /* pose do boneco de blocos */
-  const w=st.t*(4+st.speed*1.2),sw=Math.min(st.speed/5,1)*.9;
+  const w=st.t*4+walkPhase*1.2,sw=Math.min(st.speed/5,1)*.9;
   legs[0].rotation.x=Math.sin(w)*sw;legs[1].rotation.x=-Math.sin(w)*sw;
   arms[0].g.rotation.x=-Math.sin(w)*sw*.8;arms[1].g.rotation.x=Math.sin(w)*sw*.8;
   arms[0].g.rotation.z=.08+st.morph*.12;arms[1].g.rotation.z=-.08-st.morph*.12;

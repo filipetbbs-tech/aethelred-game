@@ -777,22 +777,23 @@ function endClimb(pos,rot,snap){
   climbOut={snap:snap,off:null,t:0};climbCD=.35;
 }
 let climbOut=null,climbCD=0;
-/* chegada ao topo: (1) de pé de frente para a parede, sobe com o final da Climbing Up Wall (joelho sobe até a borda)
-   com as mãos apoiadas na borda; (2) passa por cima da borda e fica de pé, misturando para a pose parada */
-const TOP_T0=0,TOP_T1=2.0,TOP_SPEED=2.0,TOP_UP=.4;
+/* chegada ao topo: (1) assim que as mãos alcançam a borda, Braced Hang To Crouch (pendurado na borda, puxa o corpo
+   e termina agachado em cima, com o avanço da animação levando a personagem para cima da borda);
+   (2) mistura do agachado para a pose parada */
+const TOP_SPEED=1.15,TOP_UP=.35,TOP_LEDGE=1.65;
 function updateClimb(dt,ix,iz,spaceDown){
   const C=climb;C.t+=dt;
   const F=wallFrame(C);
   if(C.mantle){
     const M=C.mantle;M.t+=dt;
-    const dur1=(TOP_T1-TOP_T0)/TOP_SPEED;
+    const dur1=clipSrc.hang.clip.duration/TOP_SPEED;
     if(M.t<dur1){
-      const k=sm(M.t/.3);
-      hero.position.copy(M.p0).lerp(M.p1,k);hero.quaternion.copy(M.q0).slerp(M.q1,k);
+      /* a posição vem do avanço da animação (aplicado em poseClimb) */
+      hero.quaternion.copy(M.q0).slerp(M.q1,sm(M.t/.2));
     }else{
-      if(!M.up){M.up={t:0,snap:snapBones(),off:null};}
+      if(!M.up){M.up={t:0,snap:snapBones(),off:null,p:hero.position.clone()};}
       M.up.t+=dt;const k=sm(M.up.t/TOP_UP);
-      hero.position.copy(M.p1).lerp(M.p2,k);hero.quaternion.copy(M.q1);
+      hero.position.copy(M.up.p).lerp(M.p2,k);hero.quaternion.copy(M.q1);
       if(M.up.t>=TOP_UP){st.x=M.p2.x;st.z=M.p2.z;endClimb(M.p2,Math.atan2(-F.n.x,-F.n.z),snapBones());st.vy=0;return;}
     }
     st.x=hero.position.x;st.y=hero.position.y;st.z=hero.position.z;st.speed=0;
@@ -814,16 +815,16 @@ function updateClimb(dt,ix,iz,spaceDown){
   const v=Math.hypot(vr,vy);C.moving+=((v>.1?1:0)-C.moving)*Math.min(1,dt*8);
   C.phase+=v*dt/CRAWL_STRIDE;
   /* topo: passa para cima */
-  if(C.y>=C.o.h-.9&&vy>0&&clipSrc.climbup){
-    C.y=C.o.h-.9;const F2=wallFrame(C),h=C.o.h;
-    /* base escolhida para o pé que sobe terminar na altura da borda */
-    const p1=F2.p.clone().addScaledVector(F2.n,.2);p1.y=h-2.0*rig.restP.Hips.y/1.15;
-    const p2=F2.p.clone().addScaledVector(F2.n,-.5);p2.y=h;
+  if(C.y>=C.o.h-1.1&&vy>0&&clipSrc.hang){
+    C.y=C.o.h-1.1;const F2=wallFrame(C),h=C.o.h;
+    /* base escolhida para os pés terminarem em cima da borda; as mãos começam na borda */
+    const p1=F2.p.clone().addScaledVector(F2.n,.32);p1.y=h-TOP_LEDGE*clipSrc.hang.scale;
+    const p2=F2.p.clone().addScaledVector(F2.n,-.55);p2.y=h;
     C.mantle={t:0,p0:hero.position.clone(),q0:hero.quaternion.clone(),p1:p1,p2:p2,
       q1:new THREE.Quaternion().setFromAxisAngle(UPV,Math.atan2(-F2.n.x,-F2.n.z)),snap:snapBones(),off:null};
     return;
   }
-  if(C.y>=C.o.h-.9&&clipSrc.climbup)C.y=C.o.h-.9;
+  if(C.y>=C.o.h-1.1&&clipSrc.hang)C.y=C.o.h-1.1;
   /* embaixo: solta e fica de pé */
   if(C.y<=.3&&vy<0){const out=F.p.clone().addScaledVector(F.n,.45);out.y=0;endClimb(out,Math.atan2(-F.n.x,-F.n.z),snapBones());return;}
   const F3=wallFrame(C),q=wallQuat(F3,C.psi),k=sm(C.t/.25);
@@ -843,25 +844,21 @@ function poseClimb(dt){
   const C=climb,M=C.mantle;
   if(M){
     if(M.up){inertBlend(M.up,TOP_UP);return;}
-    applyClip('climbup',TOP_T0+M.t*TOP_SPEED,1);
-    inertBlend(M,.3);
-    /* mãos na borda, empurrando o corpo para cima */
-    const F=wallFrame(C),B=rig.B,w=sm(M.t/.35);
+    const rm=applyClip('hang',M.t*TOP_SPEED,1);
+    if(!M.rm0)M.rm0=rm;
+    /* avanço da animação: sobe a borda e entra por cima dela */
+    const F=wallFrame(C),k=sm(M.t/.2);
+    hero.position.copy(M.p0).lerp(M.p1,k).addScaledVector(F.n,-(rm.z-M.rm0.z)).addScaledVector(F.R,-(rm.x-M.rm0.x));
+    hero.updateMatrixWorld(true);st.x=hero.position.x;st.y=hero.position.y;st.z=hero.position.z;
+    inertBlend(M,.25);
+    /* mãos presas na borda enquanto puxa o corpo */
+    const B=rig.B,ct=M.t*TOP_SPEED,w=sm(M.t/.2)*(1-sm((ct-.55)/.25));
     if(w>0)['Left','Right'].forEach(function(s){
-      const sh=wp(B[s+'Arm']),lat=Math.max(-.4,Math.min(.4,sh.clone().sub(F.p).dot(F.R)*1.15));
-      const tg=F.p.clone().addScaledVector(F.n,-.12).addScaledVector(F.R,lat);tg.y=C.o.h+.04;
+      const sh=wp(B[s+'Arm']),lat=Math.max(-.4,Math.min(.4,sh.clone().sub(F.p).dot(F.R)*1.1));
+      const tg=F.p.clone().addScaledVector(F.n,-.1).addScaledVector(F.R,lat);tg.y=C.o.h+.03;
       const pole=F.n.clone().addScaledVector(F.R,Math.sign(lat)*.6).add(_v.set(0,-.3,0));
       ikHinge(B[s+'Arm'],B[s+'ForeArm'],B[s+'Hand'],tg,pole,w,s+'Arm');
     });
-    /* o pé que sobe (esquerdo) pisa em cima da borda */
-    const wf=sm((TOP_T0+M.t*TOP_SPEED-1.25)/.4);
-    if(wf>0){
-      const f=wp(B.LeftFoot),lat=Math.max(-.35,Math.min(.35,f.clone().sub(F.p).dot(F.R)));
-      const tg=F.p.clone().addScaledVector(F.n,-.18).addScaledVector(F.R,lat);tg.y=C.o.h+rig.restP.LeftFoot.y;
-      B.LeftFoot.getWorldQuaternion(_cq);const fq=_cq.clone();
-      ikHinge(B.LeftUpLeg,B.LeftLeg,B.LeftFoot,tg,F.n.clone().negate().add(_v.set(0,.6,0)),wf,'LeftLeg',true);
-      setWorldQuat(B.LeftFoot,fq);
-    }
     return;
   }
   const R=clipSrc.crawl,d=R.clip.duration;
@@ -982,7 +979,7 @@ function findAct(re){for(const k in acts){if(re.test(k))return acts[k];}return n
 /* animações do Mixamo (pasta animacoes/), transferidas para o esqueleto da personagem por retarget:
    cada osso copia a rotação do osso de mesmo nome no esqueleto do Mixamo, no espaço do personagem,
    descontando a diferença entre as poses de repouso dos dois esqueletos */
-const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'},die1:{file:'animacoes/dying_1.glb'},die2:{file:'animacoes/dying_2.glb'},die3:{file:'animacoes/dying_3.glb'},die4:{file:'animacoes/dying_4.glb'},die5:{file:'animacoes/dying_5.glb'},crawl:{file:'animacoes/running_crawl.glb'},climbup:{file:'animacoes/climbing_up_wall.glb'}};
+const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'},die1:{file:'animacoes/dying_1.glb'},die2:{file:'animacoes/dying_2.glb'},die3:{file:'animacoes/dying_3.glb'},die4:{file:'animacoes/dying_4.glb'},die5:{file:'animacoes/dying_5.glb'},crawl:{file:'animacoes/running_crawl.glb'},hang:{file:'animacoes/braced_hang_to_crouch.glb'}};
 const clipSrc={};
 function loadClips(){
   Object.keys(CLIPS).forEach(function(name){

@@ -21,6 +21,12 @@ a Braced Hang To Crouch (puxa o corpo pela borda e sobe agachada) e fica de pé 
 embaixo, solta. As muralhas do fundo
 e dos lados também podem ser escaladas.
 
+Ataque aéreo: atacar no ar (salto da parede ou pulo normal) usa a "Standing Melee Run
+Jump Attack" (1,05 s a 2,3 s, tabela AIRATK): vira para o inimigo mais próximo (ou para onde
+estava indo), levanta as duas mãos, desce golpeando e esmaga o chão na aterrissagem — dano em
+área (AIR_HIT: ~3 m em volta, dano 3, empurrão forte). A altura se ajusta para o impacto cair
+no chão; termina em guarda.
+
 Dano: quando um inimigo acerta, o golpe em andamento é cortado e o combo volta ao primeiro
 golpe. A personagem leva um tranco na direção do golpe (tronco e cabeça vão para trás, braços
 ficam para trás do corpo, joelhos cedem; de lado o tronco gira), recua uns 45 cm e fica

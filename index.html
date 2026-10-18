@@ -1454,71 +1454,37 @@ function loadArmForms(root){
     [].concat(mesh.material).forEach(function(mm){mm.morphTargets=true;mm.vertexColors=true;mm.needsUpdate=true;});
     mesh.updateMorphTargets();
     armForm={mesh:mesh,idx:idx,tc:tc,col:col,last:-1};
-    loadHumanArms(mesh);applyArmForm();
+    loadHumanModel(mesh);applyArmForm();
   },function(){});
 }
-/* braços humanos (bracos_humanos.glb): recortados de um modelo do mesmo personagem gerado com braços normais, já na
-   mesma pose; cada vértice traz os ossos do braço do esqueleto atual (JOINTS/WEIGHTS) e o arquivo traz as matrizes de
-   ligação (extras.inverseBind). Na forma normal eles aparecem e os triângulos dos braços antigos são escondidos */
-function loadHumanArms(mesh){
-  loadBinary('bracos_humanos.glb',function(buf){
+/* forma normal: o modelo humano inteiro (aethelred_humano_rig.glb, gerado por ferramentas/rig_modelo_humano.py a partir
+   do mesmo personagem gerado com braços normais), preso ao mesmo esqueleto: cada vértice traz JOINTS/WEIGHTS e o arquivo
+   traz as matrizes de ligação (extras.inverseBind). A transformação troca a malha inteira pelo modelo atual */
+function loadHumanModel(mesh){
+  loadBinary('aethelred_humano_rig.glb',function(buf){
     new THREE.GLTFLoader().parse(buf,'',function(g){
       let src=null;g.scene.traverse(function(o){if(o.isMesh&&!src)src=o;});if(!src)return;
-      const ib=src.userData.inverseBind||(src.parent&&src.parent.userData.inverseBind)||[];
+      const ib=src.userData.inverseBind||[];
       const bones=mesh.skeleton.bones,inv=bones.map(function(b,i){return new THREE.Matrix4().fromArray(ib,i*16);});
       const mat=src.material;mat.skinning=true;mat.needsUpdate=true;
-      const arm=new THREE.SkinnedMesh(src.geometry,mat);arm.castShadow=true;arm.receiveShadow=true;arm.frustumCulled=false;
-      mesh.parent.add(arm);arm.position.copy(mesh.position);arm.quaternion.copy(mesh.quaternion);arm.scale.copy(mesh.scale);
-      arm.updateMatrixWorld(true);arm.bind(new THREE.Skeleton(bones,inv),mesh.bindMatrix);
-      /* índice do corpo sem os braços antigos: tira os triângulos com algum vértice da lista hideOld (pele e osso dos braços,
-         calculada pelo script; sem ela, os presos mais de 75% aos ossos do braço) */
-      const g0=mesh.geometry,si=g0.attributes.skinIndex,sw=g0.attributes.skinWeight,nv=si.count,isArm=bones.map(function(b){return /(Arm|ForeArm|Hand)/.test(b.name)&&!/Shoulder/.test(b.name);});
-      const armV=new Uint8Array(nv),gi=['getX','getY','getZ','getW'];for(let v=0;v<nv;v++){let a=0;for(let k=0;k<4;k++)if(isArm[si[gi[k]](v)])a+=sw[gi[k]](v);armV[v]=a>.75?1:0;}
-      const hide=src.userData.hideOld;if(hide){armV.fill(0);hide.forEach(function(v){armV[v]=1;});}
-      const full=g0.index,src2=full.array,keep=[];for(let t=0;t<src2.length;t+=3)if(!armV[src2[t]]&&!armV[src2[t+1]]&&!armV[src2[t+2]])keep.push(src2[t],src2[t+1],src2[t+2]);
-      if(src.userData.align)loadShowcase(mesh,src.userData.align);
-      armForm.human={mesh:arm,full:full,noArm:new THREE.BufferAttribute(new Uint32Array(keep),1),shown:null};armForm.last=-1;applyArmForm();
+      const hm=new THREE.SkinnedMesh(src.geometry,mat);hm.castShadow=true;hm.receiveShadow=true;hm.frustumCulled=false;
+      mesh.parent.add(hm);hm.position.copy(mesh.position);hm.quaternion.copy(mesh.quaternion);hm.scale.copy(mesh.scale);
+      hm.updateMatrixWorld(true);hm.bind(new THREE.Skeleton(bones,inv),mesh.bindMatrix);
+      armForm.human={mesh:hm,shown:null};armForm.last=-1;applyArmForm();
     },function(){});
   },function(){});
 }
 function applyArmForm(){
   if(!armForm)return;
-  /* com os braços humanos: até a metade da transformação eles aparecem; depois voltam os braços antigos, que começam na
-     forma recolhida e terminam com as garras e os espetos crescidos */
+  /* com o modelo humano: até a metade da transformação ele aparece; depois entra o modelo atual, que começa com os braços
+     recolhidos e termina com as garras e os espetos crescidos */
   const H=armForm.human,human=H&&st.morph<.5;
-  if(H&&H.shown!==human){H.shown=human;H.mesh.visible=human;armForm.mesh.geometry.setIndex(human?H.noArm:H.full);}
+  if(H&&H.shown!==human){H.shown=human;H.mesh.visible=human;armForm.mesh.visible=!human;}
   const k=H?Math.max(0,Math.min(1,(1-st.morph)*2)):1-st.morph;if(Math.abs(k-armForm.last)<.002)return;armForm.last=k;
   armForm.mesh.morphTargetInfluences[0]=k;
   const c=armForm.col,idx=armForm.idx,tc=armForm.tc;
   for(let i=0;i<idx.length;i++){const j=idx[i]*3;c[j]=1+(tc[i*3]/255-1)*k;c[j+1]=1+(tc[i*3+1]/255-1)*k;c[j+2]=1+(tc[i*3+2]/255-1)*k;}
   armForm.mesh.geometry.attributes.color.needsUpdate=true;
-}
-/* vitrine: o modelo novo inteiro (aethelred_bracos_humanos_leve.glb, sem esqueleto), parado ao lado do ponto de
-   partida e virado para a câmera. Usa o mesmo alinhamento calculado para encaixar os braços (extras.align: escala,
-   rotação e posição do modelo novo no espaço do modelo atual) e a mesma transformação da malha do personagem, então
-   fica exatamente na proporção do modelo atual */
-function loadShowcase(mesh,align){
-  loadBinary('aethelred_bracos_humanos_leve.glb',function(buf){
-    new THREE.GLTFLoader().parse(buf,'',function(g){
-      hero.updateMatrixWorld(true);
-      /* espaço de ligação da malha do personagem levado ao mundo pelo quadril (como se a malha inteira estivesse presa
-         a ele, na pose em que foi rigada); só a escala e a rotação interessam, a posição vai para o chão da vitrine */
-      const sk=mesh.skeleton,hi=sk.bones.findIndex(function(b){return /Hips$/.test(b.name);});
-      mesh.updateMatrixWorld(true);
-      const M=new THREE.Matrix4().copy(mesh.matrixWorld).multiply(mesh.bindMatrixInverse).multiply(sk.bones[hi].matrixWorld).multiply(sk.boneInverses[hi]).multiply(mesh.bindMatrix);
-      const rel=new THREE.Matrix4().copy(hero.matrixWorld).invert().multiply(M);
-      const ps=new THREE.Vector3(),qs=new THREE.Quaternion(),ss=new THREE.Vector3();rel.decompose(ps,qs,ss);
-      /* fica de pé e virado para a frente: tira a inclinação que a pose do quadril teria no quadro atual */
-      const e=new THREE.Euler().setFromQuaternion(qs,'YXZ');
-      const o=g.scene;o.matrixAutoUpdate=false;
-      const up=new THREE.Matrix4().compose(new THREE.Vector3(),qs,ss).multiply(new THREE.Matrix4().fromArray(align));
-      o.matrix.copy(up);o.updateMatrixWorld(true);
-      const bb=new THREE.Box3().setFromObject(o),cx=(bb.min.x+bb.max.x)/2,cz=(bb.min.z+bb.max.z)/2;
-      o.matrix.premultiply(new THREE.Matrix4().makeTranslation(-cx,-bb.min.y,-cz));
-      const holder=new THREE.Group();holder.add(o);holder.position.set(2.2,0,6);scene.add(holder);
-      o.traverse(function(m){if(m.isMesh){m.castShadow=true;m.receiveShadow=true;m.frustumCulled=false;}});
-    },function(){});
-  },function(){});
 }
 /* carrega o modelo que acompanha o jogo */
 loadBinary('aethelred_rig_leve.glb',function(buf){parseGLB(buf,'aethelred_rig_leve.glb');},

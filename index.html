@@ -445,7 +445,9 @@ function resolve(){
 const GUARD={s:[.78,-.55,.35],o:[.78,-.55,.35],yaw:0,pitch:.34,roll:0,drop:.17,fwd:.03,side:0};
 /* na guarda, só a parte de cima do tronco tomba um pouco para a frente (o quadril fica onde está) */
 const GUARD_CHEST=.32;
-const GUARD_WALK_WIDE=.11;
+/* caminhada em guarda: base um pouco mais larga, quadril só parte do abaixamento da guarda parada (joelhos levemente
+   dobrados, não agachado), passos mais rasantes (altura do pé da caminhada escalada) e joelhos só um pouco para fora */
+const GUARD_WALK_WIDE=.07,GUARD_WALK_RISE=.55,GUARD_WALK_LIFT=.6,GUARD_WALK_KNEE=.3,GUARD_WALK_TOE=.38;
 let guardChest=0;
 /* Golpes 1 a 4 baseados nas referências: preparação curta enrolando o tronco, golpe de um quadro com o braço todo
    esticado, arcos em diagonal, o tronco gira até ~80° e dobra para frente; o fim de um golpe já prepara o próximo.
@@ -1907,7 +1909,7 @@ function applyProc(A,p,w,mv){
   /* quadril: abaixa, avança e desloca o peso */
   if(!B.Hips._p){B.Hips._p=B.Hips.position.clone();touchedP.push(B.Hips);}
   B.Hips.getWorldPosition(_v);
-  _v.addScaledVector(fr.up,-pose[9]*L*w).addScaledVector(fr.fwd,pose[10]*L*w).addScaledVector(fr.right,pose[11]*L*w);
+  _v.addScaledVector(fr.up,-pose[9]*L*w*(1-GUARD_WALK_RISE*mv)).addScaledVector(fr.fwd,pose[10]*L*w).addScaledVector(fr.right,pose[11]*L*w);
   B.Hips.position.copy(B.Hips.parent.worldToLocal(_v));B.Hips.updateMatrixWorld(true);
   const le=A.legEnd||[.88,1],lc=A.legClip&&clipSrc[A.legClip]&&combo.active?w*(1-sm((p-le[0])/(le[1]-le[0]))):0;
   if(lc>0)legClipHips(A,p,lc);
@@ -2015,13 +2017,16 @@ function applyProc(A,p,w,mv){
     }
     footTarget(k,A,p,_ft);
     if(feet[k]&&feet[k].lift)_ft.y+=feet[k].lift;
-    if(mv>0){_ft.lerp(_animFoot[k],mv);
+    if(mv>0){const af=_animFoot[k].clone(),gy=st.y+feet.y;if(af.y>gy)af.y=gy+(af.y-gy)*GUARD_WALK_LIFT;_ft.lerp(af,mv);
       /* andando em guarda: base mais larga que a da caminhada normal, para a canela não entrar na linha do corpo com o joelho dobrado */
       _ft.addScaledVector(new THREE.Vector3().crossVectors(new THREE.Vector3(Math.sin(st.rot),0,Math.cos(st.rot)),UPV),sg*GUARD_WALK_WIDE*mv);}
-    _pole.copy(fr.fwd).addScaledVector(fr.right,.45*sg);
+    _pole.copy(fr.fwd).addScaledVector(fr.right,(.45+(GUARD_WALK_KNEE-.45)*mv)*sg);
     ikHinge(B[s+'UpLeg'],B[s+'Leg'],B[s+'Foot'],_ft,_pole,wl,s+'Leg');
     B[s+'Foot'].getWorldQuaternion(_cq);
     setWorldQuat(B[s+'Foot'],_cq.slerp(_fq[k],wl));
+    /* andando em guarda: ponta do pé um pouco para fora, alinhada com o joelho aberto (sem ela o pé aponta reto e,
+       com a base larga, o tornozelo parece virado para dentro) */
+    if(mv>0)rotAxis(B[s+'Foot'],UPV,-sg*GUARD_WALK_TOE*mv*wl);
   });
   if(!combo.snap)groundFeet();
 }

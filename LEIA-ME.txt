@@ -48,6 +48,10 @@ agarra e arremessa: o herói usa a "Getting Thrown" (segurado, voa, cai com 15 d
 com invencibilidade — e se levanta), sem controle e imune a outros golpes até ficar de pé.
 Parâmetros na tabela THROWN do index.html.
 
+Caminhada em guarda: usa os passos da caminhada normal com o quadril só um pouco mais baixo
+(GUARD_WALK_RISE: joelhos levemente dobrados, não agachado), passos mais rasantes (GUARD_WALK_LIFT),
+base um pouco mais larga (GUARD_WALK_WIDE), joelhos um pouco para fora (GUARD_WALK_KNEE) e a ponta
+dos pés ~20° para fora, alinhada com o joelho (GUARD_WALK_TOE). Constantes no index.html.
 Mira dos golpes: sem tocar no analógico esquerdo (ou WASD), cada golpe vira para o inimigo mais
 próximo (lock-on automático). Com o analógico apontado na hora do golpe (inclusive o próximo golpe
 do combo), ele vira para aquele lado: trava no inimigo mais próximo dentro de um cone de ~50° para

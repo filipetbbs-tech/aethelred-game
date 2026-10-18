@@ -48,6 +48,11 @@ agarra e arremessa: o herói usa a "Getting Thrown" (segurado, voa, cai com 15 d
 com invencibilidade — e se levanta), sem controle e imune a outros golpes até ficar de pé.
 Parâmetros na tabela THROWN do index.html.
 
+Mira dos golpes: sem tocar no analógico esquerdo (ou WASD), cada golpe vira para o inimigo mais
+próximo (lock-on automático). Com o analógico apontado na hora do golpe (inclusive o próximo golpe
+do combo), ele vira para aquele lado: trava no inimigo mais próximo dentro de um cone de ~50° para
+cada lado da direção apontada; se não houver ninguém ali, ataca na direção apontada mesmo
+(enemyInCone no index.html). O chute em corrida continua mirando só em quem já está à frente.
 Dano: quando um inimigo acerta, o golpe em andamento é cortado e o combo volta ao primeiro
 golpe. A personagem leva um tranco na direção do golpe (tronco e cabeça vão para trás, braços
 ficam para trás do corpo, joelhos cedem; de lado o tronco gira), recua uns 45 cm e fica

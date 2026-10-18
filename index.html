@@ -543,6 +543,15 @@ ATT_B.concat([RUN_ATT]).forEach(function(A){
   if(A.clip){A.dur=(A.c1-A.c0)/A.speed;A.tw=A.kw;A.tf=A.kf;}
 });
 const comboEl=document.getElementById('combo');
+/* inimigo para onde o jogador apontou: dentro do cone (ângulo máximo "ang" em radianos), o mais próximo vence,
+   com distância pesada pelo desvio do ângulo, para preferir quem está bem na direção */
+function enemyInCone(dir,maxD,ang){
+  let best=null,bs=1e9;
+  enemies.forEach(function(e){if(e.dead)return;const dx=e.g.position.x-st.x,dz=e.g.position.z-st.z,d=Math.hypot(dx,dz);if(d>maxD)return;
+    let a=Math.atan2(dx,dz)-dir;while(a>Math.PI)a-=Math.PI*2;while(a<-Math.PI)a+=Math.PI*2;a=Math.abs(a);if(a>ang)return;
+    const sc=d*(1+a*1.5);if(sc<bs){bs=sc;best=[dx,dz];}});
+  return best;
+}
 function nearestEnemy(maxD){
   let best=null,bd=maxD;
   enemies.forEach(function(e){if(e.dead)return;const dx=e.g.position.x-st.x,dz=e.g.position.z-st.z,d=Math.hypot(dx,dz);if(d<bd){bd=d;best=[dx,dz];}});
@@ -558,16 +567,23 @@ function startAttack(i,A){
   combo.snap=(combo.prevA&&(combo.prevA.clip||A.clip)&&baseBones)?baseBones.map(function(b){return [b.quaternion.clone(),b.position.clone()];}):null;
   if(feet.L)feet.L.rel=null;if(feet.R)feet.R.rel=null;
   combo.active=true;combo.i=i;combo.t=0;combo.swung=false;combo.queued=false;combo.hitDone=false;combo.cur=A;combo.stepFrom={};
-  /* na corrida só mira em quem já está à frente, para não quebrar o embalo */
-  let best=nearestEnemy(A.run?6:7);
-  if(best&&A.run){const d=Math.hypot(best[0],best[1]);if((best[0]*Math.sin(st.rot)+best[1]*Math.cos(st.rot))/d<.7)best=null;}
+  /* direção do analógico/WASD no espaço da câmera: com ela, o golpe sai para onde o jogador apontou */
+  const ix=(keys.KeyD?1:0)-(keys.KeyA?1:0)+joy.x,iz=(keys.KeyW?1:0)-(keys.KeyS?1:0)-joy.y;
+  let aim=null;
+  if(Math.hypot(ix,iz)>.2){const fx=-Math.sin(st.yaw),fz=-Math.cos(st.yaw),rx=Math.cos(st.yaw),rz=-Math.sin(st.yaw);aim=Math.atan2(fx*iz+rx*ix,fz*iz+rz*ix);}
+  let best=null;
+  if(A.run){
+    /* na corrida só mira em quem já está à frente, para não quebrar o embalo */
+    best=nearestEnemy(6);
+    if(best){const d=Math.hypot(best[0],best[1]);if((best[0]*Math.sin(st.rot)+best[1]*Math.cos(st.rot))/d<.7)best=null;}
+  }else if(aim!==null){
+    /* apontando: trava no inimigo mais próximo dentro de um cone de ~50° para cada lado da direção; sem ninguém
+       ali, o golpe sai na direção apontada mesmo (troca de alvo livre no meio do combo) */
+    best=enemyInCone(aim,7,.87);
+  }else best=nearestEnemy(7);
   if(best)st.rotT=Math.atan2(best[0],best[1]);
-  else if(A.run)st.rotT=st.rot;
-  else{
-    const ix=(keys.KeyD?1:0)-(keys.KeyA?1:0)+joy.x,iz=(keys.KeyW?1:0)-(keys.KeyS?1:0)-joy.y;
-    if(Math.hypot(ix,iz)>.2){const fx=-Math.sin(st.yaw),fz=-Math.cos(st.yaw),rx=Math.cos(st.yaw),rz=-Math.sin(st.yaw);st.rotT=Math.atan2(fx*iz+rx*ix,fz*iz+rz*ix);}
-    else st.rotT=st.rot;
-  }
+  else if(aim!==null&&!A.run)st.rotT=aim;
+  else st.rotT=st.rot;
   comboEl.textContent=A.run?A.name:'Golpe '+(i+1)+' de '+ATT.length+': '+A.name;
 }
 function attack(){
@@ -613,7 +629,7 @@ function updateComboState(dt){
   if(!combo.paused)combo.t+=dt;
   const p=progA(A,combo.t);
   /* vira o corpo para o alvo no começo do golpe; os pés giram junto, como um pivô, para as pernas não trançarem */
-  if(p<.5){let diff=st.rotT-st.rot;while(diff>Math.PI)diff-=Math.PI*2;while(diff<-Math.PI)diff+=Math.PI*2;const dr=diff*Math.min(1,dt*7);st.rot+=dr;pivotFeet(dr);}
+  if(p<.5){let diff=st.rotT-st.rot;while(diff>Math.PI)diff-=Math.PI*2;while(diff<-Math.PI)diff+=Math.PI*2;const dr=diff*Math.min(1,dt*11);st.rot+=dr;pivotFeet(dr);}
   /* avanço do corpo junto com o golpe, parando antes de atravessar o inimigo */
   const dl=lungeAt(A,p)-lungeAt(A,p0);
   if(dl>0){
@@ -2282,7 +2298,7 @@ function tick(raw){
 }
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
+window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,get rig(){return rig;},get custom(){return custom;},cam:cam};
 frame();
 })();
 </script>

@@ -538,6 +538,7 @@ function startAttack(i,A){
   combo.prevA=combo.active?combo.cur:null;combo.rmPrev=null;
   combo.snapOff=null;combo.snapT=0;
   combo.snap=(combo.prevA&&(combo.prevA.clip||A.clip)&&baseBones)?baseBones.map(function(b){return [b.quaternion.clone(),b.position.clone()];}):null;
+  if(feet.L)feet.L.rel=null;if(feet.R)feet.R.rel=null;
   combo.active=true;combo.i=i;combo.t=0;combo.swung=false;combo.queued=false;combo.hitDone=false;combo.cur=A;combo.stepFrom={};
   /* na corrida só mira em quem já está à frente, para não quebrar o embalo */
   let best=nearestEnemy(A.run?6:7);
@@ -670,6 +671,8 @@ function takeHit(fx,fz,dmg){
   SOUND.voice('pain');SOUND.impact(false);rumble(1,.45,240);
   shake=Math.max(shake,.3);hitStop=Math.max(hitStop,.045);
   const snap=(combo.active&&baseBones)?snapBones():null;
+  /* entrando na guarda pelo dano: os pés partem de onde estão agora, não de onde ficaram na última guarda */
+  if(!combo.active&&combo.w<.05)plantFeet();
   combo.active=false;combo.queued=false;combo.i=-1;combo.grace=0;combo.cool=HIT_LOCK;combo.snap=null;
   if(combo.cur){combo.pose=GUARD_ABS.slice();combo.hold=COMBAT_HOLD;combo.holdT=1;combo.outDur=0;}
   comboEl.textContent='';landT=0;
@@ -1274,7 +1277,9 @@ function plantFeet(){
   if(!rig)return;
   rig.m.updateMatrixWorld(true);
   feet.L=wp(rig.B.LeftFoot);feet.R=wp(rig.B.RightFoot);
-  feet.y=(feet.L.y+feet.R.y)/2-st.y;
+  /* altura do pé em repouso sobre o chão (não a do quadro atual, que pode estar no ar ou com o pé erguido) */
+  feet.y=hero.localToWorld(rig.restP.LeftFoot.clone()).y-hero.position.y;
+  feet.L.y=feet.R.y=st.y+feet.y;
 }
 const curW={wind:0,strike:0,sw:0};
 const pose=new Array(POSE_N).fill(0);
@@ -1418,6 +1423,7 @@ function armArc(A,ct,w){
   return wt;
 }
 const _animFoot={L:new THREE.Vector3(),R:new THREE.Vector3()};
+let procDt=1/60;
 function applyProc(A,p,w,mv){
   const B=rig.B;mv=mv||0;
   B.LeftFoot.getWorldQuaternion(_fq.L);B.RightFoot.getWorldQuaternion(_fq.R);
@@ -1478,8 +1484,25 @@ function applyProc(A,p,w,mv){
   ['Left','Right'].forEach(function(s){
     const k=s[0],sg=s==='Right'?1:-1;
     if(gnd<.999&&feet[k]){feet[k].copy(_animFoot[k]);feet[k].y=st.y+feet.y;}
+    /* no chão, o pé plantado fica sempre na altura do chão atual (topo de pilastra, muralha ou piso) */
+    else if(feet[k])feet[k].y=st.y+feet.y;
     if(wl<.001)return;
+    /* passo de ajuste: se o corpo foi empurrado (dano, inimigos, colisão) e o pé plantado ficou longe de onde
+       deveria estar embaixo do corpo, ele dá um passo rápido até lá, com o pé subindo um pouco */
+    if(feet[k]&&!combo.active){
+      const f=feet[k],c=Math.cos(st.rot),sn=Math.sin(st.rot);
+      /* posição natural: onde o pé estava em relação ao corpo quando a guarda começou */
+      if(!f.rel){let rx=f.x-st.x,rz=f.z-st.z;const l=Math.hypot(rx,rz);if(l>.45){rx*=.45/l;rz*=.45/l;}f.rel=[rx*c-rz*sn,rx*sn+rz*c];}
+      const nx=st.x+f.rel[0]*c+f.rel[1]*sn,nz=st.z-f.rel[0]*sn+f.rel[1]*c,dx=nx-f.x,dz=nz-f.z,d=Math.hypot(dx,dz);
+      if(d>.32)f.stepping=true;
+      if(f.stepping){
+        const u=1-Math.exp(-procDt*16);f.x+=dx*u;f.z+=dz*u;
+        f.lift=Math.min(.09,d*.3);
+        if(d<.05){f.stepping=false;f.lift=0;}
+      }else f.lift=0;
+    }
     footTarget(k,A,p,_ft);
+    if(feet[k]&&feet[k].lift)_ft.y+=feet[k].lift;
     if(mv>0)_ft.lerp(_animFoot[k],mv);
     _pole.copy(fr.fwd).addScaledVector(fr.right,.45*sg);
     ikHinge(B[s+'UpLeg'],B[s+'Leg'],B[s+'Foot'],_ft,_pole,wl,s+'Leg');
@@ -1566,6 +1589,7 @@ function playAct(a,once){
 let wasAir=false,landT=0;
 function updateModel(dt){
   if(!custom)return;
+  procDt=dt;
   if(mixer){
     const run=findAct(/run|sprint/),walk=findAct(/walk/),idle=findAct(/idle|stand|breath/);
     const jStart=findAct(/start/),jLand=findAct(/land/);

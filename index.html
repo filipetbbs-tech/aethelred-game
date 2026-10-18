@@ -445,6 +445,7 @@ function resolve(){
 const GUARD={s:[.78,-.55,.35],o:[.78,-.55,.35],yaw:0,pitch:.34,roll:0,drop:.17,fwd:.03,side:0};
 /* na guarda, só a parte de cima do tronco tomba um pouco para a frente (o quadril fica onde está) */
 const GUARD_CHEST=.32;
+const GUARD_WALK_WIDE=.11;
 let guardChest=0;
 /* Golpes 1 a 4 baseados nas referências: preparação curta enrolando o tronco, golpe de um quadro com o braço todo
    esticado, arcos em diagonal, o tronco gira até ~80° e dobra para frente; o fim de um golpe já prepara o próximo.
@@ -1999,7 +2000,9 @@ function applyProc(A,p,w,mv){
     }
     footTarget(k,A,p,_ft);
     if(feet[k]&&feet[k].lift)_ft.y+=feet[k].lift;
-    if(mv>0)_ft.lerp(_animFoot[k],mv);
+    if(mv>0){_ft.lerp(_animFoot[k],mv);
+      /* andando em guarda: base mais larga que a da caminhada normal, para a canela não entrar na linha do corpo com o joelho dobrado */
+      _ft.addScaledVector(new THREE.Vector3().crossVectors(new THREE.Vector3(Math.sin(st.rot),0,Math.cos(st.rot)),UPV),sg*GUARD_WALK_WIDE*mv);}
     _pole.copy(fr.fwd).addScaledVector(fr.right,.45*sg);
     ikHinge(B[s+'UpLeg'],B[s+'Leg'],B[s+'Foot'],_ft,_pole,wl,s+'Leg');
     B[s+'Foot'].getWorldQuaternion(_cq);

@@ -121,7 +121,10 @@ for side,sg in [('Left',1),('Right',-1)]:
         a,b=chain[k],chain[k+1];ab=b-a;L=nrm(ab);u=ab/L;t=(Q2-a)@u;tc=np.clip(t,0,L);r=nrm(Q2-(a+np.outer(tc,u)),axis=1)
         if k==0:r=np.where(t<-.03,9,r)
         s_=r<best;best[s_]=r[s_];T[s_]=tc[s_]/L;segi[s_]=k
-    candNV=(best<np.where(segi==2,.08,.085))&(Q2[:,0]*sg>.1)
+    # bola em volta da mão: pega o polegar, que sai para a frente da palma e fica longe do eixo punho-dedos
+    Hc=Wo+(Mo-Wo)*.9;ball=nrm(Q2-Hc,axis=1)<.12
+    fix=ball&(segi!=2)&(nrm(Q2-Hc,axis=1)<nrm(Q2-En,axis=1));segi[fix]=2;T[fix]=.4;best[fix]=0
+    candNV=((best<np.where(segi==2,.08,.085))|ball)&(Q2[:,0]*sg>.1)
     cand=candNV&(val2>.2)
     # cresce a partir da pele, só dentro do candidato
     reg=m&cand
@@ -155,10 +158,29 @@ for side,sg in [('Left',1),('Right',-1)]:
     for f in ['Thumb','Index','Middle','Ring','Pinky']:
         for k in (1,2,3):IBn[bi[f'{side}Hand{f}{k}']]=IBn[hi]
 Wn/=np.maximum(Wn.sum(1),1e-9)[:,None]
+# vértices do modelo antigo a esconder na forma normal: pele e osso dos braços. A armadura do ombro também está presa
+# ao osso do braço, mas é escura; por isso, no alto do braço só some o que é claro (pele/osso)
+from PIL import Image;import io
+img=j['images'][0];bv=j['bufferViews'][img['bufferView']];o=b0+bv.get('byteOffset',0)
+texo=np.asarray(Image.open(io.BytesIO(d[o:o+bv['byteLength']])).convert('RGB')).astype(np.float64)/255
+Ho,Wo_=texo.shape[:2];pxo=np.clip((UV[:,0]%1)*Wo_,0,Wo_-1).astype(int);pyo=np.clip((UV[:,1]%1)*Ho,0,Ho-1).astype(int);valo=texo[pyo,pxo].max(1)
+hide=np.zeros(len(P),bool)
+for side in ['Left','Right']:
+    def wso(keys):
+        w=np.zeros(len(P))
+        for k in keys:
+            if side+k in bi:w+=(W*(J==bi[side+k])).sum(1)
+        return w
+    up=wso(['Arm']);rest=wso(['ForeArm','Hand']+[f'Hand{f}{k}' for f in ['Thumb','Index','Middle','Ring','Pinky'] for k in (1,2,3)])
+    S_=BP[bi[side+'Arm']];E_=BP[bi[side+'ForeArm']];L_=np.linalg.norm(E_-S_);t_=((P-S_)@((E_-S_)/L_))/L_
+    hide|=((up+rest)>.75)&((rest>.5)|(valo>.22)|(t_>.6))
+hideOld=np.nonzero(hide)[0]
+print('esconder do modelo antigo',len(hideOld))
+
 tri=I2[sel_all[I2].all(1)]
 used=np.unique(tri);remap=-np.ones(N,int);remap[used]=np.arange(len(used))
 print('verts braço novo',len(used),'tris',len(tri))
-z=dict(P=Q2[used],N=Nw[used],UV=UV2[used],J=Jn[used],W=Wn[used],I=remap[tri],IB=IBn)
+z=dict(hideOld=hideOld,P=Q2[used],N=Nw[used],UV=UV2[used],J=Jn[used],W=Wn[used],I=remap[tri],IB=IBn)
 img=j2['images'][0];bv=j2['bufferViews'][img['bufferView']];jpg=d2[b02+bv.get('byteOffset',0):b02+bv.get('byteOffset',0)+bv['byteLength']]
 P=z['P'].astype(np.float32);Nn=z['N'].astype(np.float32);UV=z['UV'].astype(np.float32);Jt=z['J'].astype(np.uint16);Wt=z['W'].astype(np.float32);I=z['I'].astype(np.uint32).ravel()
 blobs=[];views=[];accs=[]
@@ -174,7 +196,7 @@ off=sum(len(b) for b in blobs);pad=(4-len(jpg)%4)%4;blobs.append(jpg+b'\0'*pad);
 binb=b''.join(blobs)
 gl={'asset':{'version':'2.0','generator':'aethelred bracos humanos'},'scene':0,'scenes':[{'nodes':[0]}],'nodes':[{'name':'bracos_humanos','mesh':0}],
  'meshes':[{'name':'bracos_humanos','primitives':[{'attributes':{'POSITION':iP,'NORMAL':iN,'TEXCOORD_0':iU,'JOINTS_0':iJ,'WEIGHTS_0':iW},'indices':iI,'material':0}],
-   'extras':{'inverseBind':[float(x) for x in z['IB'].transpose(0,2,1).ravel()]}}],
+   'extras':{'inverseBind':[float(x) for x in z['IB'].transpose(0,2,1).ravel()],'hideOld':[int(x) for x in z['hideOld']]}}],
  'materials':[{'name':'pele','doubleSided':True,'pbrMetallicRoughness':{'baseColorTexture':{'index':0},'metallicFactor':0,'roughnessFactor':.8}}],
  'textures':[{'source':0}],'images':[{'bufferView':len(views)-1,'mimeType':'image/jpeg'}],
  'accessors':accs,'bufferViews':views,'buffers':[{'byteLength':len(binb)}]}

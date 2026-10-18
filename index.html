@@ -1470,9 +1470,11 @@ function loadHumanArms(mesh){
       const arm=new THREE.SkinnedMesh(src.geometry,mat);arm.castShadow=true;arm.receiveShadow=true;arm.frustumCulled=false;
       mesh.parent.add(arm);arm.position.copy(mesh.position);arm.quaternion.copy(mesh.quaternion);arm.scale.copy(mesh.scale);
       arm.updateMatrixWorld(true);arm.bind(new THREE.Skeleton(bones,inv),mesh.bindMatrix);
-      /* índice do corpo sem os braços antigos: tira os triângulos com algum vértice preso mais da metade aos ossos do braço */
+      /* índice do corpo sem os braços antigos: tira os triângulos com algum vértice da lista hideOld (pele e osso dos braços,
+         calculada pelo script; sem ela, os presos mais de 75% aos ossos do braço) */
       const g0=mesh.geometry,si=g0.attributes.skinIndex,sw=g0.attributes.skinWeight,nv=si.count,isArm=bones.map(function(b){return /(Arm|ForeArm|Hand)/.test(b.name)&&!/Shoulder/.test(b.name);});
       const armV=new Uint8Array(nv),gi=['getX','getY','getZ','getW'];for(let v=0;v<nv;v++){let a=0;for(let k=0;k<4;k++)if(isArm[si[gi[k]](v)])a+=sw[gi[k]](v);armV[v]=a>.75?1:0;}
+      const hide=src.userData.hideOld;if(hide){armV.fill(0);hide.forEach(function(v){armV[v]=1;});}
       const full=g0.index,src2=full.array,keep=[];for(let t=0;t<src2.length;t+=3)if(!armV[src2[t]]&&!armV[src2[t+1]]&&!armV[src2[t+2]])keep.push(src2[t],src2[t+1],src2[t+2]);
       armForm.human={mesh:arm,full:full,noArm:new THREE.BufferAttribute(new Uint32Array(keep),1),shown:null};armForm.last=-1;applyArmForm();
     },function(){});
@@ -1490,8 +1492,21 @@ function applyArmForm(){
   for(let i=0;i<idx.length;i++){const j=idx[i]*3;c[j]=1+(tc[i*3]/255-1)*k;c[j+1]=1+(tc[i*3+1]/255-1)*k;c[j+2]=1+(tc[i*3+2]/255-1)*k;}
   armForm.mesh.geometry.attributes.color.needsUpdate=true;
 }
+/* vitrine: o modelo novo inteiro (aethelred_bracos_humanos_leve.glb, sem esqueleto), parado ao lado do ponto de
+   partida, na altura do personagem e virado para a câmera, para avaliar a qualidade dele como um todo */
+function loadShowcase(){
+  loadBinary('aethelred_bracos_humanos_leve.glb',function(buf){
+    new THREE.GLTFLoader().parse(buf,'',function(g){
+      const o=g.scene,b=new THREE.Box3().setFromObject(o),sz=b.getSize(new THREE.Vector3()),k=1.9/sz.y;
+      o.scale.setScalar(k);const c=b.getCenter(new THREE.Vector3());
+      const holder=new THREE.Group();o.position.set(-c.x*k,-b.min.y*k,-c.z*k);holder.add(o);
+      holder.position.set(2.2,0,6);scene.add(holder);
+      o.traverse(function(m){if(m.isMesh){m.castShadow=true;m.receiveShadow=true;}});
+    },function(){});
+  },function(){});
+}
 /* carrega o modelo que acompanha o jogo */
-loadBinary('aethelred_rig_leve.glb',function(buf){parseGLB(buf,'aethelred_rig_leve.glb');},
+loadBinary('aethelred_rig_leve.glb',function(buf){parseGLB(buf,'aethelred_rig_leve.glb');loadShowcase();},
   function(){say('Não encontrei o modelo da personagem. Arraste um arquivo .glb para a tela ou toque em “Carregar modelo GLB”.');},
   function(f){say('Carregando o modelo da personagem... '+Math.round(f*100)+'%');});
 /* remove quadros-chave com tempo repetido: as animações do modelo têm alguns, e o Three.js

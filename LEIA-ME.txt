@@ -12,7 +12,8 @@ Como executar no computador:
 
 Escalada: pule (Espaço) perto de uma pilastra ou parede, de frente para ela, para grudar
 na superfície (Running Crawl). Na parede: W sobe, S desce, A/D vão para os lados, Shift
-acelera, Espaço salta para longe. No meio de um pulo ela agarra sozinha a parede em que
+acelera, Espaço salta para longe com um mortal para trás (continua de frente para a parede,
+gira 360° com as pernas encolhidas e cai em pé). No meio de um pulo ela agarra sozinha a parede em que
 encostar (indo ou olhando para ela). Assim que as mãos alcançam o fim da parede ela faz
 a Braced Hang To Crouch (puxa o corpo pela borda e sobe agachada) e fica de pé em cima;
 embaixo, solta. As muralhas do fundo

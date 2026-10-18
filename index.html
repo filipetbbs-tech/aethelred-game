@@ -296,6 +296,8 @@ const SOUND={
   impact:function(heavy){if(!sfxOK())return;
     toneDrop('sine',150,45,.9,.2);noiseHit('highpass',2200,1400,.7,.45,.003,.07);noiseHit('bandpass',3200,1100,2,.32,.005,.14,.01);
     if(heavy){toneDrop('sine',95,32,.9,.38,0,true);noiseHit('lowpass',600,120,.8,.5,.005,.3);}},
+  /* inimigo arrastado no chão */
+  scrape:function(){if(!sfxOK())return;noiseHit('bandpass',700+Math.random()*500,350,.9,.16,.01,.14);noiseHit('lowpass',220,90,1,.12,.005,.1);},
   step:function(power){if(!sfxOK())return;const p=power||1;
     noiseHit('lowpass',260+Math.random()*80,120,1,.22*p,.004,.08);noiseHit('highpass',3500,2500,.7,.035*p,.002,.03);},
   land:function(){if(!sfxOK())return;toneDrop('sine',110,40,.6,.2);noiseHit('lowpass',450,120,.8,.4,.004,.16);},
@@ -762,9 +764,11 @@ function poseDodge(dt){
 function normAng(a){while(a>Math.PI)a-=Math.PI*2;while(a<-Math.PI)a+=Math.PI*2;return a;}
 /* agarrão (R1 no controle, E no teclado): começo da Surprise Uppercut — passo à frente e a mão esquerda se estica e
    agarra. Pegando um inimigo à frente, ele fica preso na mão (levantado, sem atacar). R1 de novo solta empurrando;
-   ataque enquanto segura dá o gancho de direita (resto da animação) e lança o inimigo. Solta sozinho após 4 s ou se
-   outro inimigo acertar a personagem */
-const GRAB={reach:.35,hold:.47,missEnd:.82,speed:1.25,range:1.9,arc:1.3,maxHold:4,upEnd:1.55,upHit:1.12,upSpeed:1.2};
+   ataque enquanto segura dá o gancho de direita (resto da animação) e lança o inimigo. Segurando, anda (inimigo erguido
+   na mão) e corre: no sprint pressiona o inimigo contra o chão e o arrasta, com dano pelo atrito (dragDmg por segundo).
+   Solta se outro inimigo acertar a personagem */
+const GRAB={reach:.35,hold:.47,missEnd:.82,speed:1.25,range:1.9,arc:1.3,upEnd:1.55,upHit:1.12,upSpeed:1.2,
+  walk:3.2,run:6.4,dragDmg:1.1,dragTick:.35};
 let grab=null;
 function grabKey(){
   if(grab){if(grab.phase==='hold')releaseGrab(true);return;}
@@ -783,7 +787,7 @@ function grabTry(){
 }
 function releaseGrab(push){
   const G=grab;if(!G)return;
-  if(G.e){const e=G.e;e.held=false;e.stun=push?.8:.5;
+  if(G.e){const e=G.e;e.held=false;e.stun=push?.8:.5;e.g.rotation.order='XYZ';e.g.rotation.set(0,e.g.rotation.y,0);
     if(push){const fx=Math.sin(st.rot),fz=Math.cos(st.rot);e.vx=fx*8;e.vz=fz*8;e.vy=2;SOUND.impact(false);shake=Math.max(shake,.15);}}
   climbOut={snap:snapBones(),off:null,t:0};grab=null;
   if(combo.cur){combo.pose=GUARD_ABS.slice();combo.hold=COMBAT_HOLD;combo.holdT=1;combo.outDur=0;}
@@ -793,19 +797,29 @@ function updateGrab(dt){
   if(G.phase==='reach'){G.ct=Math.min(GRAB.missEnd,G.t*GRAB.speed);
     if(!G.tried&&G.ct>=GRAB.reach-.05){G.tried=true;const e=grabTry();
       if(e){G.e=e;e.held=true;e.stun=99;e.vx=e.vz=0;e.vy=0;SOUND.voice('growl');SOUND.slash(false);rumble(.6,.4,140);hitStop=Math.max(hitStop,.05);}}
-    if(G.e&&G.ct>=GRAB.hold){G.phase='hold';G.ht=0;}
+    if(G.e&&G.ct>=GRAB.hold){G.phase='hold';G.ht=0;G.dw=0;G.dragT=0;G.I={snap:snapBones(),off:null,t:0};}
     else if(!G.e&&G.ct>=GRAB.missEnd)releaseGrab(false);
-  }else if(G.phase==='hold'){G.ht+=dt;G.ct=GRAB.hold;if(G.ht>=GRAB.maxHold||!G.e||G.e.dead)releaseGrab(false);}
+  }else if(G.phase==='hold'){G.ht+=dt;
+    if(!G.e||G.e.dead){releaseGrab(false);return;}
+    /* arrastando no sprint: dano pelo atrito com o chão */
+    const drag=runHeld()&&st.speed>4.5;G.dw+=((drag?1:0)-G.dw)*Math.min(1,dt*7);
+    if(drag&&G.dw>.6){G.dragT+=dt;G.scr=(G.scr||0)-dt;
+      if(G.scr<=0){G.scr=.11;SOUND.scrape();}
+      if(G.dragT>=GRAB.dragTick){G.dragT=0;const e=G.e;e.hp-=GRAB.dragDmg*GRAB.dragTick*(st.morphOn?2:1);e.flash=.12;rumble(.25,.35,90);
+        if(e.hp<=0){e.dead=.001;kills++;e.held=false;e.g.rotation.order='XYZ';G.e=null;SOUND.impact(false);releaseGrab(false);}}}
+  }
   else if(G.phase==='upper'){G.ct=Math.min(GRAB.upEnd,GRAB.hold+(G.t-G.ut0)*GRAB.upSpeed);
     if(!G.hitDone&&G.ct>=GRAB.upHit){G.hitDone=true;const e=G.e;
-      if(e){e.held=false;e.hp-=3*(st.morphOn?2:1);e.flash=.2;e.stun=1.2;e.vy=8.5;e.vx=Math.sin(st.rot)*2.5;e.vz=Math.cos(st.rot)*2.5;if(e.hp<=0){e.dead=.001;kills++;}G.e=null;}
+      if(e){e.held=false;e.g.rotation.order='XYZ';e.g.rotation.set(0,e.g.rotation.y,0);e.hp-=3*(st.morphOn?2:1);e.flash=.2;e.stun=1.2;e.vy=8.5;e.vx=Math.sin(st.rot)*2.5;e.vz=Math.cos(st.rot)*2.5;if(e.hp<=0){e.dead=.001;kills++;}G.e=null;}
       SOUND.slash(true);SOUND.impact(true);shake=Math.max(shake,.35);hitStop=Math.max(hitStop,.09);rumble(1,.7,220);}
     if(G.ct>=GRAB.upEnd)releaseGrab(false);
   }
 }
 function uppercutFromGrab(){
   if(!grab||grab.phase!=='hold')return false;
-  grab.phase='upper';grab.ut0=grab.t;SOUND.swish(1.4);SOUND.voice('effort');return true;
+  grab.phase='upper';grab.ut0=grab.t;grab.rmPrev=null;grab.I={snap:snapBones(),off:null,t:0};
+  if(grab.e){grab.e.g.rotation.order='XYZ';grab.e.g.rotation.set(.25,st.rot+Math.PI,0);}
+  SOUND.swish(1.4);SOUND.voice('effort');return true;
 }
 function poseGrab(dt){
   const G=grab;
@@ -819,11 +833,33 @@ function poseGrab(dt){
   if(rm)G.rmPrev=rm;
   groundFeet();
   G.I.t+=dt;inertBlend(G.I,.12);
-  /* mão esquerda em garra; respira um pouco segurando */
-  if(G.phase==='hold'){const b=Math.sin(G.ht*6)*.04;rotAxis(rig.B.Spine1||rig.B.Spine,new THREE.Vector3(Math.cos(st.rot),0,-Math.sin(st.rot)),b);}
   /* inimigo preso: o peito dele fica na mão esquerda */
   if(G.e){const h=wp(rig.B.LeftHand),p=G.e.g.position,fx=Math.sin(st.rot),fz=Math.cos(st.rot);
     p.set(h.x+fx*.42,Math.max(0,h.y-1.15),h.z+fz*.42);G.e.g.rotation.y=st.rot+Math.PI;}
+}
+/* segurando: locomoção normal (parado, andando, correndo) com o braço esquerdo segurando o inimigo erguido à frente;
+   no sprint o tronco inclina para frente e para a esquerda e a mão pressiona o inimigo contra o chão, arrastando-o */
+function poseHold(dt){
+  const G=grab,B=rig.B,e=G.e;if(!e)return;
+  G.I.t+=dt;inertBlend(G.I,.2);
+  const F=new THREE.Vector3(Math.sin(st.rot),0,Math.cos(st.rot)),R=new THREE.Vector3().crossVectors(F,UPV).normalize(),d=G.dw;
+  /* tronco: inclina para a frente e tomba para a esquerda ao arrastar */
+  const lean=.12+.42*d,roll=.22*d;
+  [['Spine',.4],['Spine1',.35],['Spine2',.25]].forEach(function(x){if(B[x[0]]){rotAxis(B[x[0]],R,-lean*x[1]*1.0);rotAxis(B[x[0]],F,-roll*x[1]);}});
+  rig.m.updateMatrixWorld(true);
+  /* mão esquerda: erguida à frente do peito (andando) ou embaixo, à frente e à esquerda, rente ao chão (arrastando) */
+  const up=new THREE.Vector3(st.x,st.y+1.3,st.z).addScaledVector(F,.55).addScaledVector(R,-.22);
+  const dn=new THREE.Vector3(st.x,st.y+.42,st.z).addScaledVector(F,.6).addScaledVector(R,-.62);
+  const tg=up.lerp(dn,d);
+  const pole=R.clone().multiplyScalar(-1).addScaledVector(UPV,-.3).addScaledVector(F,-.4);
+  ikHinge(B.LeftArm,B.LeftForeArm,B.LeftHand,tg,pole,1,'LeftArm');
+  clawFingers(.35,false);
+  /* inimigo: pendurado pelo peito (andando) ou deitado de bruços com a cabeça na mão, arrastado atrás (correndo) */
+  const h=wp(B.LeftHand),p=e.g.position;
+  e.g.rotation.order='YXZ';
+  if(d<.5){p.set(h.x+F.x*.42,Math.max(0,h.y-1.15),h.z+F.z*.42);e.g.rotation.set(.25,st.rot+Math.PI,0);}
+  else{/* corpo em diagonal para trás e para a esquerda, fora do caminho das pernas */
+    const bx=h.x-F.x*1.4-R.x*.55,bz=h.z-F.z*1.4-R.z*.55;p.set(bx,st.y+.12,bz);e.g.rotation.set(Math.PI/2,Math.atan2(h.x-bx,h.z-bz),0);}
 }
 function hitEnv(t){
   /* sobe em 45 ms, segura um instante, volta com um pequeno rebote e some até HIT_DUR */
@@ -1884,7 +1920,7 @@ function updateModel(dt){
     if(death&&clipSrc[death.name]){poseDeath();return;}
     if(dodge){poseDodge(dt);detectSteps(dt);return;}
     if(airAtk&&clipSrc.jatk){poseAirAtk(dt);return;}
-    if(grab&&clipSrc.upc){poseGrab(dt);return;}
+    if(grab&&clipSrc.upc&&grab.phase!=='hold'){poseGrab(dt);return;}
     if(flip&&flip.rev&&clipSrc.sflip){poseFlipRev(dt);return;}
     if(climb&&clipSrc.crawl){poseClimb(dt);detectSteps(dt);return;}
     if(window.CLIP_PREVIEW&&clipSrc[CLIP_PREVIEW.name]){applyClip(CLIP_PREVIEW.name,CLIP_PREVIEW.t,1);poseHands();return;}
@@ -1893,6 +1929,7 @@ function updateModel(dt){
     if(climbOut){climbOut.t+=dt;inertBlend(climbOut,.35);if(!climbOut.snap)climbOut=null;}
     poseHit(dt);
     poseFlip(dt);
+    if(grab&&grab.phase==='hold')poseHold(dt);
     detectSteps(dt);
   }else{
     custom.rotation.x=Math.min(st.speed/9,.5)*.25;
@@ -1959,7 +1996,7 @@ function tick(raw){
     else{flip.t+=dt;st.vx=st.vz=0;if(flip.t>=FLIP_DUR||(flip.t>.15&&aboveGround()<.02))flip=null;}}
   if(airAtk){airAtk.t+=dt;ix=0;iz=0;st.vx=st.vz=0;
     if(airAtk.t>=airAtkDur()){climbOut={snap:snapBones(),off:null,t:0};airAtk=null;landT=0;wasAir=false;plantFeet();if(combo.cur){combo.pose=GUARD_ABS.slice();combo.hold=COMBAT_HOLD;combo.holdT=1;combo.outDur=0;}}}
-  if(grab){updateGrab(dt);ix=0;iz=0;}
+  if(grab){updateGrab(dt);if(grab&&grab.phase!=='hold'){ix=0;iz=0;}}
   if(wallFall&&(climb||(!flip&&aboveGround()<.02)))wallFall=false;
   if(dodgeKey){dodgeKey=false;if(!climb&&!airAtk&&!grab)startDodge(ix,iz);}
   if(dodge){
@@ -1998,7 +2035,7 @@ function tick(raw){
     const fx=-Math.sin(st.yaw),fz=-Math.cos(st.yaw),rx=Math.cos(st.yaw),rz=-Math.sin(st.yaw);
     const dx=fx*iz+rx*ix,dz=fz*iz+rz*ix;
     const run=runHeld();
-    target=(run?7.5:(combo.hold>0||combo.active)?2.8:4)*(st.morphOn?1.3:1)*Math.min(len,1);
+    target=(grab?(run?GRAB.run:GRAB.walk):run?7.5:(combo.hold>0||combo.active)?2.8:4)*(st.morphOn?1.3:1)*Math.min(len,1);
     st.x+=dx/Math.hypot(dx,dz)*target*dt;st.z+=dz/Math.hypot(dx,dz)*target*dt;
     const a=Math.atan2(dx,dz);let diff=a-st.rot;
     while(diff>Math.PI)diff-=Math.PI*2;while(diff<-Math.PI)diff+=Math.PI*2;

@@ -31,8 +31,10 @@ no chão; termina em guarda.
 Agarrão (R1 no controle, E no teclado): começo da "Surprise Uppercut" — passo à frente e a
 mão esquerda agarra. Pegando um inimigo à frente (até ~1,9 m), ele fica preso na mão, levantado
 e sem atacar. R1/E de novo solta empurrando; ataque enquanto segura dá o gancho de direita
-(resto da animação), com dano 3 e lançando o inimigo para cima. Solta sozinho depois de 4 s ou
-se outro inimigo acertar a personagem. Sem inimigo ao alcance, completa o puxão no vazio.
+(resto da animação), com dano 3 e lançando o inimigo para cima. Segurando, anda (3,2 m/s,
+inimigo erguido pelo peito na mão esquerda) e corre (6,4 m/s): no sprint inclina o tronco,
+pressiona o inimigo contra o chão e o arrasta de bruços ao lado, com dano pelo atrito (1,1 por
+segundo), som de raspagem e vibração. Solta se outro inimigo acertar a personagem. Sem inimigo ao alcance, completa o puxão no vazio.
 Parâmetros na tabela GRAB do index.html. O R1 deixou de atacar (ataque só no Quadrado).
 
 Dano: quando um inimigo acerta, o golpe em andamento é cortado e o combo volta ao primeiro

@@ -315,14 +315,14 @@ const ATT_B=[
     {t:.53,e:'l',s:[.05,-.05,1.0],o:[.88,-.25,-.25],yaw:-.2,pitch:.42,roll:.06,drop:.27,fwd:.18,side:-.03},
     {t:.63,e:'o',s:[-.8,-.2,.4],o:[.9,-.3,-.4],yaw:-1.2,pitch:.48,roll:.14,drop:.27,fwd:.16,side:-.1},
     {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:-.4,pitch:.38,roll:.04,drop:.2,fwd:.05,side:0}]},
-  {name:'Garra esquerda, rodopio de 360°',right:false,dur:.85,tw:.36,tf:.66,hit:.6,chain:.64,kw:.38,ki:.58,kf:.64,dmg:2,range:2.6,arc:6.3,knock:8,lunge:[.35,.38,.62],spin:[Math.PI*2,.4,.62],
-   steps:[{f:'s',t0:.6,t1:.72,to:[.36,.3],lift:.1},{f:'o',t0:.64,t1:.8,to:[.32,-.24],lift:.06}],
-   keys:[
-    {t:.38,e:'io',s:[.95,.12,-.5],o:[.6,-.3,.6],yaw:1.35,pitch:.3,roll:-.2,drop:.26,fwd:-.04,side:.12},
-    {t:.45,e:'i',s:[.98,.05,.2],o:[.85,-.25,-.1],yaw:.5,pitch:.34,roll:-.1,drop:.24,fwd:.04,side:.04},
-    {t:.58,e:'l',s:[.9,0,.4],o:[.9,-.25,-.25],yaw:.15,pitch:.36,roll:-.05,drop:.24,fwd:.12,side:0},
-    {t:.64,e:'o',s:[-.6,-.15,.55],o:[.9,-.3,-.4],yaw:-1.0,pitch:.42,roll:.12,drop:.24,fwd:.14,side:-.1},
-    {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:-.3,pitch:.36,roll:0,drop:.18,fwd:.04,side:0}]},
+  /* 4º golpe: corpo inteiro da Sword And Shield Slash (salto girando), mas quem golpeia é a mão esquerda:
+     um arco grande e esticado, com as garras abertas, calculado no referencial do tronco (acompanha o giro).
+     arcL.keys: tempo da animação em segundos e posição da mão [para fora, para cima, para frente];
+     arcL.other: pose da mão direita (contrapeso) durante o golpe. */
+  {name:'Salto girando: garra esquerda em arco aberto',right:false,clip:'finisher',c0:.45,c1:1.85,speed:1.25,hit:.68,chain:.8,kw:.5,ki:.68,kf:.76,dmg:2,range:2.7,arc:2.8,knock:9,noReach:true,openClaw:true,keys:[],steps:[],
+   arcL:{in:[1.0,1.15],out:[1.55,1.78],
+     keys:[{t:1.15,p:[.5,1.0,-.4]},{t:1.28,p:[.85,.55,.45]},{t:1.4,p:[-.05,-.35,1.0]},{t:1.52,p:[-.55,-.8,.5]},{t:1.7,p:[-.35,-.6,.55]}],
+     other:{p:[.72,-.3,-.45],w:.75}}},
   /* bote: agacha segurando a preparação, salta para frente com as duas garras erguidas e crava as duas em X */
   {name:'Golpe final: bote com as duas garras',right:true,both:true,dur:1.2,tw:.48,tf:.7,hit:.66,chain:1,kw:.52,ki:.66,kf:.76,dmg:4,range:3.0,arc:6.3,knock:14,finisher:true,lunge:[1.3,.48,.66],
    steps:[{f:'s',t0:.48,t1:.66,to:[.3,.26],lift:.42},{f:'o',t0:.48,t1:.68,to:[.32,-.16],lift:.36}],
@@ -379,6 +379,8 @@ function startAttack(i,A){
   combo.hold=0;combo.outDur=0;
   if(!combo.active&&combo.w<.05)plantFeet();
   combo.prevA=combo.active?combo.cur:null;combo.rmPrev=null;
+  combo.snapOff=null;
+  combo.snap=(combo.prevA&&(combo.prevA.clip||A.clip)&&baseBones)?baseBones.map(function(b){return [b.quaternion.clone(),b.position.clone()];}):null;
   combo.active=true;combo.i=i;combo.t=0;combo.queued=false;combo.hitDone=false;combo.cur=A;combo.stepFrom={};
   /* na corrida só mira em quem já está à frente, para não quebrar o embalo */
   let best=nearestEnemy(A.run?6:7);
@@ -912,19 +914,34 @@ function poseFull(){
   }
   combo.shown=pose.slice();
   applyProc(A,p,w);
+  blendSnap();
+}
+/* entrando ou saindo de uma animação do Mixamo: no primeiro quadro do golpe novo guarda a diferença fixa entre a
+   pose antiga e a nova, e essa diferença some suavemente. Como ela é fixa, a interpolação nunca troca de lado,
+   mesmo que a animação gire o corpo depois */
+const _iq=new THREE.Quaternion();
+function blendSnap(){
+  if(!combo.snap||!combo.active)return;
+  const k=sm(combo.t/.2);
+  if(k>=1){combo.snap=null;combo.snapOff=null;return;}
+  if(!combo.snapOff)combo.snapOff=baseBones.map(function(b,i){return [combo.snap[i][0].clone().multiply(b.quaternion.clone().invert()),combo.snap[i][1].clone().sub(b.position)];});
+  baseBones.forEach(function(b,i){
+    const o=combo.snapOff[i];
+    b.quaternion.premultiply(_iq.copy(o[0]).slerp(_q.set(0,0,0,1),k));
+    b.position.addScaledVector(o[1],1-k);
+  });
+  rig.m.updateMatrixWorld(true);
 }
 /* golpe feito com animação do Mixamo: entra misturando com a pose do golpe anterior, avança o corpo
    com o deslocamento do quadril da animação e estica os braços para as garras alcançarem mais longe */
 function poseClip(A,p,w){
-  const B=rig.B,prev=combo.prevA;
-  let bl=1;
-  if(combo.active&&prev&&!prev.clip&&combo.pose){
-    bl=sm(combo.t/.22);
-    if(bl<1){for(let n=0;n<POSE_N;n++)pose[n]=combo.pose[n];applyProc(prev,1,w);rig.m.updateMatrixWorld(true);}
-  }
+  const B=rig.B,bl=1;
   if(combo.active)phaseWeights(A,p);else curW.wind=curW.strike=0;
-  const rm=applyClip(A.clip,A.c0+p*(A.c1-A.c0),bl<1?bl:w);
+  const ct=A.c0+p*(A.c1-A.c0);
+  const rm=applyClip(A.clip,ct,bl<1?bl:w);
   if(!rm)return;
+  if(A.arcL)armArc(A,ct,w*bl);
+  blendSnap();
   if(combo.active){
     if(combo.rmPrev){
       const dx=rm.x-combo.rmPrev.x,dz=rm.z-combo.rmPrev.z,c=Math.cos(st.rot),sn=Math.sin(st.rot);
@@ -940,6 +957,36 @@ function poseClip(A,p,w){
     ikHinge(B[s+'Arm'],B[s+'ForeArm'],B[s+'Hand'],_tg,el.sub(sh),ext,s+'Arm');
     if(isS&&combo.active){const dir=wp(B[s+'Hand']).sub(wp(B[s+'ForeArm'])).normalize();clawBase=wp(B[s+'Hand']);clawTip=wp(B[s+'HandMiddle3']||B[s+'Hand']).addScaledVector(dir,.16);}
   });
+}
+/* arco de uma mão por cima de uma animação do Mixamo, no referencial do tronco (Spine2) */
+function evalArc(K,t,out){
+  let k=0;while(k<K.length-2&&t>=K[k+1].t)k++;
+  const u=Math.max(0,Math.min(1,(t-K[k].t)/(K[k+1].t-K[k].t)));
+  const p0=K[Math.max(0,k-1)].p,p1=K[k].p,p2=K[k+1].p,p3=K[Math.min(K.length-1,k+2)].p;
+  for(let n=0;n<3;n++)out[n]=crs(p0[n],p1[n],p2[n],p3[n],u);
+  return out;
+}
+const _arc=[0,0,0];
+function armArc(A,ct,w){
+  const R=A.arcL,B=rig.B;
+  const wt=w*sm((ct-R.in[0])/(R.in[1]-R.in[0]))*(1-sm((ct-R.out[0])/(R.out[1]-R.out[0])));
+  if(wt<.01)return 0;
+  rig.m.updateMatrixWorld(true);
+  const qS=new THREE.Quaternion();B.Spine2.getWorldQuaternion(qS);hero.getWorldQuaternion(_hq);
+  const d=qS.multiply(_hq.clone().multiply(rig.restQ.Spine2).invert());
+  const tf=fr.fwd.clone().applyQuaternion(d),tr=fr.right.clone().applyQuaternion(d),tu=fr.up.clone().applyQuaternion(d);
+  const sN=A.right?'Right':'Left',oN=A.right?'Left':'Right';
+  [[sN,evalArc(R.keys,ct,_arc).slice(),wt],[oN,R.other.p,wt*R.other.w]].forEach(function(e){
+    const s=e[0],out=s==='Right'?tr:tr.clone().negate(),hx=safeHand(e[1][0],e[1][1],e[1][2]);
+    const sh=wp(B[s+'Arm']);
+    _tg.copy(sh).addScaledVector(out,hx[0]*rig.armLen).addScaledVector(tu,hx[1]*rig.armLen).addScaledVector(tf,hx[2]*rig.armLen);
+    const cl=wp(B[s+'Shoulder']),from=sh.clone().sub(cl).normalize(),to=_tg.clone().sub(cl).normalize();
+    aimBone(B[s+'Shoulder'],from,from.clone().lerp(to,.22*e[2]).normalize());
+    _pole.copy(out).multiplyScalar(.3).addScaledVector(tf,-.35).addScaledVector(tu,-.3);
+    ikHinge(B[s+'Arm'],B[s+'ForeArm'],B[s+'Hand'],_tg,_pole,e[2],s+'Arm');
+  });
+  if(combo.active&&wt>.5){const dir=wp(B[sN+'Hand']).sub(wp(B[sN+'ForeArm'])).normalize();clawBase=wp(B[sN+'Hand']);clawTip=wp(B[sN+'HandMiddle3']||B[sN+'Hand']).addScaledVector(dir,.16);}
+  return wt;
 }
 function applyProc(A,p,w){
   const B=rig.B;
@@ -1011,8 +1058,9 @@ function poseHands(){
   const t=st.t,hit=combo.active,S=combo.cur&&combo.cur.right?'Right':'Left',wd=curW.wind,sk=curW.strike,sw=curW.sw;
   ['Left','Right'].forEach(function(s){
     const A=rig[s],isS=hit&&(s===S||combo.cur.both),off=(s==='Left')?0:1.7,calm=1-(isS?sk:0);
-    const openAmt=Math.min(1,.7+sw*.15+(isS?wd*.2:0))*calm;
-    const c=(isS?sk*.9:0)-openAmt;
+    const open=isS&&combo.cur.openClaw;
+    const openAmt=open?1.1:Math.min(1,.7+sw*.15+(isS?wd*.2:0))*calm;
+    const c=(isS&&!open?sk*.9:0)-openAmt;
     A.fingers.forEach(function(fg,fi){
       const th=fg.f==='Thumb'?.5:1;
       for(let i=0;i<3;i++){
@@ -1021,7 +1069,7 @@ function poseHands(){
         twistB(fg.b[i],fg.ax[i],c*kk*th+wave);
       }
       /* abertura lateral: polegar abre, anelar e mínimo vêm para junto do médio */
-      const spread=SPREAD[fg.f]+(fg.f==='Ring'||fg.f==='Pinky'?-.06*sk:0);
+      const spread=open?SPREAD[fg.f]*.3+(fg.f==='Index'?.12:fg.f==='Ring'?-.05:fg.f==='Pinky'?.02:0)+(fg.f==='Thumb'?.2:0):SPREAD[fg.f]+(fg.f==='Ring'||fg.f==='Pinky'?-.06*sk:0);
       twistB(fg.b[0],fg.sax,fg.spl*(spread*(fg.f==='Thumb'?openAmt:1)+Math.sin(t*.8+fi*.7+off)*.04*calm));
     });
   });

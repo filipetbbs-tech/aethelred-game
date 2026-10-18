@@ -21,7 +21,9 @@ M alterna entre o combo B (atual) e o combo A (anterior); P (ou o botão
 
 Combate: dois combos de 5 golpes, alternados com a tecla M.
 - Combo B (atual, tabela ATT_B): abertura rápida, revés de baixo para cima,
-  varrida pesada, rodopio de 360° e bote com as duas garras. Ritmo e peso crescem
+  varrida pesada, salto girando com a garra esquerda em arco aberto (corpo da
+  animação Sword And Shield Slash, braço esquerdo por cima via arcL) e bote com
+  as duas garras. Ritmo e peso crescem
   a cada golpe, e cada golpe termina na pose em que o próximo começa.
 - Combo A (anterior, tabela ATT_A): golpes baseados nas referências e o salto do
   Mixamo como golpe final. Os golpes são animados por código sobre o esqueleto,

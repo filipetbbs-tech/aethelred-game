@@ -40,3 +40,12 @@ Analisado quadro a quadro a 10 fps.
 - Combo B: escalada de ritmo e peso (0,55 s → 0,55 → 0,7 → 0,85 → 1,2 s; dano 1, 1, 1, 2, 4), tudo no mesmo estilo,
   e o fim de cada golpe deixa o tronco torcido para o lado do braço seguinte (continuidade de yaw entre golpes).
 - Final: bote com as duas garras, com a preparação longa (agacha e segura) antes de um golpe rápido, para dar peso.
+
+## 4º golpe do combo B (pedido)
+
+- Usa o movimento do corpo inteiro da Sword And Shield Slash (preparação, salto, giro no ar, aterrissagem),
+  mas quem golpeia é a mão esquerda: arco grande e esticado, garras abertas, calculado no referencial do tronco.
+- Na animação original o golpe é um corte de cima para baixo com a mão direita entre 1,2 e 1,41 s; a mão esquerda
+  faz o arco entre 1,15 e 1,52 s, com impacto ~1,40 s (aterrissagem). A mão direita vai para trás como contrapeso.
+- Transições entre golpes procedurais e animações do Mixamo usam uma diferença de pose fixa que some em 0,2 s
+  (evita o salto de 180° que aparecia quando a animação girava o corpo durante a mistura).

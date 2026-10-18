@@ -31,7 +31,9 @@ qualquer botão com a página aberta (Chrome/Edge recomendados).
   Quadrado ou R1: atacar (correndo: chute voador) |  Triângulo: transformar
   L3 (clique) ou R2 segurado: correr              |  Direcional ↑/↓: zoom
   Direcional ←: invencibilidade
-  Options: pausar   |  Create: ligar/desligar inimigos   |  Touchpad (clique): som
+  Options: pausar   |  Create: ligar/desligar inimigos
+  O som é liberado pelo navegador só depois de um clique ou tecla na página: se jogar só
+  com o controle, clique uma vez na tela ao abrir (um aviso aparece se o som estiver bloqueado).
   O controle vibra ao acertar um golpe e ao levar dano.
 
 Controles: WASD move, Shift corre (correndo, o ataque vira um chute voador), Espaço pula, J ou clique ataca, F transforma,

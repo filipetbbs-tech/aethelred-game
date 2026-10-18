@@ -29,11 +29,13 @@ canvas{display:block}
 #pad{position:fixed;left:22px;bottom:calc(26px + env(safe-area-inset-bottom,0px));width:120px;height:120px;border-radius:50%;border:1px solid #6b5a4a;background:rgba(20,16,16,.45);display:none}
 #knob{position:absolute;left:40px;top:40px;width:40px;height:40px;border-radius:50%;background:#6b5a4a}
 @media (pointer:coarse){#pad{display:block}}
+#soundHint{display:none;position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);max-width:calc(100% - 32px);box-sizing:border-box;padding:10px 16px;border:1px solid #d8b25a;border-radius:6px;background:rgba(20,16,16,.85);color:#f0d68a;font-size:15px;text-align:center;z-index:5;pointer-events:none}
 #dmg{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 50%,rgba(150,10,10,.6) 100%)}
 </style>
 </head>
 <body>
 <div id="dmg"></div>
+<div id="soundHint">Som bloqueado pelo navegador: clique uma vez na tela (ou aperte uma tecla) para liberar.</div>
 <div id="hud">
   <h1>Aethelred, protótipo de blocos</h1>
   <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador. Pule perto de uma pilastra ou parede para escalar (W/S/A/D na parede, Espaço salta dela).<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. G liga e desliga a invencibilidade (os golpes ainda empurram e atordoam, mas a vida não cai). P pausa a personagem (a câmera continua livre). O liga e desliga o som.</p>
@@ -223,6 +225,8 @@ function playVoice(k,rate,gain){
   return true;
 }
 addEventListener('pointerdown',audioInit);addEventListener('keydown',audioInit);
+const soundHint=document.getElementById('soundHint');
+setInterval(function(){if(soundHint.style.display==='block'&&SFX.ctx&&SFX.ctx.state==='running')soundHint.style.display='none';},300);
 function sfxOK(){return SFX.on&&SFX.ctx&&(SFX.ctx.state==='running'||SFX.offline);}
 function env(g,t,a,peak,dur){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);}
 /* ruído filtrado com varredura de frequência */
@@ -366,7 +370,7 @@ pad.addEventListener('pointerup',padEnd);pad.addEventListener('pointercancel',pa
 /* controle (DualSense / qualquer controle no layout padrão do navegador)
    analógico esquerdo move, direito gira a câmera; X pula/agarra, Quadrado ou R1 ataca, Triângulo transforma,
    Círculo solta da parede, L3 ou R2 corre, R3 centraliza a câmera, direcional ↑↓ zoom, ← invencibilidade,
-   Options pausa, Create liga/desliga inimigos, touchpad liga/desliga o som */
+   Options pausa, Create liga/desliga inimigos */
 const gp={run:false,jump:false,runLatch:false,prev:[],idx:-1,stick:false};
 const GP_DEAD=.16;
 function gpAxis(x,y){const l=Math.hypot(x,y);if(l<GP_DEAD)return [0,0];const k=Math.min(1,(l-GP_DEAD)/(1-GP_DEAD))/l;return [x*k,y*k];}
@@ -384,6 +388,9 @@ function pollGamepad(raw){
   if(!g)for(let i=0;i<list.length;i++)if(list[i]&&list[i].connected){g=list[i];gp.idx=i;break;}
   if(!g)return;
   const b=g.buttons.map(function(x){return x.pressed||x.value>.4;}),hit=function(i){return b[i]&&!gp.prev[i];};
+  /* o navegador só libera o áudio depois de um clique ou tecla na página; botão do controle não conta */
+  if(b.some(function(x,i){return x&&!gp.prev[i];})){audioInit();
+    if(SFX.on&&(!SFX.ctx||SFX.ctx.state!=='running')&&!gp.warned){gp.warned=true;soundHint.style.display='block';}}
   /* movimento: usa o mesmo canal do direcional da tela, sem atrapalhar o toque */
   const L=gpAxis(g.axes[0]||0,g.axes[1]||0);
   if(padId===null){if(L[0]||L[1]){joy.x=L[0];joy.y=L[1];gp.stick=true;}else if(gp.stick){joy.x=joy.y=0;gp.stick=false;}}
@@ -406,7 +413,6 @@ function pollGamepad(raw){
   }
   if(hit(14))toggleGod();
   if(hit(8))toggleFoes();
-  if(hit(17))toggleSound();
   gp.prev=b;
 }
 

@@ -365,6 +365,54 @@ pad.addEventListener('pointermove',e=>{if(e.pointerId===padId)padMove(e);});
 function padEnd(e){if(e.pointerId===padId){padId=null;joy.x=joy.y=0;knob.style.transform='';}}
 pad.addEventListener('pointerup',padEnd);pad.addEventListener('pointercancel',padEnd);
 
+/* controle (DualSense / qualquer controle no layout padrão do navegador)
+   analógico esquerdo move, direito gira a câmera; X pula/agarra, Quadrado ou R1 ataca, Triângulo transforma,
+   Círculo solta da parede, L3 ou R2 corre, R3 centraliza a câmera, direcional ↑↓ zoom, ← combo, → voz,
+   Options pausa, Create liga/desliga inimigos, touchpad liga/desliga o som */
+const gp={run:false,jump:false,runLatch:false,prev:[],idx:-1,stick:false};
+const GP_DEAD=.16;
+function gpAxis(x,y){const l=Math.hypot(x,y);if(l<GP_DEAD)return [0,0];const k=Math.min(1,(l-GP_DEAD)/(1-GP_DEAD))/l;return [x*k,y*k];}
+function runHeld(){return keys.ShiftLeft||keys.ShiftRight||gp.run;}
+function jumpHeld(){return keys.Space||gp.jump;}
+function rumble(strong,weak,ms){
+  const g=gp.idx>=0&&navigator.getGamepads?navigator.getGamepads()[gp.idx]:null;
+  try{if(g&&g.vibrationActuator)g.vibrationActuator.playEffect('dual-rumble',{duration:ms,strongMagnitude:strong,weakMagnitude:weak});}catch(e){}
+}
+addEventListener('gamepadconnected',function(e){gp.idx=e.gamepad.index;stateEl.textContent='Controle conectado: '+e.gamepad.id.replace(/\s*\(.*$/,'');});
+addEventListener('gamepaddisconnected',function(e){if(e.gamepad.index===gp.idx){gp.idx=-1;gp.run=gp.jump=false;if(gp.stick){joy.x=joy.y=0;gp.stick=false;}stateEl.textContent='Controle desconectado';}});
+function pollGamepad(raw){
+  const list=navigator.getGamepads?navigator.getGamepads():[];
+  let g=gp.idx>=0?list[gp.idx]:null;
+  if(!g)for(let i=0;i<list.length;i++)if(list[i]&&list[i].connected){g=list[i];gp.idx=i;break;}
+  if(!g)return;
+  const b=g.buttons.map(function(x){return x.pressed||x.value>.4;}),hit=function(i){return b[i]&&!gp.prev[i];};
+  /* movimento: usa o mesmo canal do direcional da tela, sem atrapalhar o toque */
+  const L=gpAxis(g.axes[0]||0,g.axes[1]||0);
+  if(padId===null){if(L[0]||L[1]){joy.x=L[0];joy.y=L[1];gp.stick=true;}else if(gp.stick){joy.x=joy.y=0;gp.stick=false;}}
+  /* correr: L3 liga até soltar o analógico; R2 segurado também corre */
+  if(hit(10))gp.runLatch=!gp.runLatch;
+  if(Math.hypot(L[0],L[1])<.3)gp.runLatch=false;
+  gp.run=gp.runLatch||!!b[7];
+  gp.jump=!!b[0];
+  /* câmera */
+  const R=gpAxis(g.axes[2]||0,g.axes[3]||0);
+  if(R[0]||R[1]){st.yaw-=R[0]*raw*2.8;st.pitch=Math.max(.08,Math.min(1.25,st.pitch+R[1]*raw*1.7));}
+  if(hit(11)){st.yaw=st.rot+Math.PI;}
+  if(b[12])st.camD=Math.max(1.4,st.camD*Math.exp(-raw*1.6));
+  if(b[13])st.camD=Math.min(16,st.camD*Math.exp(raw*1.6));
+  if(hit(9))togglePause();
+  if(!paused){
+    if(hit(2)||hit(5))attack();
+    if(hit(3))toggle();
+    if(hit(1)&&climb)dropFromWall();
+  }
+  if(hit(14))toggleCombo();
+  if(hit(15))cycleVoice();
+  if(hit(8))toggleFoes();
+  if(hit(17))toggleSound();
+  gp.prev=b;
+}
+
 /* colisão */
 function resolve(){
   const R=.4,high=st.y>8.5;
@@ -550,7 +598,7 @@ function attack(){
   if(combo.active){if(combo.t/combo.cur.dur>.15)combo.queued=true;return;}
   if(combo.cool>0)return;
   /* correndo, o ataque vira o chute voador */
-  if((keys.ShiftLeft||keys.ShiftRight)&&st.speed>5.5&&clipSrc.kick){startAttack(-1,RUN_ATT);return;}
+  if(runHeld()&&st.speed>5.5&&clipSrc.kick){startAttack(-1,RUN_ATT);return;}
   const next=(combo.grace>0&&combo.i<ATT.length-1)?combo.i+1:0;
   startAttack(next);
 }
@@ -558,7 +606,7 @@ function spinAt(A,p){if(!A.spin)return 0;const u=Math.max(0,Math.min(1,(p-A.spin
 function fadeOut(d){combo.hold=0;combo.outT=0;combo.outDur=d;combo.outW=combo.w;}
 function lungeAt(A,p){if(!A.lunge)return 0;return A.lunge[0]*sm((p-A.lunge[1])/(A.lunge[2]-A.lunge[1]));}
 function updateComboState(dt){
-  const sprinting=(keys.ShiftLeft||keys.ShiftRight)&&st.speed>5;
+  const sprinting=runHeld()&&st.speed>5;
   stance+=((sprinting||aboveGround()>.05?0:1)-stance)*Math.min(1,dt*6);
   combo.snapT=(combo.snapT||0)+dt;
   moveW+=((st.speed>.6?1:0)-moveW)*Math.min(1,dt*6);
@@ -644,7 +692,7 @@ function hitEnemies(A){
     if(e.hp<=0){e.dead=.001;kills++;}
   });
   if(any)SOUND.slash(A.finisher||A.dmg>=2);
-  if(any){hitStop=A.finisher?.15:.09;shake=A.finisher?.34:.19;}
+  if(any){hitStop=A.finisher?.15:.09;shake=A.finisher?.34:.19;rumble(A.finisher?.9:.5,A.finisher?.6:.35,A.finisher?180:110);}
 }
 function updateCombat(dt){
   hurt-=dt;msgT-=dt;
@@ -659,7 +707,7 @@ function updateCombat(dt){
     if(e.stun<=0){
       e.g.rotation.y=Math.atan2(dx,dz);e.g.rotation.x=0;
       if(d>1){p.x+=dx/d*e.sp*dt;p.z+=dz/d*e.sp*dt;}
-      else if(!death&&!climb&&st.y<1.2){e.cd-=dt;if(e.cd<=0&&hurt<=0){hp-=8;hurt=.6;e.cd=1;SOUND.voice('pain');}}
+      else if(!death&&!climb&&st.y<1.2){e.cd-=dt;if(e.cd<=0&&hurt<=0){hp-=8;hurt=.6;e.cd=1;SOUND.voice('pain');rumble(1,.4,220);}}
     }else e.g.rotation.x=Math.min(e.stun,.4)*.6;
     p.x+=e.vx*dt;p.z+=e.vz*dt;
     const f=Math.max(0,1-dt*8);e.vx*=f;e.vz*=f;
@@ -777,6 +825,12 @@ function endClimb(pos,rot,snap){
   climbOut={snap:snap,off:null,t:0};climbCD=.35;
 }
 let climbOut=null,climbCD=0;
+/* solta da parede (Círculo no controle) e cai */
+function dropFromWall(){
+  if(!climb||climb.mantle)return;
+  const F=wallFrame(climb),out=F.p.clone().addScaledVector(F.n,.45);out.y=Math.max(0,climb.y-.4);
+  endClimb(out,Math.atan2(-F.n.x,-F.n.z),snapBones());st.vy=0;
+}
 /* chegada ao topo: (1) assim que as mãos alcançam a borda, Braced Hang To Crouch (pendurado na borda, puxa o corpo
    e termina agachado em cima, com o avanço da animação levando a personagem para cima da borda);
    (2) mistura do agachado para a pose parada */
@@ -806,7 +860,7 @@ function updateClimb(dt,ix,iz,spaceDown){
     st.vy=6.5;st.vx=F.n.x*5.5;st.vz=F.n.z*5.5;SOUND.voice('jump');
     return;
   }
-  const run=keys.ShiftLeft||keys.ShiftRight,sp=CLIMB_SPEED*(run?1.4:1);
+  const run=runHeld(),sp=CLIMB_SPEED*(run?1.4:1);
   const len=Math.hypot(ix,iz),vr=len>.1?ix/Math.max(1,len)*sp:0,vy=len>.1?iz/Math.max(1,len)*sp:0;
   if(len>.1){let a=Math.atan2(vr,vy),d=a-C.psi;while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;C.psi+=d*Math.min(1,dt*9);}
   C.y+=vy*dt;
@@ -1540,6 +1594,7 @@ pauseBtn.onclick=togglePause;
 function frame(){
   requestAnimationFrame(frame);
   const raw=Math.min(clock.getDelta(),.05);
+  pollGamepad(raw);
   if(!paused)tick(raw);
   if(keys.ArrowLeft)st.yaw+=raw*1.8;if(keys.ArrowRight)st.yaw-=raw*1.8;
   if(climb&&!drag){const F=wallFrame(climb);let a=Math.atan2(F.n.x,F.n.z),dd=a-st.yaw;while(dd>Math.PI)dd-=Math.PI*2;while(dd<-Math.PI)dd+=Math.PI*2;st.yaw+=dd*Math.min(1,raw*3);}
@@ -1572,7 +1627,7 @@ function tick(raw){
     if(Math.hypot(ix,iz)>.3&&combo.t/combo.cur.dur>.8&&!combo.queued&&!combo.cur.clip){combo.active=false;combo.pose=pose.slice();combo.grace=.35;combo.hold=0;}
     else{ix=0;iz=0;}
   }
-  const spaceDown=keys.Space&&!st.spacePrev;st.spacePrev=keys.Space;
+  const jh=jumpHeld(),spaceDown=jh&&!st.spacePrev;st.spacePrev=jh;
   if(climb){updateClimb(dt,ix,iz,spaceDown);updateComboState(dt);updateCombat(dt);updateModel(dt);updateTrail(dt,null,null,false);return;}
   climbCD-=dt;
   if(spaceDown&&tryClimb(1.15,.3)){updateModel(dt);return;}
@@ -1581,14 +1636,14 @@ function tick(raw){
     let mx=0,mz=0;if(Math.hypot(ix,iz)>.1){mx=-Math.sin(st.yaw)*iz+Math.cos(st.yaw)*ix;mz=-Math.cos(st.yaw)*iz-Math.sin(st.yaw)*ix;}
     if(tryClimb(.75,.25,mx,mz)){updateModel(dt);return;}
   }
-  if(keys.Space)jump();
+  if(jh)jump();
   const len=Math.hypot(ix,iz);
   let target=0;
   if(len>.1){
     ix/=Math.max(len,1);iz/=Math.max(len,1);
     const fx=-Math.sin(st.yaw),fz=-Math.cos(st.yaw),rx=Math.cos(st.yaw),rz=-Math.sin(st.yaw);
     const dx=fx*iz+rx*ix,dz=fz*iz+rz*ix;
-    const run=keys.ShiftLeft||keys.ShiftRight;
+    const run=runHeld();
     target=(run?7.5:(combo.hold>0||combo.active)?2.8:4)*(st.morphOn?1.3:1)*Math.min(len,1);
     st.x+=dx/Math.hypot(dx,dz)*target*dt;st.z+=dz/Math.hypot(dx,dz)*target*dt;
     const a=Math.atan2(dx,dz);let diff=a-st.rot;

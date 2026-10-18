@@ -114,10 +114,9 @@ Combate: combo de 5 golpes (tabela ATT_B): abertura rápida, revés de baixo par
   a cada golpe, e cada golpe termina na pose em que o próximo começa.
 O golpe 5 usa as pernas da "Jump Attack" (legClip/legMap na tabela): agacha, se ergue um
 pouco sem sair do chão (o trecho do salto é pulado: 'cut'), desce com o bote caindo agachado
-com um pé à frente e, desequilibrado pela força, tropeça dois passos à frente com as pernas da
-"Jogging Stumble" espelhada (legClip2: primeiro o pé direito, depois o esquerdo; stumble: 90 cm).
-Em cada passo o pé é guiado até a base da guarda (endStance/footSwing), então o golpe termina
-já na posição de ataque;
+com o pé esquerdo à frente (pernas espelhadas: legMirror) e crava o ataque. Sem passos: ainda
+agachado, só se levanta (legEnd) e fica na posição de combate, com o corpo avançando 16 cm por
+cima dos pés para centralizar o peso;
 braços e tronco continuam procedurais.
 Os golpes são animados por código sobre o esqueleto,
 com IK de braços e pernas que respeita a dobra natural do cotovelo e do joelho.

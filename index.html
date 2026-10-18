@@ -488,19 +488,13 @@ const ATT_B=[
      other:{p:[.72,-.3,-.45],w:.75}}},
   /* bote: agacha segurando a preparação, salta para frente com as duas garras erguidas e crava as duas em X */
   {name:'Golpe final: bote com as duas garras',right:true,both:true,dur:1.5,tw:.384,tf:.56,hit:.66,chain:1,kw:.52,ki:.66,kf:.76,dmg:4,range:3.0,arc:6.3,knock:14,finisher:true,lunge:[.7,.48,.66],
-   /* pernas da Jump Attack (legClip): agacha, se ergue um pouco (quase sem sair do chão), desce com o bote caindo
-      agachado com um pé à frente e, desequilibrado pela força, dá um passo à frente ao se levantar (stumble);
-      legMap liga o progresso do golpe ao tempo da animação, legDy limita a altura do quadril */
+   /* pernas da Jump Attack (legClip): agacha, se ergue um pouco (quase sem sair do chão) e desce com o bote, cravando
+      agachado; legMap liga o progresso do golpe ao tempo da animação (segura a pose de aterrissagem), legDy limita a
+      altura do quadril; legMirror: pernas espelhadas, para cravar com o pé esquerdo à frente como na guarda;
+      legEnd: entre esses pontos ele se levanta, sem dar passos, até a postura de combate (stumble: o corpo
+      avança um pouco por cima dos pés enquanto levanta, centralizando o peso entre eles) */
    legClip:'jumpatk',legMap:[[0,0],[.3,.25],[.46,.5],[.57,.545],[.65,1.52,'cut'],[.72,1.7],[1,1.75]],legDy:[-.62,.14],
-   /* dur/tw/tf: preparação e impacto no mesmo tempo de antes (1,2 s), só o fim (os dois passos) ficou mais longo */
-   stumble:[.9,.74,.94],
-   /* legEnd: as pernas da Jump Attack saem entre esses dois pontos e entram as da Jogging Stumble (legClip2, espelhada:
-      primeiro o pé direito, depois o esquerdo), com o tropeço; em cada passo o pé é guiado até a base da guarda
-      (endStance: [lado, frente]; footSwing: janela de cada passo), calculada onde o corpo vai parar */
-   legEnd:[.72,.76],
-   /* rise: o quadril sai da altura agachada do bote e vai até a do tropeço aos poucos, até esse ponto do golpe */
-   legClip2:{name:'stumble',mirror:true,map:[[.72,.08],[.97,.66]],w:[.71,.79,.97,1],dy:[-.45,-.1],rise:.93},
-   endStance:{L:[-.24,.39],R:[.25,-.29]},footSwing:{R:[.74,.88],L:[.88,.97]},
+   legEnd:[.8,1],legMirror:true,stumble:[.16,.8,1],
    steps:[],
    keys:[
     {t:.18,e:'io',s:[.88,-.3,.12],o:[.88,-.3,.12],yaw:.15,pitch:.3,roll:0,drop:.22,fwd:-.02,side:0},
@@ -595,7 +589,7 @@ function attack(){
 }
 function spinAt(A,p){if(!A.spin)return 0;const u=Math.max(0,Math.min(1,(p-A.spin[1])/(A.spin[2]-A.spin[1])));return A.spin[0]*(u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2);}
 function fadeOut(d){combo.hold=0;combo.outT=0;combo.outDur=d;combo.outW=combo.w;}
-/* lunge: avanço do golpe; stumble: passo de desequilíbrio depois do golpe (mesmo formato: distância, início, fim) */
+/* lunge: avanço do golpe; stumble: deslocamento depois do golpe (mesmo formato: distância, início, fim) */
 function lungeAt(A,p){let d=0;if(A.lunge)d+=A.lunge[0]*sm((p-A.lunge[1])/(A.lunge[2]-A.lunge[1]));if(A.stumble)d+=A.stumble[0]*sm((p-A.stumble[1])/(A.stumble[2]-A.stumble[1]));return d;}
 function updateComboState(dt){
   const sprinting=runHeld()&&st.speed>5;
@@ -1468,7 +1462,7 @@ function findAct(re){for(const k in acts){if(re.test(k))return acts[k];}return n
 /* animações do Mixamo (pasta animacoes/), transferidas para o esqueleto da personagem por retarget:
    cada osso copia a rotação do osso de mesmo nome no esqueleto do Mixamo, no espaço do personagem,
    descontando a diferença entre as poses de repouso dos dois esqueletos */
-const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'},die1:{file:'animacoes/dying_1.glb'},die2:{file:'animacoes/dying_2.glb'},die3:{file:'animacoes/dying_3.glb'},die4:{file:'animacoes/dying_4.glb'},die5:{file:'animacoes/dying_5.glb'},crawl:{file:'animacoes/running_crawl.glb'},hang:{file:'animacoes/braced_hang_to_crouch.glb'},aerial:{file:'animacoes/aerial_evade.glb'},qroll:{file:'animacoes/quick_roll_to_run.glb'},sflip:{file:'animacoes/stylish_flip.glb'},jatk:{file:'animacoes/run_jump_attack.glb'},upc:{file:'animacoes/surprise_uppercut.glb'},bh:{file:'animacoes/melee_backhand.glb'},thrown:{file:'animacoes/getting_thrown.glb'},jumpatk:{file:'animacoes/jumping_attack.glb'},stumble:{file:'animacoes/jogging_stumble.glb'}};
+const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'},die1:{file:'animacoes/dying_1.glb'},die2:{file:'animacoes/dying_2.glb'},die3:{file:'animacoes/dying_3.glb'},die4:{file:'animacoes/dying_4.glb'},die5:{file:'animacoes/dying_5.glb'},crawl:{file:'animacoes/running_crawl.glb'},hang:{file:'animacoes/braced_hang_to_crouch.glb'},aerial:{file:'animacoes/aerial_evade.glb'},qroll:{file:'animacoes/quick_roll_to_run.glb'},sflip:{file:'animacoes/stylish_flip.glb'},jatk:{file:'animacoes/run_jump_attack.glb'},upc:{file:'animacoes/surprise_uppercut.glb'},bh:{file:'animacoes/melee_backhand.glb'},thrown:{file:'animacoes/getting_thrown.glb'},jumpatk:{file:'animacoes/jumping_attack.glb'}};
 const clipSrc={};
 function loadClips(){
   Object.keys(CLIPS).forEach(function(name){
@@ -1860,7 +1854,7 @@ function legClipHips(A,p,w){
 function legClipLegs(A,w){
   const R=clipSrc[A.legClip],B=rig.B,T=A._lt;
   const put=function(t,k){R.action.time=t;R.mixer.update(0);R.src.updateMatrixWorld(true);
-    LEG_BONES.forEach(function(n){if(!R.S[n]||!B[n]||!R.off[n])return;heroSpace(R.S[n],_rq).multiply(R.off[n]).premultiply(_hq);B[n].getWorldQuaternion(_rq2);setWorldQuat(B[n],_rq2.slerp(_rq,k));});};
+    LEG_BONES.forEach(function(n){const m=A.legMirror?mirrorName(n):n;if(!R.S[m]||!B[n]||!R.off[n])return;heroSpace(R.S[m],_rq);if(A.legMirror)_rq.set(_rq.x,-_rq.y,-_rq.z,_rq.w);_rq.multiply(R.off[n]).premultiply(_hq);B[n].getWorldQuaternion(_rq2);setWorldQuat(B[n],_rq2.slerp(_rq,k));});};
   put(T.t0,w);if(T.u>0)put(T.t1,w*T.u);
 }
 /* segunda animação de pernas (legClip2): tempo pelo mapa, peso com entrada e saída, espelhamento opcional */

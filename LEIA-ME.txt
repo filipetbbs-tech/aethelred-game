@@ -23,6 +23,10 @@ golpe. A personagem leva um tranco na direção do golpe (tronco e cabeça vão 
 ficam para trás do corpo, joelhos cedem; de lado o tronco gira), recua uns 45 cm e fica
 atordoada por 0,35 s, sem andar, pular ou atacar. A reação toda dura 0,6 s, com clarão
 vermelho no corpo e nas bordas da tela, tremor de câmera, som de impacto e vibração.
+Atingida no ar (pulo) ou durante o chute voador: usa a "Hit To The Legs" (tropeça para a
+frente e cai de cara no chão, com o avanço da animação virando deslocamento) e depois se
+levanta (mistura da pose deitada para a parada). Sem controle até ficar de pé (~2,7 s);
+golpes durante a queda só tiram vida.
 
 Controle de PlayStation 5 (DualSense) ou outro controle: conecte por USB ou Bluetooth e aperte
 qualquer botão com a página aberta (Chrome/Edge recomendados).

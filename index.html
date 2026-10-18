@@ -323,7 +323,7 @@ const ATT_B=[
     {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:-.3,pitch:.36,roll:0,drop:.18,fwd:.04,side:0}]},
   /* bote: agacha segurando a preparação, salta para frente com as duas garras erguidas e crava as duas em X */
   {name:'Golpe final: bote com as duas garras',right:true,both:true,dur:1.2,tw:.48,tf:.7,hit:.66,chain:1,kw:.52,ki:.66,kf:.76,dmg:4,range:3.0,arc:6.3,knock:14,finisher:true,lunge:[1.3,.48,.66],
-   steps:[{f:'s',t0:.48,t1:.66,to:[.3,.48],lift:.42},{f:'o',t0:.48,t1:.68,to:[.32,.18],lift:.36}],
+   steps:[{f:'s',t0:.48,t1:.66,to:[.3,.26],lift:.42},{f:'o',t0:.48,t1:.68,to:[.32,-.16],lift:.36}],
    keys:[
     {t:.4,e:'io',s:[.5,.95,-.35],o:[.5,.95,-.35],yaw:.3,pitch:.15,roll:0,drop:.3,fwd:-.08,side:0},
     {t:.52,e:'o',s:[.45,1.0,-.2],o:[.45,1.0,-.2],yaw:.2,pitch:-.35,roll:0,drop:-.3,fwd:.02,side:0},
@@ -371,7 +371,7 @@ function nearestEnemy(maxD){
 function startAttack(i){
   const A=ATT[i];
   combo.start=(combo.w>.05&&combo.shown)?combo.shown.slice():GUARD_ABS.slice();
-  combo.hold=0;
+  combo.hold=0;combo.outDur=0;
   if(!combo.active&&combo.w<.05)plantFeet();
   combo.prevA=combo.active?combo.cur:null;combo.rmPrev=null;
   combo.active=true;combo.i=i;combo.t=0;combo.queued=false;combo.hitDone=false;combo.cur=A;combo.stepFrom={};
@@ -398,11 +398,21 @@ function attack(){
   startAttack(next);
 }
 function spinAt(A,p){if(!A.spin)return 0;const u=Math.max(0,Math.min(1,(p-A.spin[1])/(A.spin[2]-A.spin[1])));return A.spin[0]*(u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2);}
+function fadeOut(d){combo.hold=0;combo.outT=0;combo.outDur=d;combo.outW=combo.w;}
 function lungeAt(A,p){if(!A.lunge)return 0;return A.lunge[0]*sm((p-A.lunge[1])/(A.lunge[2]-A.lunge[1]));}
 function updateComboState(dt){
   combo.cool-=dt;combo.grace-=dt;
-  if(!combo.active&&combo.hold>0){combo.hold-=dt;combo.holdT+=dt;combo.w+=(1-combo.w)*Math.min(1,dt*10);return;}
-  if(!combo.active){combo.w+=(0-combo.w)*Math.min(1,dt*4.5);if(combo.w<.002)combo.w=0;msgHold-=dt;if(combo.grace<=0&&combo.cool<=0&&msgHold<=0&&comboEl.textContent)comboEl.textContent='';return;}
+  if(!combo.active&&combo.hold>0){
+    combo.hold-=dt;combo.holdT+=dt;combo.w+=(1-combo.w)*Math.min(1,dt*10);
+    if(combo.hold<=0)fadeOut(1.0);
+    return;
+  }
+  if(!combo.active&&combo.outDur){
+    /* saída suave da pose de luta para o idle */
+    combo.outT+=dt;combo.w=combo.outW*(1-sm(combo.outT/combo.outDur));
+    if(combo.outT>=combo.outDur){combo.outDur=0;combo.w=0;}
+  }
+  if(!combo.active){if(!combo.outDur)combo.w+=(0-combo.w)*Math.min(1,dt*4.5);if(combo.w<.002)combo.w=0;msgHold-=dt;if(combo.grace<=0&&combo.cool<=0&&msgHold<=0&&comboEl.textContent)comboEl.textContent='';return;}
   combo.w+=(1-combo.w)*Math.min(1,dt*14);
   const A=combo.cur,p0=progA(A,combo.t);
   if(!combo.paused)combo.t+=dt;
@@ -834,9 +844,14 @@ function poseFull(){
   if(combo.active){evalPose(A,combo.start,p,pose);combo.pose=pose.slice();phaseWeights(A,p);}
   else{
     /* depois do golpe, vai para a guarda e respira, até o tempo de guarda acabar */
-    const k=sm(combo.holdT/.3),br=Math.sin(st.t*2.2);
+    const k=sm(combo.holdT/.3),t=st.t,br=Math.sin(t*2.2);
     for(let n=0;n<POSE_N;n++)pose[n]=combo.pose[n]+(GUARD_ABS[n]-combo.pose[n])*k;
     pose[7]+=br*.025*k;pose[9]+=br*.012*k;
+    /* guarda viva: cada mão oscila devagar no seu ritmo, o tronco balança e o peso passa de um lado para o outro */
+    const g=k*sm(combo.holdT/.8);
+    pose[0]+=.07*Math.sin(t*1.3)*g;pose[1]+=.08*Math.sin(t*1.7+1)*g;pose[2]+=.06*Math.sin(t*1.1+2)*g;
+    pose[3]+=.07*Math.sin(t*1.2+3)*g;pose[4]+=.08*Math.sin(t*1.6+4)*g;pose[5]+=.06*Math.sin(t*1.05+5)*g;
+    pose[6]+=.1*Math.sin(t*.8)*g;pose[8]+=.05*Math.sin(t*1.1+.5)*g;pose[11]+=.03*Math.sin(t*.8+.3)*g;
     curW.wind=curW.strike=0;
   }
   combo.shown=pose.slice();
@@ -1045,7 +1060,7 @@ function frame(){
   let ix=(keys.KeyD?1:0)-(keys.KeyA?1:0)+joy.x;
   let iz=(keys.KeyW?1:0)-(keys.KeyS?1:0)-joy.y;
   if(tpose){ix=0;iz=0;}
-  if(!combo.active&&combo.hold>0&&(Math.hypot(ix,iz)>.3||keys.Space))combo.hold=0;
+  if(!combo.active&&combo.hold>0&&(Math.hypot(ix,iz)>.3||keys.Space))fadeOut(.35);
   if(combo.active){
     /* andar cancela o fim do golpe, para o controle não ficar preso */
     if(Math.hypot(ix,iz)>.3&&combo.t/combo.cur.dur>.8&&!combo.queued&&!combo.cur.clip){combo.active=false;combo.pose=pose.slice();combo.grace=.35;combo.hold=0;}

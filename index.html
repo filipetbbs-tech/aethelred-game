@@ -458,13 +458,13 @@ const ATT_B=[
     {t:.52,e:'l',s:[-.1,-.3,1.0],o:[.88,-.25,-.25],yaw:-.5,pitch:.6,roll:.12,drop:.24,fwd:.16,side:-.04},
     {t:.6,e:'o',s:[-.55,-.7,.45],o:[.88,-.3,-.38],yaw:-.85,pitch:.75,roll:.16,drop:.26,fwd:.14,side:-.06},
     {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:-.3,pitch:.42,roll:.04,drop:.2,fwd:.05,side:0}]},
-  {name:'Garra esquerda de revés, de baixo para cima',right:false,dur:.6,tw:.34,tf:.6,hit:.5,chain:.6,kw:.36,ki:.52,kf:.6,dmg:1,range:2.2,arc:2.2,knock:6,lunge:[.3,.34,.58],
+  {name:'Garra esquerda de revés, de baixo para cima',right:false,dur:.6,tw:.34,tf:.6,hit:.5,chain:.6,kw:.36,ki:.52,kf:.6,dmg:1,range:2.2,arc:2.2,knock:6,lunge:[.3,.34,.58],palm:-1.3,
    steps:[{f:'s',t0:.32,t1:.52,to:[.32,.32],lift:.1},{f:'o',t0:.5,t1:.68,to:[.32,-.2],lift:.05}],
    keys:[
     {t:.36,e:'io',s:[.75,-.7,-.35],o:[.75,0,.4],yaw:.9,pitch:.7,roll:.22,drop:.3,fwd:-.02,side:.1},
     {t:.44,e:'i',s:[.5,-.45,.65],o:[.8,-.1,.15],yaw:.45,pitch:.5,roll:.12,drop:.24,fwd:.06,side:.05},
-    {t:.52,e:'l',s:[-.05,.25,1.0],o:[.88,-.3,-.25],yaw:-.3,pitch:.25,roll:-.08,drop:.14,fwd:.16,side:-.02},
-    {t:.6,e:'o',s:[-.55,.75,.4],o:[.9,-.4,-.35],yaw:-.75,pitch:-.05,roll:-.15,drop:.08,fwd:.12,side:-.06},
+    {t:.52,e:'l',s:[-.05,.12,1.0],o:[.88,-.3,-.25],yaw:-.3,pitch:.28,roll:-.08,drop:.15,fwd:.16,side:-.02},
+    {t:.6,e:'o',s:[-.18,.08,.98],o:[.9,-.4,-.35],yaw:-.75,pitch:.08,roll:-.15,drop:.1,fwd:.12,side:-.06},
     {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:-.3,pitch:.34,roll:0,drop:.17,fwd:.03,side:0}]},
   {name:'Garra direita, varrida pesada da direita para a esquerda',right:true,dur:.74,tw:.36,tf:.6,hit:.51,chain:.63,kw:.38,ki:.53,kf:.63,dmg:1,range:2.5,arc:2.8,knock:7,lunge:[.5,.36,.62],
    steps:[{f:'o',t0:.34,t1:.56,to:[.36,.42],lift:.12},{f:'s',t0:.52,t1:.72,to:[.34,-.26],lift:.06}],
@@ -484,7 +484,8 @@ const ATT_B=[
      other:{p:[.72,-.3,-.45],w:.75}}},
   /* bote: agacha segurando a preparação, salta para frente com as duas garras erguidas e crava as duas em X */
   {name:'Golpe final: bote com as duas garras',right:true,both:true,dur:1.2,tw:.48,tf:.7,hit:.66,chain:1,kw:.52,ki:.66,kf:.76,dmg:4,range:3.0,arc:6.3,knock:14,finisher:true,lunge:[1.3,.48,.66],
-   steps:[{f:'s',t0:.48,t1:.66,to:[.3,.26],lift:.42},{f:'o',t0:.48,t1:.68,to:[.32,-.16],lift:.36}],
+   /* as duas pernas encolhem juntas no salto e aterrissam lado a lado, um pouco à frente */
+   steps:[{f:'s',t0:.5,t1:.67,to:[.27,.22],lift:.3},{f:'o',t0:.5,t1:.67,to:[.27,.2],lift:.3}],
    keys:[
     {t:.18,e:'io',s:[.88,-.3,.12],o:[.88,-.3,.12],yaw:.15,pitch:.3,roll:0,drop:.22,fwd:-.02,side:0},
     {t:.4,e:'io',s:[.5,.95,-.35],o:[.5,.95,-.35],yaw:.3,pitch:.15,roll:0,drop:.3,fwd:-.08,side:0},
@@ -1870,6 +1871,9 @@ function applyProc(A,p,w,mv){
     const isS=combo.active&&((s==='Right')===A.right);
     const bend=isS?(-.25*curW.wind+.35*curW.strike):-.1;
     rotAxis(B[s+'Hand'],new THREE.Vector3().crossVectors(dir,fr.up).normalize(),bend*w);
+    /* palm: gira o punho em torno do antebraço para a palma ficar virada para o lado do golpe */
+    if(isS&&A.palm&&combo.active){const pk=sm((p-A.kw+.1)/.12)*(1-sm((p-.82)/.18)),pf=sm((p-A.ki)/(A.kf-A.ki))*(1-sm((p-.82)/.18));
+      rotAxis(B[s+'Hand'],dir,(A.palm*pk+(A.palm2||0)*pf)*w);}
     if(isS){
       const tipB=B[s+'HandMiddle3']||B[s+'Hand'];
       clawBase=wp(B[s+'Hand']);

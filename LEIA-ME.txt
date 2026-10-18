@@ -24,10 +24,20 @@ ficam para trás do corpo, joelhos cedem; de lado o tronco gira), recua uns 45 c
 atordoada por 0,35 s, sem andar, pular ou atacar. A reação toda dura 0,6 s, com clarão
 vermelho no corpo e nas bordas da tela, tremor de câmera, som de impacto e vibração.
 
+Esquiva (K no teclado, Círculo no controle), na direção apertada em relação à personagem:
+- frente: Quick Roll To Run (rolamento para a frente)
+- direita: Aerial Evade (passo e giro acrobático no ar, 2,75 m para o lado)
+- esquerda: Aerial Evade espelhada
+- trás (ou sem direção): Quick Roll To Run tocada de trás para frente (rolamento para trás)
+Diagonais vão para a esquiva mais próxima, com o corpo girando o resto. Imune a dano na
+primeira metade da esquiva; ela corta o golpe em andamento. Só no chão. Os parâmetros ficam
+na tabela DODGES do index.html (trecho da animação, velocidade, distância, imunidade).
+Run To Rolling foi convertida (run_to_rolling.glb) mas não está em uso.
+
 Controle de PlayStation 5 (DualSense) ou outro controle: conecte por USB ou Bluetooth e aperte
 qualquer botão com a página aberta (Chrome/Edge recomendados).
   Analógico esquerdo: mover   |  Analógico direito: câmera  |  R3: câmera atrás da personagem
-  X: pular / agarrar parede / saltar da parede   |  Círculo: soltar da parede
+  X: pular / agarrar parede / saltar da parede   |  Círculo: esquivar (na parede: soltar)
   Quadrado ou R1: atacar (correndo: chute voador) |  Triângulo: transformar
   L3 (clique) ou R2 segurado: correr              |  Direcional ↑/↓: zoom
   Direcional ←: invencibilidade

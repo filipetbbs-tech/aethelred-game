@@ -38,7 +38,7 @@ canvas{display:block}
 <div id="soundHint">Som bloqueado pelo navegador: clique uma vez na tela (ou aperte uma tecla) para liberar.</div>
 <div id="hud">
   <h1>Aethelred, protótipo de blocos</h1>
-  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador. Pule perto de uma pilastra ou parede para escalar (W/S/A/D na parede, Espaço salta dela).<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. G liga e desliga a invencibilidade (os golpes ainda empurram e atordoam, mas a vida não cai). P pausa a personagem (a câmera continua livre). O liga e desliga o som.</p>
+  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador. Pule perto de uma pilastra ou parede para escalar (W/S/A/D na parede, Espaço salta dela).<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. K esquiva na direção que você estiver apertando (frente, trás, lados; sem direção, para trás). G liga e desliga a invencibilidade (os golpes ainda empurram e atordoam, mas a vida não cai). P pausa a personagem (a câmera continua livre). O liga e desliga o som.</p>
   <p id="state">Forma normal</p>
   <p id="vida">Vida 100   Abatidos 0</p>
   <p id="combo"></p>
@@ -320,7 +320,7 @@ soundBtn.onclick=toggleSound;
 let tpose=false;
 const st={x:0,z:8,y:0,vy:0,rot:Math.PI,rotT:Math.PI,yaw:0,pitch:.35,camD:6.5,t:0,speed:0,morph:0,morphOn:false};
 const keys={};const joy={x:0,y:0};
-addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyG')toggleGod();if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();});
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyG')toggleGod();if(e.code==='KeyK')dodgeKey=true;if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 const stateEl=document.getElementById('state');
 function toggle(){st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
@@ -369,8 +369,9 @@ pad.addEventListener('pointerup',padEnd);pad.addEventListener('pointercancel',pa
 
 /* controle (DualSense / qualquer controle no layout padrão do navegador)
    analógico esquerdo move, direito gira a câmera; X pula/agarra, Quadrado ou R1 ataca, Triângulo transforma,
-   Círculo solta da parede, L3 ou R2 corre, R3 centraliza a câmera, direcional ↑↓ zoom, ← invencibilidade,
+   Círculo esquiva (na parede: solta), L3 ou R2 corre, R3 centraliza a câmera, direcional ↑↓ zoom, ← invencibilidade,
    Options pausa, Create liga/desliga inimigos */
+let dodgeKey=false;
 const gp={run:false,jump:false,runLatch:false,prev:[],idx:-1,stick:false};
 const GP_DEAD=.16;
 function gpAxis(x,y){const l=Math.hypot(x,y);if(l<GP_DEAD)return [0,0];const k=Math.min(1,(l-GP_DEAD)/(1-GP_DEAD))/l;return [x*k,y*k];}
@@ -409,7 +410,7 @@ function pollGamepad(raw){
   if(!paused){
     if(hit(2)||hit(5))attack();
     if(hit(3))toggle();
-    if(hit(1)&&climb)dropFromWall();
+    if(hit(1)){if(climb)dropFromWall();else dodgeKey=true;}
   }
   if(hit(14))toggleGod();
   if(hit(8))toggleFoes();
@@ -555,7 +556,7 @@ function startAttack(i,A){
 function attack(){
   if(paused||death||climb)return;
   if(aboveGround()>.03||tpose)return;
-  if(hitR&&hitR.t<HIT_LOCK)return;
+  if((hitR&&hitR.t<HIT_LOCK)||dodge)return;
   landT=0;
   if(combo.active){if(combo.t/combo.cur.dur>.15)combo.queued=true;return;}
   if(combo.cool>0)return;
@@ -667,9 +668,11 @@ function toggleGod(){god=!god;godBtn.textContent='Invencível: '+(god?'sim':'nã
 godBtn.onclick=toggleGod;
 const dmgEl=document.getElementById('dmg');
 function takeHit(fx,fz,dmg){
+  if(dodgeInv())return;
   if(!god)hp-=dmg;hurt=.6;
   SOUND.voice('pain');SOUND.impact(false);rumble(1,.45,240);
   shake=Math.max(shake,.3);hitStop=Math.max(hitStop,.045);
+  if(dodge){dodge=null;}
   const snap=(combo.active&&baseBones)?snapBones():null;
   /* entrando na guarda pelo dano: os pés partem de onde estão agora, não de onde ficaram na última guarda */
   if(!combo.active&&combo.w<.05)plantFeet();
@@ -680,6 +683,55 @@ function takeHit(fx,fz,dmg){
   if(l<1e-4){px=-Math.sin(st.rot);pz=-Math.cos(st.rot);}else{px/=l;pz/=l;}
   hitR={t:0,px:px,pz:pz,I:snap?{snap:snap,off:null,t:0}:null};
 }
+/* esquiva (Círculo no controle, K no teclado), na direção do analógico em relação à personagem:
+   frente = Quick Roll To Run; direita = Aerial Evade; esquerda = Aerial Evade espelhada;
+   trás = Quick Roll To Run de trás para frente (rolamento para trás). Sem direção: para trás.
+   Imune a dano no começo da esquiva; corta o golpe em andamento. */
+const DODGES={
+  fwd:{name:'qroll',c0:0,c1:1.38,speed:1.15,dist:.75,inv:.55},
+  back:{name:'qroll',c0:1.38,c1:0,speed:1.25,dist:.6,inv:.55},
+  right:{name:'aerial',c0:.62,c1:3.2,speed:1.75,dist:1,inv:.6,turn:.42},
+  left:{name:'aerial',c0:.62,c1:3.2,speed:1.75,dist:1,inv:.6,mirror:true,turn:-.42}
+};
+let dodge=null;
+/* direção para onde o quadril aponta num quadro da animação (para desfazer o giro que sobra no fim) */
+function clipYaw(name,t){
+  const R=clipSrc[name];R.action.time=Math.max(0,Math.min(t,R.clip.duration));R.mixer.update(0);R.src.updateMatrixWorld(true);
+  const l=R.S.LeftUpLeg.getWorldPosition(new THREE.Vector3()),r=R.S.RightUpLeg.getWorldPosition(new THREE.Vector3());
+  return Math.atan2(r.z-l.z,r.x-l.x);
+}
+function startDodge(ix,iz){
+  if(dodge||death||climb||tpose||!rig||aboveGround()>.05)return false;
+  if(hitR&&hitR.t<HIT_LOCK)return false;
+  /* direção desejada no mundo; sem direção, para trás */
+  let wx,wz;
+  if(Math.hypot(ix,iz)>.2){const fx=-Math.sin(st.yaw),fz=-Math.cos(st.yaw),rx=Math.cos(st.yaw),rz=-Math.sin(st.yaw);wx=fx*iz+rx*ix;wz=fz*iz+rz*ix;}
+  else{wx=-Math.sin(st.rot);wz=-Math.cos(st.rot);}
+  /* escolhe a esquiva mais próxima da direção em relação ao corpo e gira o corpo o resto (até 45°) */
+  const want=Math.atan2(wx,wz);let rel=want-st.rot;while(rel>Math.PI)rel-=Math.PI*2;while(rel<-Math.PI)rel+=Math.PI*2;
+  const q=Math.round(rel/(Math.PI/2));const key=[ 'fwd','left','back','right'][((q%4)+4)%4];
+  const D=DODGES[key];if(!clipSrc[D.name])return false;
+  /* turn: as esquivas laterais também recuam um pouco; o corpo vira um pouco para o caminho sair na direção pedida */
+  st.rot=st.rotT=want-q*Math.PI/2+(D.turn||0);
+  const yawFix=(clipYaw(D.name,D.c1)-clipYaw(D.name,D.c0))*(D.mirror?-1:1);
+  const snap=baseBones?snapBones():null;
+  combo.active=false;combo.queued=false;combo.i=-1;combo.grace=0;combo.snap=null;landT=0;
+  dodge={D:D,key:key,t:0,rmPrev:null,rot0:st.rot,yawFix:yawFix,I:{snap:snap,off:null,t:0}};
+  SOUND.whoosh&&SOUND.whoosh(1.1);
+  return true;
+}
+function dodgeDur(){return Math.abs(dodge.D.c1-dodge.D.c0)/dodge.D.speed;}
+function dodgeInv(){return dodge&&dodge.t<dodgeDur()*dodge.D.inv;}
+function poseDodge(dt){
+  const T=dodge,D=T.D,k=Math.min(1,T.t/dodgeDur()),ct=D.c0+(D.c1-D.c0)*k;
+  const rm=applyClip(D.name,ct,1,D.mirror);
+  /* o giro que a animação acumula é desfeito aos poucos no próprio corpo, para terminar olhando para onde começou */
+  if(T.yawFix)rotAxis(rig.B.Hips,UPV,normAng(T.yawFix)*sm(k));
+  if(rm&&T.rmPrev){const dx=(rm.x-T.rmPrev.x)*D.dist,dz=(rm.z-T.rmPrev.z)*D.dist,c=Math.cos(st.rot),sn=Math.sin(st.rot);st.x+=dx*c+dz*sn;st.z+=-dx*sn+dz*c;}
+  if(rm)T.rmPrev=rm;
+  T.I.t+=dt;inertBlend(T.I,.12);
+}
+function normAng(a){while(a>Math.PI)a-=Math.PI*2;while(a<-Math.PI)a+=Math.PI*2;return a;}
 function hitEnv(t){
   /* sobe em 45 ms, segura um instante, volta com um pequeno rebote e some até HIT_DUR */
   if(t<=0)return 0;const a=.045;
@@ -1058,7 +1110,7 @@ function findAct(re){for(const k in acts){if(re.test(k))return acts[k];}return n
 /* animações do Mixamo (pasta animacoes/), transferidas para o esqueleto da personagem por retarget:
    cada osso copia a rotação do osso de mesmo nome no esqueleto do Mixamo, no espaço do personagem,
    descontando a diferença entre as poses de repouso dos dois esqueletos */
-const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'},die1:{file:'animacoes/dying_1.glb'},die2:{file:'animacoes/dying_2.glb'},die3:{file:'animacoes/dying_3.glb'},die4:{file:'animacoes/dying_4.glb'},die5:{file:'animacoes/dying_5.glb'},crawl:{file:'animacoes/running_crawl.glb'},hang:{file:'animacoes/braced_hang_to_crouch.glb'}};
+const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'},die1:{file:'animacoes/dying_1.glb'},die2:{file:'animacoes/dying_2.glb'},die3:{file:'animacoes/dying_3.glb'},die4:{file:'animacoes/dying_4.glb'},die5:{file:'animacoes/dying_5.glb'},crawl:{file:'animacoes/running_crawl.glb'},hang:{file:'animacoes/braced_hang_to_crouch.glb'},aerial:{file:'animacoes/aerial_evade.glb'},qroll:{file:'animacoes/quick_roll_to_run.glb'}};
 const clipSrc={};
 function loadClips(){
   Object.keys(CLIPS).forEach(function(name){
@@ -1102,14 +1154,18 @@ function buildRetarget(name,g){
 }
 /* aplica o quadro t (segundos) da animação "name" com peso w */
 const _rq=new THREE.Quaternion(),_rq2=new THREE.Quaternion();
-function applyClip(name,t,w){
+/* mirror: espelha a animação (direita vira esquerda): cada osso usa o osso do outro lado, refletido no eixo lateral */
+const _mq=new THREE.Quaternion();
+function mirrorName(n){return n.indexOf('Left')>=0?n.replace('Left','Right'):n.indexOf('Right')>=0?n.replace('Right','Left'):n;}
+function applyClip(name,t,w,mirror){
   const R=clipSrc[name];if(!R||w<=0)return null;
   R.action.time=Math.max(0,Math.min(t,R.clip.duration));R.mixer.update(0);
   hero.updateMatrixWorld(true);hero.getWorldQuaternion(_hq);_hqi.copy(_hq).invert();
   R.src.updateMatrixWorld(true);
   const B=rig.B;
   R.list.forEach(function(n){
-    heroSpace(R.S[n],_rq).multiply(R.off[n]).premultiply(_hq);
+    if(mirror){const m=R.S[mirrorName(n)]||R.S[n];heroSpace(m,_rq);_rq.set(_rq.x,-_rq.y,-_rq.z,_rq.w);_rq.multiply(R.off[n]).premultiply(_hq);}
+    else heroSpace(R.S[n],_rq).multiply(R.off[n]).premultiply(_hq);
     B[n].getWorldQuaternion(_rq2);
     setWorldQuat(B[n],_rq2.slerp(_rq,w));
   });
@@ -1118,7 +1174,7 @@ function applyClip(name,t,w){
   const dy=(hp.y-R.hips0.y)*R.scale;
   if(!B.Hips._p){B.Hips._p=B.Hips.position.clone();touchedP.push(B.Hips);}
   B.Hips.getWorldPosition(_v);_v.addScaledVector(_dn.set(0,1,0).applyQuaternion(_hq),dy*w);B.Hips.position.copy(B.Hips.parent.worldToLocal(_v));B.Hips.updateMatrixWorld(true);
-  return {x:(hp.x-R.hips0.x)*R.scale,z:(hp.z-R.hips0.z)*R.scale};
+  return {x:(mirror?-1:1)*(hp.x-R.hips0.x)*R.scale,z:(hp.z-R.hips0.z)*R.scale};
 }
 
 /* esqueleto: ataques de corpo inteiro com IK de braços e pernas */
@@ -1614,6 +1670,7 @@ function updateModel(dt){
     if(rig)saveBase();
     hero.updateMatrixWorld(true);
     if(death&&clipSrc[death.name]){poseDeath();return;}
+    if(dodge){poseDodge(dt);detectSteps(dt);return;}
     if(climb&&clipSrc.crawl){poseClimb(dt);detectSteps(dt);return;}
     if(window.CLIP_PREVIEW&&clipSrc[CLIP_PREVIEW.name]){applyClip(CLIP_PREVIEW.name,CLIP_PREVIEW.t,1);poseHands();return;}
     poseFull();
@@ -1678,6 +1735,11 @@ function tick(raw){
     if(Math.hypot(ix,iz)>.3&&combo.t/combo.cur.dur>.8&&!combo.queued&&!combo.cur.clip){combo.active=false;combo.pose=pose.slice();combo.grace=.35;combo.hold=0;}
     else{ix=0;iz=0;}
   }
+  if(dodgeKey){dodgeKey=false;if(!climb)startDodge(ix,iz);}
+  if(dodge){
+    dodge.t+=dt;ix=0;iz=0;
+    if(dodge.t>=dodgeDur()){climbOut={snap:snapBones(),off:null,t:0};dodge=null;plantFeet();}
+  }
   /* recuperação da aterrissagem: parado até a animação de pouso terminar */
   const landing=landT>0&&!climb;
   if(landing){ix=0;iz=0;}
@@ -1691,7 +1753,7 @@ function tick(raw){
       if(combo.stepFrom)for(const k in combo.stepFrom){combo.stepFrom[k].x+=dx;combo.stepFrom[k].z+=dz;}}
     if(hitR.t>=HIT_DUR&&!hitR.I){hitR=null;}
   }
-  const jh=jumpHeld()&&!landing&&!(hitR&&hitR.t<HIT_LOCK),spaceDown=jh&&!st.spacePrev;st.spacePrev=jumpHeld();
+  const jh=jumpHeld()&&!landing&&!dodge&&!(hitR&&hitR.t<HIT_LOCK),spaceDown=jh&&!st.spacePrev;st.spacePrev=jumpHeld();
   if(climb){updateClimb(dt,ix,iz,spaceDown);updateComboState(dt);updateCombat(dt);updateModel(dt);updateTrail(dt,null,null,false);return;}
   climbCD-=dt;
   if(spaceDown&&tryClimb(1.15,.3)){updateModel(dt);return;}
@@ -1760,7 +1822,7 @@ function tick(raw){
 }
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
+window.AETH={get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
 frame();
 })();
 </script>

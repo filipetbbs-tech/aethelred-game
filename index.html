@@ -484,9 +484,11 @@ const ATT_B=[
      other:{p:[.72,-.3,-.45],w:.75}}},
   /* bote: agacha segurando a preparação, salta para frente com as duas garras erguidas e crava as duas em X */
   {name:'Golpe final: bote com as duas garras',right:true,both:true,dur:1.2,tw:.48,tf:.7,hit:.66,chain:1,kw:.52,ki:.66,kf:.76,dmg:4,range:3.0,arc:6.3,knock:14,finisher:true,lunge:[1.3,.48,.66],
-   /* pernas da Jump Attack (legClip): agacha, salta com as pernas recolhidas para trás e aterrissa com um pé à frente,
-      ajoelhado; legMap liga o progresso do golpe ao tempo da animação, legDy limita a altura do quadril */
-   legClip:'jumpatk',legMap:[[0,0],[.3,.25],[.48,.5],[.56,.8],[.62,1.1],[.67,1.52],[.78,1.8],[.92,2.3],[1,2.6]],legDy:[-.62,.38],
+   /* pernas da Jump Attack (legClip): agacha, se ergue um pouco (quase sem sair do chão), desce com o bote caindo
+      agachado com um pé à frente e, desequilibrado pela força, dá um passo à frente ao se levantar (stumble);
+      legMap liga o progresso do golpe ao tempo da animação, legDy limita a altura do quadril */
+   legClip:'jumpatk',legMap:[[0,0],[.3,.25],[.46,.5],[.57,.545],[.65,1.52,'cut'],[.74,1.75],[.8,2.6],[.93,3.05],[1,3.25]],legDy:[-.62,.14],
+   stumble:[.55,.8,.95],
    steps:[],
    keys:[
     {t:.18,e:'io',s:[.88,-.3,.12],o:[.88,-.3,.12],yaw:.15,pitch:.3,roll:0,drop:.22,fwd:-.02,side:0},
@@ -581,7 +583,8 @@ function attack(){
 }
 function spinAt(A,p){if(!A.spin)return 0;const u=Math.max(0,Math.min(1,(p-A.spin[1])/(A.spin[2]-A.spin[1])));return A.spin[0]*(u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2);}
 function fadeOut(d){combo.hold=0;combo.outT=0;combo.outDur=d;combo.outW=combo.w;}
-function lungeAt(A,p){if(!A.lunge)return 0;return A.lunge[0]*sm((p-A.lunge[1])/(A.lunge[2]-A.lunge[1]));}
+/* lunge: avanço do golpe; stumble: passo de desequilíbrio depois do golpe (mesmo formato: distância, início, fim) */
+function lungeAt(A,p){let d=0;if(A.lunge)d+=A.lunge[0]*sm((p-A.lunge[1])/(A.lunge[2]-A.lunge[1]));if(A.stumble)d+=A.stumble[0]*sm((p-A.stumble[1])/(A.stumble[2]-A.stumble[1]));return d;}
 function updateComboState(dt){
   const sprinting=runHeld()&&st.speed>5;
   stance+=((sprinting||aboveGround()>.05?0:1)-stance)*Math.min(1,dt*6);
@@ -1826,19 +1829,25 @@ function armArc(A,ct,w){
 const _animFoot={L:new THREE.Vector3(),R:new THREE.Vector3()};
 let procDt=1/60;
 const LEG_BONES=['LeftUpLeg','LeftLeg','LeftFoot','LeftToeBase','RightUpLeg','RightLeg','RightFoot','RightToeBase'];
-function legClipTime(A,p){const M=A.legMap;let k=0;while(k<M.length-2&&p>M[k+1][0])k++;const a=M[k],b=M[k+1];return a[1]+(b[1]-a[1])*Math.max(0,Math.min(1,(p-a[0])/(b[0]-a[0])));}
+/* trecho do legMap marcado com 'cut' não toca a animação entre os dois tempos: mistura a pose do início com a do fim */
+function legClipTime(A,p){const M=A.legMap;let k=0;while(k<M.length-2&&p>M[k+1][0])k++;const a=M[k],b=M[k+1],u=Math.max(0,Math.min(1,(p-a[0])/(b[0]-a[0])));
+  return b[2]==='cut'?{t0:a[1],t1:b[1],u:sm(u)}:{t0:a[1]+(b[1]-a[1])*u,t1:0,u:0};}
+function legClipDy(A,R,t){R.action.time=t;R.mixer.update(0);R.src.updateMatrixWorld(true);
+  const hp=hero.worldToLocal(R.S.Hips.getWorldPosition(new THREE.Vector3()));return (hp.y-R.hips0.y)*R.scale;}
 /* pernas de uma animação do Mixamo por cima do golpe procedural: só os ossos das pernas e a altura do quadril */
 function legClipHips(A,p,w){
-  const R=clipSrc[A.legClip];R.action.time=legClipTime(A,p);R.mixer.update(0);R.src.updateMatrixWorld(true);
+  const R=clipSrc[A.legClip],T=legClipTime(A,p);A._lt=T;
   hero.updateMatrixWorld(true);hero.getWorldQuaternion(_hq);_hqi.copy(_hq).invert();
-  const hp=hero.worldToLocal(R.S.Hips.getWorldPosition(new THREE.Vector3()));
-  const dy=Math.max(A.legDy[0],Math.min(A.legDy[1],(hp.y-R.hips0.y)*R.scale));
+  let d=legClipDy(A,R,T.t0);if(T.u>0)d+=(legClipDy(A,R,T.t1)-d)*T.u;
+  const dy=Math.max(A.legDy[0],Math.min(A.legDy[1],d));
   const B=rig.B;B.Hips.getWorldPosition(_v);const ty=hero.localToWorld(rig.restP.Hips.clone()).y+dy;
   _v.y+=(ty-_v.y)*w;B.Hips.position.copy(B.Hips.parent.worldToLocal(_v));B.Hips.updateMatrixWorld(true);
 }
 function legClipLegs(A,w){
-  const R=clipSrc[A.legClip],B=rig.B;
-  LEG_BONES.forEach(function(n){if(!R.S[n]||!B[n]||!R.off[n])return;heroSpace(R.S[n],_rq).multiply(R.off[n]).premultiply(_hq);B[n].getWorldQuaternion(_rq2);setWorldQuat(B[n],_rq2.slerp(_rq,w));});
+  const R=clipSrc[A.legClip],B=rig.B,T=A._lt;
+  const put=function(t,k){R.action.time=t;R.mixer.update(0);R.src.updateMatrixWorld(true);
+    LEG_BONES.forEach(function(n){if(!R.S[n]||!B[n]||!R.off[n])return;heroSpace(R.S[n],_rq).multiply(R.off[n]).premultiply(_hq);B[n].getWorldQuaternion(_rq2);setWorldQuat(B[n],_rq2.slerp(_rq,k));});};
+  put(T.t0,w);if(T.u>0)put(T.t1,w*T.u);
 }
 function applyProc(A,p,w,mv){
   const B=rig.B;mv=mv||0;

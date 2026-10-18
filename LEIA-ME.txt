@@ -112,9 +112,10 @@ Combate: combo de 5 golpes (tabela ATT_B): abertura rápida, revés de baixo par
   animação Sword And Shield Slash, braço esquerdo por cima via arcL) e bote com
   as duas garras. Ritmo e peso crescem
   a cada golpe, e cada golpe termina na pose em que o próximo começa.
-O golpe 5 usa as pernas da "Jump Attack" (legClip/legMap na tabela): agacha, salta com as
-pernas recolhidas para trás e aterrissa com um pé à frente, ajoelhado; braços e tronco
-continuam procedurais.
+O golpe 5 usa as pernas da "Jump Attack" (legClip/legMap na tabela): agacha, se ergue um
+pouco sem sair do chão (o trecho do salto é pulado: 'cut'), desce com o bote caindo agachado
+com um pé à frente e, desequilibrado pela força, dá um passo à frente (stumble: 55 cm);
+braços e tronco continuam procedurais.
 Os golpes são animados por código sobre o esqueleto,
 com IK de braços e pernas que respeita a dobra natural do cotovelo e do joelho.
 Os valores de cada golpe ficam na tabela ATT do index.html: dur é a duração em

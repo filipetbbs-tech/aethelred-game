@@ -24,6 +24,8 @@ canvas{display:block}
 #pauseBtn{right:18px;top:calc(138px + env(safe-area-inset-top,0px));bottom:auto}
 #soundBtn{right:18px;top:calc(200px + env(safe-area-inset-top,0px));bottom:auto}
 #godBtn{right:18px;top:calc(262px + env(safe-area-inset-top,0px));bottom:auto}
+#dodgeBtn{right:18px;top:calc(324px + env(safe-area-inset-top,0px));bottom:auto}
+#dodgeBtn.on{border-color:#d8b25a;color:#f0d68a}
 #godBtn.on{border-color:#d8b25a;color:#f0d68a}
 #glbMsg{margin-top:8px;font-size:13px;color:var(--bone);opacity:.85}
 #pad{position:fixed;left:22px;bottom:calc(26px + env(safe-area-inset-bottom,0px));width:120px;height:120px;border-radius:50%;border:1px solid #6b5a4a;background:rgba(20,16,16,.45);display:none}
@@ -38,7 +40,7 @@ canvas{display:block}
 <div id="soundHint">Som bloqueado pelo navegador: clique uma vez na tela (ou aperte uma tecla) para liberar.</div>
 <div id="hud">
   <h1>Aethelred, protótipo de blocos</h1>
-  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador. Pule perto de uma pilastra ou parede para escalar (W/S/A/D na parede, Espaço salta dela).<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. K esquiva na direção que você estiver apertando (frente, trás, lados; sem direção, para trás). G liga e desliga a invencibilidade (os golpes ainda empurram e atordoam, mas a vida não cai). P pausa a personagem (a câmera continua livre). O liga e desliga o som.</p>
+  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador. Pule perto de uma pilastra ou parede para escalar (W/S/A/D na parede, Espaço salta dela).<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. K esquiva na direção que você estiver apertando (frente, trás, lados; sem direção, para trás); L ou o botão "Esquiva" alterna entre a esquiva atual e a 1ª versão. G liga e desliga a invencibilidade (os golpes ainda empurram e atordoam, mas a vida não cai). P pausa a personagem (a câmera continua livre). O liga e desliga o som.</p>
   <p id="state">Forma normal</p>
   <p id="vida">Vida 100   Abatidos 0</p>
   <p id="combo"></p>
@@ -52,6 +54,7 @@ canvas{display:block}
 <button class="btn" id="pauseBtn">Pausar</button>
 <button class="btn" id="soundBtn">Som: ligado</button>
 <button class="btn" id="godBtn">Invencível: não</button>
+<button class="btn" id="dodgeBtn">Esquiva: atual</button>
 <input type="file" id="glbIn" accept=".glb" hidden>
 <button class="btn" id="morph">Transformar</button>
 
@@ -320,7 +323,7 @@ soundBtn.onclick=toggleSound;
 let tpose=false;
 const st={x:0,z:8,y:0,vy:0,rot:Math.PI,rotT:Math.PI,yaw:0,pitch:.35,camD:6.5,t:0,speed:0,morph:0,morphOn:false};
 const keys={};const joy={x:0,y:0};
-addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyG')toggleGod();if(e.code==='KeyK')dodgeKey=true;if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();});
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyG')toggleGod();if(e.code==='KeyK')dodgeKey=true;if(e.code==='KeyL')toggleDodgeVer();if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 const stateEl=document.getElementById('state');
 function toggle(){st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
@@ -687,13 +690,24 @@ function takeHit(fx,fz,dmg){
    frente = Quick Roll To Run; direita = Aerial Evade; esquerda = Aerial Evade espelhada;
    trás = Quick Roll To Run de trás para frente (rolamento para trás). Sem direção: para trás.
    Imune a dano no começo da esquiva; corta o golpe em andamento. */
-const DODGES={
+/* versão atual; a primeira versão (DODGES_V1) fica para comparar pelo botão "Esquiva" ou pela tecla L */
+const DODGES_V2={
   fwd:{name:'qroll',c0:0,c1:1.38,speed:1.75,dist:.75,inv:.55},
   back:{name:'qroll',c0:1.38,c1:0,speed:1.75,dist:.6,inv:.55},
   right:{name:'aerial',c0:.62,c1:3.2,speed:1.75,dist:1.8,inv:.6,turn:.42},
   left:{name:'aerial',c0:.62,c1:3.2,speed:1.75,dist:1.8,inv:.6,mirror:true,turn:-.42}
 };
-let dodge=null;
+const DODGES_V1={
+  fwd:Object.assign({},DODGES_V2.fwd,{speed:1.15}),
+  back:Object.assign({},DODGES_V2.back,{speed:1.25}),
+  right:Object.assign({},DODGES_V2.right,{dist:1}),
+  left:Object.assign({},DODGES_V2.left,{dist:1})
+};
+let DODGES=DODGES_V2,dodge=null;
+const dodgeBtn=document.getElementById('dodgeBtn');
+function toggleDodgeVer(){DODGES=DODGES===DODGES_V2?DODGES_V1:DODGES_V2;dodgeBtn.textContent='Esquiva: '+(DODGES===DODGES_V2?'atual':'1ª versão');dodgeBtn.classList.toggle('on',DODGES===DODGES_V1);dodgeBtn.blur();
+  comboEl.textContent=DODGES===DODGES_V2?'Esquiva atual: rolamentos em 0,8 s, lateral de 5 m':'Esquiva 1ª versão: rolamentos em 1,2 s, lateral de 2,75 m';msgHold=2.5;}
+dodgeBtn.onclick=toggleDodgeVer;
 /* direção para onde o quadril aponta num quadro da animação (para desfazer o giro que sobra no fim) */
 function clipYaw(name,t){
   const R=clipSrc[name];R.action.time=Math.max(0,Math.min(t,R.clip.duration));R.mixer.update(0);R.src.updateMatrixWorld(true);

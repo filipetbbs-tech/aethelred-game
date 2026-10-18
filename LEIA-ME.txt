@@ -32,6 +32,8 @@ Esquiva (K no teclado, Círculo no controle), na direção apertada em relação
 Diagonais vão para a esquiva mais próxima, com o corpo girando o resto. Imune a dano na
 primeira metade da esquiva; ela corta o golpe em andamento. Só no chão. Os parâmetros ficam
 na tabela DODGES do index.html (trecho da animação, velocidade, distância, imunidade).
+Botão "Esquiva" (ou tecla L): alterna entre a esquiva atual (rolamentos em 0,8 s, lateral de
+5 m) e a 1ª versão (rolamentos em 1,2 s, lateral de 2,75 m), para comparar.
 Run To Rolling foi convertida (run_to_rolling.glb) mas não está em uso.
 
 Controle de PlayStation 5 (DualSense) ou outro controle: conecte por USB ou Bluetooth e aperte

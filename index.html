@@ -848,7 +848,7 @@ function startDeath(){
   return true;
 }
 function respawn(){
-  airAtk=null;flip=null;dodge=null;
+  wallFall=false;airAtk=null;flip=null;dodge=null;
   death=null;hp=100;kills=0;enemies.forEach(function(e){scene.remove(e.g);});enemies.length=0;
   st.x=0;st.z=8;st.y=0;st.vy=0;spawnT=2;msgT=2.5;combo.active=false;combo.i=-1;combo.w=0;combo.hold=0;
   if(foesOn)for(let i=0;i<3;i++)spawnEnemy();
@@ -949,12 +949,14 @@ function poseFlipRev(dt){
 const AIRATK={c0:1.05,c1:2.3,land:1.7,hit:1.74,speed:1.15,blendOut:.35};
 const AIR_HIT={name:'Ataque aéreo',range:2.9,arc:Math.PI*2,dmg:3,knock:11,finisher:true};
 let airAtk=null;
+/* queda depois do salto da parede (de costas para onde vai), até tocar o chão */
+let wallFall=false;
 function airAtkDur(){return (AIRATK.c1-AIRATK.c0)/AIRATK.speed;}
 function startAirAttack(){
   if(airAtk||!clipSrc.jatk||!rig||dodge)return;
   /* sem mira automática: segue na direção do salto. No salto da parede continua de frente para a parede (de costas
      para onde vai) e o avanço da animação é invertido, para seguir se afastando dela; no pulo, vira para onde estava indo */
-  const back=!!(flip&&flip.rev);
+  const back=!!(flip&&flip.rev)||wallFall;
   if(!back&&Math.hypot(st.vx||0,st.vz||0)>.5)st.rot=st.rotT=Math.atan2(st.vx,st.vz);
   const R=clipSrc.jatk;R.action.time=AIRATK.c0;R.mixer.update(0);R.src.updateMatrixWorld(true);
   const dy0=(hero.worldToLocal(R.S.Hips.getWorldPosition(new THREE.Vector3())).y-R.hips0.y)*R.scale;
@@ -1879,10 +1881,11 @@ function tick(raw){
     if(flip.rev){flip.t+=dt;st.vx=st.vz=0;
       /* no alto: passa para a física, com a animação de pulo, ainda se afastando da parede */
       if(flip.t>=flipRevDur()){const c=Math.sin(st.rot),d=Math.cos(st.rot);
-        climbOut={snap:snapBones(),off:null,t:0};st.vy=-1.5;st.vx=-c*2.2;st.vz=-d*2.2;flip=null;}}
+        climbOut={snap:snapBones(),off:null,t:0};st.vy=-1.5;wallFall=true;st.vx=-c*2.2;st.vz=-d*2.2;flip=null;}}
     else{flip.t+=dt;st.vx=st.vz=0;if(flip.t>=FLIP_DUR||(flip.t>.15&&aboveGround()<.02))flip=null;}}
   if(airAtk){airAtk.t+=dt;ix=0;iz=0;st.vx=st.vz=0;
     if(airAtk.t>=airAtkDur()){climbOut={snap:snapBones(),off:null,t:0};airAtk=null;landT=0;wasAir=false;plantFeet();if(combo.cur){combo.pose=GUARD_ABS.slice();combo.hold=COMBAT_HOLD;combo.holdT=1;combo.outDur=0;}}}
+  if(wallFall&&(climb||(!flip&&aboveGround()<.02)))wallFall=false;
   if(dodgeKey){dodgeKey=false;if(!climb&&!airAtk)startDodge(ix,iz);}
   if(dodge){
     dodge.t+=dt;ix=0;iz=0;

@@ -18,6 +18,12 @@ a Braced Hang To Crouch (puxa o corpo pela borda e sobe agachada) e fica de pé 
 embaixo, solta. As muralhas do fundo
 e dos lados também podem ser escaladas.
 
+Dano: quando um inimigo acerta, o golpe em andamento é cortado e o combo volta ao primeiro
+golpe. A personagem leva um tranco na direção do golpe (tronco e cabeça vão para trás, braços
+ficam para trás do corpo, joelhos cedem; de lado o tronco gira), recua uns 45 cm e fica
+atordoada por 0,35 s, sem andar, pular ou atacar. A reação toda dura 0,6 s, com clarão
+vermelho no corpo e nas bordas da tela, tremor de câmera, som de impacto e vibração.
+
 Controle de PlayStation 5 (DualSense) ou outro controle: conecte por USB ou Bluetooth e aperte
 qualquer botão com a página aberta (Chrome/Edge recomendados).
   Analógico esquerdo: mover   |  Analógico direito: câmera  |  R3: câmera atrás da personagem

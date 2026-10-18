@@ -27,9 +27,11 @@ canvas{display:block}
 #pad{position:fixed;left:22px;bottom:calc(26px + env(safe-area-inset-bottom,0px));width:120px;height:120px;border-radius:50%;border:1px solid #6b5a4a;background:rgba(20,16,16,.45);display:none}
 #knob{position:absolute;left:40px;top:40px;width:40px;height:40px;border-radius:50%;background:#6b5a4a}
 @media (pointer:coarse){#pad{display:block}}
+#dmg{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 50%,rgba(150,10,10,.6) 100%)}
 </style>
 </head>
 <body>
+<div id="dmg"></div>
 <div id="hud">
   <h1>Aethelred, protótipo de blocos</h1>
   <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador. Pule perto de uma pilastra ou parede para escalar (W/S/A/D na parede, Espaço salta dela).<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. M alterna entre o combo novo (B) e o anterior (A). P pausa a personagem (a câmera continua livre). O liga e desliga o som. V troca a versão da voz (original, tratada, criatura).</p>
@@ -595,6 +597,7 @@ function toggleCombo(){
 function attack(){
   if(paused||death||climb)return;
   if(aboveGround()>.03||tpose)return;
+  if(hitR&&hitR.t<HIT_LOCK)return;
   landT=0;
   if(combo.active){if(combo.t/combo.cur.dur>.15)combo.queued=true;return;}
   if(combo.cool>0)return;
@@ -695,6 +698,62 @@ function hitEnemies(A){
   if(any)SOUND.slash(A.finisher||A.dmg>=2);
   if(any){hitStop=A.finisher?.15:.09;shake=A.finisher?.34:.19;rumble(A.finisher?.9:.5,A.finisher?.6:.35,A.finisher?180:110);}
 }
+/* dano na personagem: corta o golpe, zera o combo e dispara a reação (tranco na direção do golpe, recuo e
+   atordoamento curto, clarão vermelho, tremor e vibração) */
+const HIT_LOCK=.35,HIT_DUR=.6;
+let hitR=null;
+const dmgEl=document.getElementById('dmg');
+function takeHit(fx,fz,dmg){
+  hp-=dmg;hurt=.6;
+  SOUND.voice('pain');SOUND.impact(false);rumble(1,.45,240);
+  shake=Math.max(shake,.3);hitStop=Math.max(hitStop,.045);
+  const snap=(combo.active&&baseBones)?snapBones():null;
+  combo.active=false;combo.queued=false;combo.i=-1;combo.grace=0;combo.cool=HIT_LOCK;combo.snap=null;
+  if(combo.cur){combo.pose=GUARD_ABS.slice();combo.hold=COMBAT_HOLD;combo.holdT=1;combo.outDur=0;}
+  comboEl.textContent='';landT=0;
+  let px=st.x-fx,pz=st.z-fz;const l=Math.hypot(px,pz);
+  if(l<1e-4){px=-Math.sin(st.rot);pz=-Math.cos(st.rot);}else{px/=l;pz/=l;}
+  hitR={t:0,px:px,pz:pz,I:snap?{snap:snap,off:null,t:0}:null};
+}
+function hitEnv(t){
+  /* sobe em 45 ms, segura um instante, volta com um pequeno rebote e some até HIT_DUR */
+  if(t<=0)return 0;const a=.045;
+  const e=t<a?sm(t/a):Math.exp(-(t-a)*4.5)*Math.cos((t-a)*6);
+  return e*(1-sm((t-HIT_DUR+.15)/.15));
+}
+const _ha=new THREE.Vector3(),_hf=new THREE.Vector3(),_hr=new THREE.Vector3(),_ht=new THREE.Vector3();
+function poseHit(dt){
+  if(!hitR||!rig)return;
+  const B=rig.B,t=hitR.t;
+  if(hitR.I){hitR.I.t+=dt;inertBlend(hitR.I,.15);if(!hitR.I.snap)hitR.I=null;}
+  const e=hitEnv(t),eh=hitEnv(t-.03);
+  if(Math.abs(e)<1e-4&&Math.abs(eh)<1e-4)return;
+  /* eixo que tomba o tronco para o lado do empurrão, e giro do tronco quando o golpe vem de lado */
+  const push=_ht.set(hitR.px,0,hitR.pz);
+  _ha.crossVectors(UPV,push).normalize();
+  _hf.set(Math.sin(st.rot),0,Math.cos(st.rot));_hr.crossVectors(_hf,UPV);
+  const side=push.dot(_hr),twistAx=_hr.clone().cross(_hf).negate().normalize();
+  /* quadril cede (os joelhos dobram pelo ajuste dos pés no chão) e inclina ao contrário */
+  B.Hips.getWorldPosition(_v);_v.y-=.12*Math.max(0,e);B.Hips.position.copy(B.Hips.parent.worldToLocal(_v));B.Hips.updateMatrixWorld(true);
+  rotAxis(B.Hips,_ha,-.1*e);
+  const sp=[['Spine',.28],['Spine1',.24],['Spine2',.2]];
+  sp.forEach(function(x){if(B[x[0]]){rotAxis(B[x[0]],_ha,x[1]*e);rotAxis(B[x[0]],twistAx,-side*.2*e);}});
+  if(B.Neck)rotAxis(B.Neck,_ha,.2*eh);
+  rotAxis(B.Head,_ha,.4*eh);
+  /* braços ficam para trás do tronco, indo na direção de quem bateu */
+  ['Left','Right'].forEach(function(s){rotAxis(B[s+'Arm'],_ha,.6*eh);rotAxis(B[s+'ForeArm'],_ha,.4*eh);});
+  groundFeet();
+}
+let heroMats=null;
+function hitFlash(){
+  if(!custom)return;
+  if(!heroMats){heroMats=[];custom.traverse(function(o){if(o.isMesh)[].concat(o.material).forEach(function(m){if(m&&m.color&&heroMats.indexOf(m)<0){m.userData.c0=m.color.clone();heroMats.push(m);}});});}
+  /* clarão: tinge a cor do material de vermelho (multiplicando, para manter a textura visível) */
+  const k=hitR?Math.max(0,1-hitR.t/.2):0;
+  heroMats.forEach(function(m){m.color.copy(m.userData.c0).multiply(_hitTint.setRGB(1+1.4*k,1-.55*k,1-.55*k));});
+  dmgEl.style.opacity=hitR?Math.max(0,1-hitR.t/.45).toFixed(3):0;
+}
+const _hitTint=new THREE.Color();
 function updateCombat(dt){
   hurt-=dt;msgT-=dt;
   spawnT-=dt;
@@ -708,7 +767,7 @@ function updateCombat(dt){
     if(e.stun<=0){
       e.g.rotation.y=Math.atan2(dx,dz);e.g.rotation.x=0;
       if(d>1){p.x+=dx/d*e.sp*dt;p.z+=dz/d*e.sp*dt;}
-      else if(!death&&!climb&&st.y<1.2){e.cd-=dt;if(e.cd<=0&&hurt<=0){hp-=8;hurt=.6;e.cd=1;SOUND.voice('pain');rumble(1,.4,220);}}
+      else if(!death&&!climb&&st.y<1.2){e.cd-=dt;if(e.cd<=0&&hurt<=0){e.cd=1;takeHit(p.x,p.z,8);}}
     }else e.g.rotation.x=Math.min(e.stun,.4)*.6;
     p.x+=e.vx*dt;p.z+=e.vz*dt;
     const f=Math.max(0,1-dt*8);e.vx*=f;e.vz*=f;
@@ -1570,6 +1629,7 @@ function updateModel(dt){
     poseFull();
     poseHands();
     if(climbOut){climbOut.t+=dt;inertBlend(climbOut,.35);if(!climbOut.snap)climbOut=null;}
+    poseHit(dt);
     detectSteps(dt);
   }else{
     custom.rotation.x=Math.min(st.speed/9,.5)*.25;
@@ -1631,7 +1691,14 @@ function tick(raw){
   /* recuperação da aterrissagem: parado até a animação de pouso terminar */
   const landing=landT>0&&!climb;
   if(landing){ix=0;iz=0;}
-  const jh=jumpHeld()&&!landing,spaceDown=jh&&!st.spacePrev;st.spacePrev=jumpHeld();
+  if(hitR){
+    hitR.t+=dt;
+    if(hitR.t<HIT_LOCK){ix=0;iz=0;}
+    /* recuo de ~0,45 m nos primeiros 0,22 s */
+    if(hitR.t<.22&&!climb){const v=4.2*(1-hitR.t/.22);st.x+=hitR.px*v*dt;st.z+=hitR.pz*v*dt;}
+    if(hitR.t>=HIT_DUR&&!hitR.I){hitR=null;}
+  }
+  const jh=jumpHeld()&&!landing&&!(hitR&&hitR.t<HIT_LOCK),spaceDown=jh&&!st.spacePrev;st.spacePrev=jumpHeld();
   if(climb){updateClimb(dt,ix,iz,spaceDown);updateComboState(dt);updateCombat(dt);updateModel(dt);updateTrail(dt,null,null,false);return;}
   climbCD-=dt;
   if(spaceDown&&tryClimb(1.15,.3)){updateModel(dt);return;}
@@ -1664,6 +1731,7 @@ function tick(raw){
   updateCombat(dt);
   hero.position.set(st.x,st.y,st.z);hero.rotation.y=st.rot;
   updateModel(dt);
+  hitFlash();
   const A=combo.cur,pp=combo.active&&A?progA(A,combo.t):0;
   updateTrail(dt,clawBase,clawTip,combo.active&&A&&pp>A.kw+.04&&pp<A.kf+.04);
   /* transformação */
@@ -1699,7 +1767,7 @@ function tick(raw){
 }
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
+window.AETH={hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,0);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
 frame();
 })();
 </script>

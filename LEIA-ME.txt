@@ -28,6 +28,13 @@ sobe com as mãos abertas, desce num arco largo e as duas garras se fecham à fr
 área (AIR_HIT: ~3 m em volta, dano 3, empurrão forte). A altura se ajusta para o impacto cair
 no chão; termina em guarda.
 
+Agarrão (R1 no controle, E no teclado): começo da "Surprise Uppercut" — passo à frente e a
+mão esquerda agarra. Pegando um inimigo à frente (até ~1,9 m), ele fica preso na mão, levantado
+e sem atacar. R1/E de novo solta empurrando; ataque enquanto segura dá o gancho de direita
+(resto da animação), com dano 3 e lançando o inimigo para cima. Solta sozinho depois de 4 s ou
+se outro inimigo acertar a personagem. Sem inimigo ao alcance, completa o puxão no vazio.
+Parâmetros na tabela GRAB do index.html. O R1 deixou de atacar (ataque só no Quadrado).
+
 Dano: quando um inimigo acerta, o golpe em andamento é cortado e o combo volta ao primeiro
 golpe. A personagem leva um tranco na direção do golpe (tronco e cabeça vão para trás, braços
 ficam para trás do corpo, joelhos cedem; de lado o tronco gira), recua uns 45 cm e fica
@@ -53,7 +60,8 @@ Controle de PlayStation 5 (DualSense) ou outro controle: conecte por USB ou Blue
 qualquer botão com a página aberta (Chrome/Edge recomendados).
   Analógico esquerdo: mover   |  Analógico direito: câmera  |  R3: câmera atrás da personagem
   X: pular / agarrar parede / saltar da parede   |  Círculo: esquivar (na parede: soltar)
-  Quadrado ou R1: atacar (correndo: chute voador) |  Triângulo: transformar
+  Quadrado: atacar (correndo: chute voador)       |  Triângulo: transformar
+  R1: agarrar inimigo (R1 de novo solta; Quadrado segurando = gancho)
   L3 (clique) ou R2 segurado: correr              |  Direcional ↑/↓: zoom
   Direcional ←: invencibilidade
   Options: pausar   |  Create: ligar/desligar inimigos

@@ -490,11 +490,11 @@ const ATT_B=[
       agachado com um pé à frente e, desequilibrado pela força, dá um passo à frente ao se levantar (stumble);
       legMap liga o progresso do golpe ao tempo da animação, legDy limita a altura do quadril */
    legClip:'jumpatk',legMap:[[0,0],[.3,.25],[.46,.5],[.57,.545],[.65,1.52,'cut'],[.72,1.75],[.75,2.6],[.88,2.86],[1,2.95]],legDy:[-.62,.14],
-   stumble:[.45,.75,.88],
-   /* endStance: base da guarda (pé esquerdo, pé direito: [lado, frente]); depois do golpe, já em guarda, os pés vão até
-      ela em passos lentos (endStep: velocidade e atraso do segundo pé) */
-   endStance:{L:[-.24,.39],R:[.25,-.29]},endStep:{speed:5,delayL:.22},
-   steps:[],
+   stumble:[.5,.74,.92],
+   /* legEnd: as pernas da animação saem entre esses dois pontos; dali em diante os dois passos do desequilíbrio (steps,
+      h: medidos pela direção do corpo) pousam os pés direto na base da guarda */
+   legEnd:[.72,.8],
+   steps:[{f:'o',t0:.74,t1:.85,to:[.24,.39],lift:.13,h:true},{f:'s',t0:.83,t1:.94,to:[.25,-.29],lift:.09,h:true}],
    keys:[
     {t:.18,e:'io',s:[.88,-.3,.12],o:[.88,-.3,.12],yaw:.15,pitch:.3,roll:0,drop:.22,fwd:-.02,side:0},
     {t:.4,e:'io',s:[.5,.95,-.35],o:[.5,.95,-.35],yaw:.3,pitch:.15,roll:0,drop:.3,fwd:-.08,side:0},
@@ -627,10 +627,7 @@ function updateComboState(dt){
   if(combo.queued&&p>=A.chain&&combo.i<ATT.length-1){startAttack(combo.i+1);return;}
   if(combo.t>=A.dur&&!combo.paused){
     combo.active=false;if(!A.clip)combo.pose=evalPose(A,combo.start,1,combo.pose||[]);
-    /* golpe com base de guarda definida: os pés vão até ela em passos lentos, primeiro o direito, depois o esquerdo */
-    if(A.endStance&&feet.L){const E=A.endStance,S=A.endStep;
-      feet.R.rel=[-E.R[0],E.R[1]];feet.L.rel=[-E.L[0],E.L[1]];
-      feet.R.stepping=feet.L.stepping=true;feet.R.ss=feet.L.ss=S.speed;feet.R.stepDelay=0;feet.L.stepDelay=S.delayL;}
+
     if(combo.i>=ATT.length-1){combo.cool=.45;combo.grace=0;combo.i=-1;}
     else combo.grace=.35;
     combo.hold=COMBAT_HOLD;combo.holdT=0;
@@ -1707,7 +1704,8 @@ function footTarget(side,A,p,out){
   for(let i=0;i<A.steps.length;i++){
     const s=A.steps[i];if(s.f!==key)continue;
     if(p<s.t0)continue;
-    const dest=new THREE.Vector3(st.x,st.y+feet.y,st.z).addScaledVector(fr.right,s.to[0]*sg).addScaledVector(fr.fwd,s.to[1]);
+    const hf=s.h?new THREE.Vector3(Math.sin(st.rot),0,Math.cos(st.rot)):fr.fwd,hr=s.h?new THREE.Vector3().crossVectors(hf,UPV):fr.right;
+    const dest=new THREE.Vector3(st.x,st.y+feet.y,st.z).addScaledVector(hr,s.to[0]*sg).addScaledVector(hf,s.to[1]);
     const id=combo.i+':'+i;
     if(!combo.stepFrom[id])combo.stepFrom[id]=feet[side].clone();
     const u=sm((p-s.t0)/(s.t1-s.t0));
@@ -1868,7 +1866,7 @@ function applyProc(A,p,w,mv){
   B.Hips.getWorldPosition(_v);
   _v.addScaledVector(fr.up,-pose[9]*L*w).addScaledVector(fr.fwd,pose[10]*L*w).addScaledVector(fr.right,pose[11]*L*w);
   B.Hips.position.copy(B.Hips.parent.worldToLocal(_v));B.Hips.updateMatrixWorld(true);
-  const lc=A.legClip&&clipSrc[A.legClip]&&combo.active?w*(1-sm((p-.88)/.12)):0;
+  const le=A.legEnd||[.88,1],lc=A.legClip&&clipSrc[A.legClip]&&combo.active?w*(1-sm((p-le[0])/(le[1]-le[0]))):0;
   if(lc>0)legClipHips(A,p,lc);
   /* torção do quadril e da coluna; yaw positivo gira o peito para a direita */
   rotAxis(B.Hips,fr.up,-yaw*.35*w);

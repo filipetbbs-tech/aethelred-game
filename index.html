@@ -493,10 +493,13 @@ const ATT_B=[
    legClip:'jumpatk',legMap:[[0,0],[.3,.25],[.46,.5],[.57,.545],[.65,1.52,'cut'],[.72,1.75],[.75,2.6],[.88,2.86],[1,2.95]],legDy:[-.62,.14],
    /* dur/tw/tf: preparação e impacto no mesmo tempo de antes (1,2 s), só o fim (os dois passos) ficou mais longo */
    stumble:[.9,.74,.94],
-   /* legEnd: as pernas da animação saem entre esses dois pontos; dali em diante os dois passos do desequilíbrio (steps,
-      h: medidos pela direção do corpo) pousam os pés direto na base da guarda */
-   legEnd:[.72,.8],
-   steps:[{f:'o',t0:.74,t1:.85,to:[.24,.39],lift:.13,h:true},{f:'s',t0:.83,t1:.94,to:[.25,-.29],lift:.09,h:true}],
+   /* legEnd: as pernas da Jump Attack saem entre esses dois pontos e entram as da Jogging Stumble (legClip2, espelhada:
+      primeiro o pé direito, depois o esquerdo), com o tropeço; em cada passo o pé é guiado até a base da guarda
+      (endStance: [lado, frente]; footSwing: janela de cada passo), calculada onde o corpo vai parar */
+   legEnd:[.72,.76],
+   legClip2:{name:'stumble',mirror:true,map:[[.72,.08],[.97,.66]],w:[.72,.76,.97,1],dy:[-.35,.1]},
+   endStance:{L:[-.24,.39],R:[.25,-.29]},footSwing:{R:[.74,.88],L:[.88,.97]},
+   steps:[],
    keys:[
     {t:.18,e:'io',s:[.88,-.3,.12],o:[.88,-.3,.12],yaw:.15,pitch:.3,roll:0,drop:.22,fwd:-.02,side:0},
     {t:.4,e:'io',s:[.5,.95,-.35],o:[.5,.95,-.35],yaw:.3,pitch:.15,roll:0,drop:.3,fwd:-.08,side:0},
@@ -1463,7 +1466,7 @@ function findAct(re){for(const k in acts){if(re.test(k))return acts[k];}return n
 /* animações do Mixamo (pasta animacoes/), transferidas para o esqueleto da personagem por retarget:
    cada osso copia a rotação do osso de mesmo nome no esqueleto do Mixamo, no espaço do personagem,
    descontando a diferença entre as poses de repouso dos dois esqueletos */
-const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'},die1:{file:'animacoes/dying_1.glb'},die2:{file:'animacoes/dying_2.glb'},die3:{file:'animacoes/dying_3.glb'},die4:{file:'animacoes/dying_4.glb'},die5:{file:'animacoes/dying_5.glb'},crawl:{file:'animacoes/running_crawl.glb'},hang:{file:'animacoes/braced_hang_to_crouch.glb'},aerial:{file:'animacoes/aerial_evade.glb'},qroll:{file:'animacoes/quick_roll_to_run.glb'},sflip:{file:'animacoes/stylish_flip.glb'},jatk:{file:'animacoes/run_jump_attack.glb'},upc:{file:'animacoes/surprise_uppercut.glb'},bh:{file:'animacoes/melee_backhand.glb'},thrown:{file:'animacoes/getting_thrown.glb'},jumpatk:{file:'animacoes/jumping_attack.glb'}};
+const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'},die1:{file:'animacoes/dying_1.glb'},die2:{file:'animacoes/dying_2.glb'},die3:{file:'animacoes/dying_3.glb'},die4:{file:'animacoes/dying_4.glb'},die5:{file:'animacoes/dying_5.glb'},crawl:{file:'animacoes/running_crawl.glb'},hang:{file:'animacoes/braced_hang_to_crouch.glb'},aerial:{file:'animacoes/aerial_evade.glb'},qroll:{file:'animacoes/quick_roll_to_run.glb'},sflip:{file:'animacoes/stylish_flip.glb'},jatk:{file:'animacoes/run_jump_attack.glb'},upc:{file:'animacoes/surprise_uppercut.glb'},bh:{file:'animacoes/melee_backhand.glb'},thrown:{file:'animacoes/getting_thrown.glb'},jumpatk:{file:'animacoes/jumping_attack.glb'},stumble:{file:'animacoes/jogging_stumble.glb'}};
 const clipSrc={};
 function loadClips(){
   Object.keys(CLIPS).forEach(function(name){
@@ -1858,6 +1861,24 @@ function legClipLegs(A,w){
     LEG_BONES.forEach(function(n){if(!R.S[n]||!B[n]||!R.off[n])return;heroSpace(R.S[n],_rq).multiply(R.off[n]).premultiply(_hq);B[n].getWorldQuaternion(_rq2);setWorldQuat(B[n],_rq2.slerp(_rq,k));});};
   put(T.t0,w);if(T.u>0)put(T.t1,w*T.u);
 }
+/* segunda animação de pernas (legClip2): tempo pelo mapa, peso com entrada e saída, espelhamento opcional */
+function legClip2W(A,p){const L=A.legClip2,W=L.w;return sm((p-W[0])/(W[1]-W[0]))*(1-sm((p-W[2])/(W[3]-W[2])));}
+function legClip2T(A,p){const M=A.legClip2.map;const u=Math.max(0,Math.min(1,(p-M[0][0])/(M[1][0]-M[0][0])));return M[0][1]+(M[1][1]-M[0][1])*u;}
+function legClip2Apply(A,p,w){
+  const L=A.legClip2,R=clipSrc[L.name],B=rig.B;if(!R)return;
+  R.action.time=legClip2T(A,p);R.mixer.update(0);R.src.updateMatrixWorld(true);
+  hero.updateMatrixWorld(true);hero.getWorldQuaternion(_hq);_hqi.copy(_hq).invert();
+  const hp=hero.worldToLocal(R.S.Hips.getWorldPosition(new THREE.Vector3()));
+  const dy=Math.max(L.dy[0],Math.min(L.dy[1],(hp.y-R.hips0.y)*R.scale));
+  B.Hips.getWorldPosition(_v);const ty=hero.localToWorld(rig.restP.Hips.clone()).y+dy;_v.y+=(ty-_v.y)*w;
+  B.Hips.position.copy(B.Hips.parent.worldToLocal(_v));B.Hips.updateMatrixWorld(true);
+  A._l2=true;
+}
+function legClip2Legs(A,w){
+  const L=A.legClip2,R=clipSrc[L.name],B=rig.B;if(!R)return;
+  LEG_BONES.forEach(function(n){const m=L.mirror?mirrorName(n):n;if(!R.S[m]||!B[n]||!R.off[n])return;
+    heroSpace(R.S[m],_rq);if(L.mirror)_rq.set(_rq.x,-_rq.y,-_rq.z,_rq.w);_rq.multiply(R.off[n]).premultiply(_hq);B[n].getWorldQuaternion(_rq2);setWorldQuat(B[n],_rq2.slerp(_rq,w));});
+}
 function applyProc(A,p,w,mv){
   const B=rig.B;mv=mv||0;
   B.LeftFoot.getWorldQuaternion(_fq.L);B.RightFoot.getWorldQuaternion(_fq.R);
@@ -1870,6 +1891,8 @@ function applyProc(A,p,w,mv){
   B.Hips.position.copy(B.Hips.parent.worldToLocal(_v));B.Hips.updateMatrixWorld(true);
   const le=A.legEnd||[.88,1],lc=A.legClip&&clipSrc[A.legClip]&&combo.active?w*(1-sm((p-le[0])/(le[1]-le[0]))):0;
   if(lc>0)legClipHips(A,p,lc);
+  const lc2=A.legClip2&&clipSrc[A.legClip2.name]&&combo.active?w*legClip2W(A,p):0;
+  if(lc2>0)legClip2Apply(A,p,lc2);
   /* torção do quadril e da coluna; yaw positivo gira o peito para a direita */
   rotAxis(B.Hips,fr.up,-yaw*.35*w);
   rotAxis(B.Hips,fr.right,-pitch*.25*w);
@@ -1924,12 +1947,27 @@ function applyProc(A,p,w,mv){
   });
   /* pernas: IK para os pés plantados, joelhos abertos em postura arqueada. Só no chão: no ar as pernas ficam
      com a animação e os pés são replantados onde ela os põe, para a aterrissagem começar do lugar certo */
-  const gnd=1-sm((aboveGround()-.02)/.2),wl=w*gnd*(1-lc);
+  const gnd=1-sm((aboveGround()-.02)/.2),wl=w*gnd*(1-Math.max(lc,lc2));
   if(lc>0){legClipLegs(A,lc);
     /* os pés plantados acompanham as pernas da animação enquanto ela manda; quando ela começa a sair, os pés ficam
        onde ela os deixou e a guarda continua dali (sem escorregar para a pose parada) */
     if(feet.L&&lc>.985*w){feet.L.copy(wp(B.LeftFoot));feet.R.copy(wp(B.RightFoot));feet.L.y=feet.R.y=st.y+feet.y;feet.L.rel=feet.R.rel=null;}
     }
+  if(lc2>0)legClip2Legs(A,lc2);
+  /* passos do tropeço: cada pé é guiado durante o seu passo até a base da guarda, medida onde o corpo vai parar */
+  if(A.endStance&&combo.active&&p>=A.legClip2.w[0]&&feet.L){
+    const hf=new THREE.Vector3(Math.sin(st.rot),0,Math.cos(st.rot)),hr=new THREE.Vector3().crossVectors(hf,UPV);
+    const rem=lungeAt(A,1)-lungeAt(A,p),bx=st.x+hf.x*rem,bz=st.z+hf.z*rem;
+    ['L','R'].forEach(function(k){const sN=k==='L'?'Left':'Right',es=A.endStance[k],sw=A.footSwing[k];
+      const tg=new THREE.Vector3(bx,st.y+feet.y,bz).addScaledVector(hr,es[0]).addScaledVector(hf,es[1]);
+      feet[k].copy(tg);feet[k].rel=null;
+      const u=Math.max(0,Math.min(1,(p-sw[0])/(sw[1]-sw[0])));if(u<=0)return;
+      const t2=tg.clone();t2.y+=Math.sin(Math.PI*u)*.18;
+      B[sN+'Foot'].getWorldQuaternion(_cq);const fq=_cq.clone();
+      ikHinge(B[sN+'UpLeg'],B[sN+'Leg'],B[sN+'Foot'],t2,hf.clone().add(_v.set(0,.3,0)),sm(u)*lc2+(1-lc2)*0,sN+'Leg',true);
+      setWorldQuat(B[sN+'Foot'],fq);
+    });
+  }
   ['Left','Right'].forEach(function(s){
     const k=s[0],sg=s==='Right'?1:-1;
     if(gnd<.999&&feet[k]){feet[k].copy(_animFoot[k]);feet[k].y=st.y+feet.y;}

@@ -487,8 +487,8 @@ const ATT_B=[
    /* pernas da Jump Attack (legClip): agacha, se ergue um pouco (quase sem sair do chão), desce com o bote caindo
       agachado com um pé à frente e, desequilibrado pela força, dá um passo à frente ao se levantar (stumble);
       legMap liga o progresso do golpe ao tempo da animação, legDy limita a altura do quadril */
-   legClip:'jumpatk',legMap:[[0,0],[.3,.25],[.46,.5],[.57,.545],[.65,1.52,'cut'],[.74,1.75],[.8,2.6],[.93,3.05],[1,3.25]],legDy:[-.62,.14],
-   stumble:[.55,.8,.95],
+   legClip:'jumpatk',legMap:[[0,0],[.3,.25],[.46,.5],[.57,.545],[.65,1.52,'cut'],[.72,1.75],[.75,2.6],[.88,3.08],[1,3.2]],legDy:[-.62,.14],
+   stumble:[.55,.75,.88],
    steps:[],
    keys:[
     {t:.18,e:'io',s:[.88,-.3,.12],o:[.88,-.3,.12],yaw:.15,pitch:.3,roll:0,drop:.22,fwd:-.02,side:0},
@@ -1859,7 +1859,7 @@ function applyProc(A,p,w,mv){
   B.Hips.getWorldPosition(_v);
   _v.addScaledVector(fr.up,-pose[9]*L*w).addScaledVector(fr.fwd,pose[10]*L*w).addScaledVector(fr.right,pose[11]*L*w);
   B.Hips.position.copy(B.Hips.parent.worldToLocal(_v));B.Hips.updateMatrixWorld(true);
-  const lc=A.legClip&&clipSrc[A.legClip]&&combo.active?w*(1-sm((p-.9)/.1)):0;
+  const lc=A.legClip&&clipSrc[A.legClip]&&combo.active?w*(1-sm((p-.88)/.12)):0;
   if(lc>0)legClipHips(A,p,lc);
   /* torção do quadril e da coluna; yaw positivo gira o peito para a direita */
   rotAxis(B.Hips,fr.up,-yaw*.35*w);
@@ -1912,8 +1912,9 @@ function applyProc(A,p,w,mv){
      com a animação e os pés são replantados onde ela os põe, para a aterrissagem começar do lugar certo */
   const gnd=1-sm((aboveGround()-.02)/.2),wl=w*gnd*(1-lc);
   if(lc>0){legClipLegs(A,lc);
-    /* os pés plantados acompanham as pernas da animação, para a guarda continuar do mesmo lugar quando ela sair */
-    if(feet.L){feet.L.copy(wp(B.LeftFoot));feet.R.copy(wp(B.RightFoot));feet.L.y=feet.R.y=st.y+feet.y;feet.L.rel=feet.R.rel=null;}}
+    /* os pés plantados acompanham as pernas da animação enquanto ela manda; quando ela começa a sair, os pés ficam
+       onde ela os deixou e a guarda continua dali (sem escorregar para a pose parada) */
+    if(feet.L&&lc>.985*w){feet.L.copy(wp(B.LeftFoot));feet.R.copy(wp(B.RightFoot));feet.L.y=feet.R.y=st.y+feet.y;feet.L.rel=feet.R.rel=null;}}
   ['Left','Right'].forEach(function(s){
     const k=s[0],sg=s==='Right'?1:-1;
     if(gnd<.999&&feet[k]){feet[k].copy(_animFoot[k]);feet[k].y=st.y+feet.y;}

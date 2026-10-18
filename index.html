@@ -23,6 +23,8 @@ canvas{display:block}
 #foesBtn{right:18px;top:calc(76px + env(safe-area-inset-top,0px));bottom:auto}
 #pauseBtn{right:18px;top:calc(138px + env(safe-area-inset-top,0px));bottom:auto}
 #soundBtn{right:18px;top:calc(200px + env(safe-area-inset-top,0px));bottom:auto}
+#godBtn{right:18px;top:calc(262px + env(safe-area-inset-top,0px));bottom:auto}
+#godBtn.on{border-color:#d8b25a;color:#f0d68a}
 #glbMsg{margin-top:8px;font-size:13px;color:var(--bone);opacity:.85}
 #pad{position:fixed;left:22px;bottom:calc(26px + env(safe-area-inset-bottom,0px));width:120px;height:120px;border-radius:50%;border:1px solid #6b5a4a;background:rgba(20,16,16,.45);display:none}
 #knob{position:absolute;left:40px;top:40px;width:40px;height:40px;border-radius:50%;background:#6b5a4a}
@@ -34,7 +36,7 @@ canvas{display:block}
 <div id="dmg"></div>
 <div id="hud">
   <h1>Aethelred, protótipo de blocos</h1>
-  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador. Pule perto de uma pilastra ou parede para escalar (W/S/A/D na parede, Espaço salta dela).<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. M alterna entre o combo novo (B) e o anterior (A). P pausa a personagem (a câmera continua livre). O liga e desliga o som. V troca a versão da voz (original, tratada, criatura).</p>
+  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador. Pule perto de uma pilastra ou parede para escalar (W/S/A/D na parede, Espaço salta dela).<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. G liga e desliga a invencibilidade (os golpes ainda empurram e atordoam, mas a vida não cai). P pausa a personagem (a câmera continua livre). O liga e desliga o som.</p>
   <p id="state">Forma normal</p>
   <p id="vida">Vida 100   Abatidos 0</p>
   <p id="combo"></p>
@@ -47,6 +49,7 @@ canvas{display:block}
 <button class="btn" id="foesBtn">Inimigos: ligados</button>
 <button class="btn" id="pauseBtn">Pausar</button>
 <button class="btn" id="soundBtn">Som: ligado</button>
+<button class="btn" id="godBtn">Invencível: não</button>
 <input type="file" id="glbIn" accept=".glb" hidden>
 <button class="btn" id="morph">Transformar</button>
 
@@ -196,30 +199,23 @@ function audioInit(){
 }
 /* vozes gravadas (pasta sons/): sorteadas sem repetir em seguida; sem os arquivos, fica a voz sintetizada */
 const VOICE_FILES={golpe:['golpe_1','golpe_2','golpe_3','golpe_4'],dor:['dor_1','dor_2'],pulo:['pulo_1'],morte:['morte_1','morte_2']};
-/* três versões das vozes para comparar (tecla V): tratada (compressão, corpo e presença, 2 semitons abaixo),
-   criatura (5 semitons abaixo com timbre mais grave e saturação) e original */
-const VOICE_PRESETS=[{id:'tratada',dir:'sons/tratada/',name:'tratada'},{id:'criatura',dir:'sons/criatura/',name:'criatura'},{id:'original',dir:'sons/',name:'original'}];
-let voicePreset=2;
+const VOICE_DIR='sons/';
 /* volume das vozes gravadas em relação aos efeitos (0,38 ≈ -8,4 dB) */
 const VOICE_GAIN=.38;
 const voiceBuf={},voiceLast={};
 function loadVoices(){
-  const P=VOICE_PRESETS[voicePreset];if(voiceBuf[P.id])return;
-  const B=voiceBuf[P.id]={};
+  if(voiceBuf.loaded)return;voiceBuf.loaded=true;
+  const B=voiceBuf;
   Object.keys(VOICE_FILES).forEach(function(k){
     VOICE_FILES[k].forEach(function(n){
-      fetch(P.dir+n+'.mp3').then(function(r){if(!r.ok)throw 0;return r.arrayBuffer();})
+      fetch(VOICE_DIR+n+'.mp3').then(function(r){if(!r.ok)throw 0;return r.arrayBuffer();})
         .then(function(b){return new Promise(function(ok,no){SFX.ctx.decodeAudioData(b,ok,no);});})
         .then(function(buf){(B[k]=B[k]||[]).push(buf);}).catch(function(){});
     });
   });
 }
-function cycleVoice(){
-  audioInit();voicePreset=(voicePreset+1)%VOICE_PRESETS.length;if(SFX.ctx)loadVoices();
-  comboEl.textContent='Voz: '+VOICE_PRESETS[voicePreset].name;msgHold=2.5;
-}
 function playVoice(k,rate,gain){
-  const L=(voiceBuf[VOICE_PRESETS[voicePreset].id]||{})[k];if(!L||!L.length)return false;
+  const L=voiceBuf[k];if(!L||!L.length)return false;
   let i=Math.floor(Math.random()*L.length);if(L.length>1&&i===voiceLast[k])i=(i+1)%L.length;voiceLast[k]=i;
   const c=SFX.ctx,src=c.createBufferSource(),g=c.createGain();
   src.buffer=L[i];src.playbackRate.value=(rate||1)*(.94+Math.random()*.12);g.gain.value=(gain||1)*VOICE_GAIN;
@@ -320,7 +316,7 @@ soundBtn.onclick=toggleSound;
 let tpose=false;
 const st={x:0,z:8,y:0,vy:0,rot:Math.PI,rotT:Math.PI,yaw:0,pitch:.35,camD:6.5,t:0,speed:0,morph:0,morphOn:false};
 const keys={};const joy={x:0,y:0};
-addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyM')toggleCombo();if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();if(e.code==='KeyV')cycleVoice();});
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyG')toggleGod();if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 const stateEl=document.getElementById('state');
 function toggle(){st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
@@ -369,7 +365,7 @@ pad.addEventListener('pointerup',padEnd);pad.addEventListener('pointercancel',pa
 
 /* controle (DualSense / qualquer controle no layout padrão do navegador)
    analógico esquerdo move, direito gira a câmera; X pula/agarra, Quadrado ou R1 ataca, Triângulo transforma,
-   Círculo solta da parede, L3 ou R2 corre, R3 centraliza a câmera, direcional ↑↓ zoom, ← combo, → voz,
+   Círculo solta da parede, L3 ou R2 corre, R3 centraliza a câmera, direcional ↑↓ zoom, ← invencibilidade,
    Options pausa, Create liga/desliga inimigos, touchpad liga/desliga o som */
 const gp={run:false,jump:false,runLatch:false,prev:[],idx:-1,stick:false};
 const GP_DEAD=.16;
@@ -408,8 +404,7 @@ function pollGamepad(raw){
     if(hit(3))toggle();
     if(hit(1)&&climb)dropFromWall();
   }
-  if(hit(14))toggleCombo();
-  if(hit(15))cycleVoice();
+  if(hit(14))toggleGod();
   if(hit(8))toggleFoes();
   if(hit(17))toggleSound();
   gp.prev=b;
@@ -438,45 +433,7 @@ const GUARD={s:[.78,-.55,.35],o:[.78,-.55,.35],yaw:0,pitch:.34,roll:0,drop:.17,f
 /* Golpes 1 a 4 baseados nas referências: preparação curta enrolando o tronco, golpe de um quadro com o braço todo
    esticado, arcos em diagonal, o tronco gira até ~80° e dobra para frente; o fim de um golpe já prepara o próximo.
    kw/ki/kf: fim da preparação, impacto e fim da continuação (tempo da tabela); tw/tf: as mesmas marcas em tempo real. */
-/* combo A (anterior): golpes 1-4 das referências e salto do Mixamo no final */
-const ATT_A=[
-  {name:'Garra direita em diagonal, de cima para baixo',right:true,dur:.7,tw:.38,tf:.55,hit:.5,chain:.62,kw:.38,ki:.52,kf:.62,dmg:1,range:2.3,arc:2.4,knock:6,lunge:[.45,.36,.6],
-   steps:[{f:'o',t0:.34,t1:.54,to:[.34,.36],lift:.12},{f:'s',t0:.5,t1:.7,to:[.32,-.24],lift:.06}],
-   keys:[
-    {t:.38,e:'io',s:[.55,.98,-.35],o:[.7,-.15,.55],yaw:1.15,pitch:-.08,roll:-.18,drop:.1,fwd:-.06,side:.08},
-    {t:.45,e:'i',s:[.45,.55,.75],o:[.8,-.2,.25],yaw:.55,pitch:.25,roll:-.05,drop:.16,fwd:.04,side:.03},
-    {t:.52,e:'l',s:[-.1,-.25,1.0],o:[.9,-.25,-.25],yaw:-.55,pitch:.68,roll:.14,drop:.27,fwd:.18,side:-.05},
-    {t:.62,e:'o',s:[-.62,-.8,.42],o:[.88,-.3,-.38],yaw:-1.0,pitch:.86,roll:.2,drop:.3,fwd:.16,side:-.08},
-    {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:-.15,pitch:.4,roll:.04,drop:.2,fwd:.05,side:0}]},
-  /* rodopio: spin gira o corpo inteiro (radianos, de t0 a t1) acompanhando a varrida; acerta tudo em volta */
-  {name:'Garra esquerda, rodopio de 360° com o braço esticado',right:false,dur:.9,tw:.36,tf:.66,hit:.6,chain:.64,kw:.38,ki:.58,kf:.64,dmg:1,range:2.5,arc:6.3,knock:7,lunge:[.35,.38,.62],spin:[Math.PI*2,.4,.62],
-   steps:[{f:'s',t0:.6,t1:.72,to:[.36,.3],lift:.1},{f:'o',t0:.64,t1:.8,to:[.32,-.24],lift:.06}],
-   keys:[
-    {t:.38,e:'io',s:[.95,.12,-.5],o:[.6,-.3,.6],yaw:1.35,pitch:.3,roll:-.2,drop:.26,fwd:-.04,side:.12},
-    {t:.45,e:'i',s:[.98,.05,.2],o:[.85,-.25,-.1],yaw:.5,pitch:.34,roll:-.1,drop:.24,fwd:.04,side:.04},
-    {t:.58,e:'l',s:[.9,0,.4],o:[.9,-.25,-.25],yaw:.15,pitch:.36,roll:-.05,drop:.24,fwd:.12,side:0},
-    {t:.64,e:'o',s:[-.6,-.15,.55],o:[.9,-.3,-.4],yaw:-1.0,pitch:.42,roll:.12,drop:.24,fwd:.14,side:-.1},
-    {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:-.1,pitch:.36,roll:0,drop:.18,fwd:.04,side:0}]},
-  {name:'Garra direita, gancho de baixo para cima',right:true,dur:.72,tw:.4,tf:.56,hit:.51,chain:.63,kw:.4,ki:.53,kf:.63,dmg:1,range:2.2,arc:2.0,knock:7,lunge:[.4,.38,.62],
-   steps:[{f:'s',t0:.36,t1:.56,to:[.3,.38],lift:.14},{f:'o',t0:.52,t1:.72,to:[.32,-.2],lift:.06}],
-   keys:[
-    {t:.4,e:'io',s:[.5,-.98,-.32],o:[.75,0,.45],yaw:.75,pitch:.82,roll:.3,drop:.36,fwd:-.02,side:.12},
-    {t:.47,e:'i',s:[.35,-.6,.7],o:[.8,-.1,.15],yaw:.35,pitch:.6,roll:.18,drop:.3,fwd:.08,side:.06},
-    {t:.53,e:'l',s:[.12,.35,.98],o:[.88,-.35,-.25],yaw:-.2,pitch:.1,roll:-.12,drop:.08,fwd:.2,side:-.02},
-    {t:.63,e:'o',s:[-.05,1.0,.32],o:[.9,-.45,-.35],yaw:-.4,pitch:-.25,roll:-.22,drop:.02,fwd:.12,side:-.06},
-    {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:0,pitch:.34,roll:0,drop:.17,fwd:.03,side:0}]},
-  {name:'Garra esquerda por cima, avançando com o corpo inteiro',right:false,dur:.78,tw:.42,tf:.58,hit:.53,chain:.65,kw:.42,ki:.55,kf:.65,dmg:2,range:2.5,arc:1.8,knock:8,lunge:[.75,.4,.64],
-   steps:[{f:'s',t0:.4,t1:.6,to:[.32,.55],lift:.18},{f:'o',t0:.56,t1:.76,to:[.32,-.3],lift:.06}],
-   keys:[
-    {t:.42,e:'io',s:[.35,1.05,-.28],o:[.72,-.1,.5],yaw:.45,pitch:-.35,roll:-.18,drop:.0,fwd:-.1,side:.06},
-    {t:.49,e:'i',s:[.3,.75,.72],o:[.8,-.1,.15],yaw:.25,pitch:.1,roll:-.06,drop:.1,fwd:.06,side:.03},
-    {t:.55,e:'l',s:[.12,-.22,1.0],o:[.88,0,-.35],yaw:-.12,pitch:.9,roll:.1,drop:.34,fwd:.3,side:0},
-    {t:.65,e:'o',s:[-.02,-.92,.55],o:[.88,-.1,-.42],yaw:-.25,pitch:1.05,roll:.12,drop:.4,fwd:.28,side:-.02},
-    {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:0,pitch:.4,roll:0,drop:.2,fwd:.05,side:0}]},
-  /* golpe final com animação do Mixamo (salto girando no ar); c0 e c1 recortam a animação em segundos */
-  {name:'Golpe final: salto girando no ar',right:true,clip:'finisher',c0:.3,c1:2.2,speed:1.1,hit:.6,chain:1,kw:.47,ki:.6,kf:.71,dmg:3,range:2.9,arc:3.6,knock:13,finisher:true,keys:[],steps:[]}
-];
-/* combo B (atual): escalada de ritmo e peso, tudo no mesmo estilo, e cada golpe termina na pose
+/* combo de garras: escalada de ritmo e peso, tudo no mesmo estilo, e cada golpe termina na pose
    em que o próximo começa a preparação (o tronco já fica torcido para o lado do braço seguinte).
    both: as duas mãos golpeiam juntas. */
 const ATT_B=[
@@ -557,7 +514,7 @@ function evalPose(A,start,p,out){
   for(let n=0;n<POSE_N;n++)out[n]=crs(p0[n],p1[n],p2[n],p3[n],u);
   return out;
 }
-ATT_A.concat(ATT_B,[RUN_ATT]).forEach(function(A){
+ATT_B.concat([RUN_ATT]).forEach(function(A){
   A.abs=A.keys.map(function(k){return toAbs(k,A.right);});
   if(A.clip){A.dur=(A.c1-A.c0)/A.speed;A.tw=A.kw;A.tf=A.kf;}
 });
@@ -587,12 +544,6 @@ function startAttack(i,A){
     else st.rotT=st.rot;
   }
   comboEl.textContent=A.run?A.name:'Golpe '+(i+1)+' de '+ATT.length+': '+A.name;
-}
-function toggleCombo(){
-  ATT=ATT===ATT_B?ATT_A:ATT_B;
-  combo.active=false;combo.i=-1;combo.hold=0;combo.grace=0;
-  comboEl.textContent=ATT===ATT_B?'Combo B (novo): abertura, revés, varrida, rodopio e bote':'Combo A (anterior): golpes das referências e salto do Mixamo';
-  combo.cool=.3;msgHold=2.5;
 }
 function attack(){
   if(paused||death||climb)return;
@@ -702,9 +653,14 @@ function hitEnemies(A){
    atordoamento curto, clarão vermelho, tremor e vibração) */
 const HIT_LOCK=.35,HIT_DUR=.6;
 let hitR=null;
+/* invencibilidade (G, botão ou ← no direcional): a vida não cai, mas o golpe ainda interrompe, empurra e atordoa */
+let god=false;
+const godBtn=document.getElementById('godBtn');
+function toggleGod(){god=!god;godBtn.textContent='Invencível: '+(god?'sim':'não');godBtn.classList.toggle('on',god);godBtn.blur();}
+godBtn.onclick=toggleGod;
 const dmgEl=document.getElementById('dmg');
 function takeHit(fx,fz,dmg){
-  hp-=dmg;hurt=.6;
+  if(!god)hp-=dmg;hurt=.6;
   SOUND.voice('pain');SOUND.impact(false);rumble(1,.45,240);
   shake=Math.max(shake,.3);hitStop=Math.max(hitStop,.045);
   const snap=(combo.active&&baseBones)?snapBones():null;
@@ -785,7 +741,7 @@ function updateCombat(dt){
   }
   if(hp<=0&&!death){if(!startDeath())respawn();}
   if(death){death.t+=dt;if(death.t>death.dur+1.6)respawn();}
-  const txt=death?'Você caiu.':msgT>0?'Recomeçando.':'Vida '+Math.max(0,Math.ceil(hp))+'   Abatidos '+kills;
+  const txt=death?'Você caiu.':msgT>0?'Recomeçando.':'Vida '+Math.max(0,Math.ceil(hp))+(god?' (invencível)':'')+'   Abatidos '+kills;
   if(vidaEl.textContent!==txt)vidaEl.textContent=txt;
   vidaEl.style.color=hurt>0?'#ff6a6a':'';
 }
@@ -1767,7 +1723,7 @@ function tick(raw){
 }
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,0);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
+window.AETH={toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,get rig(){return rig;},get custom(){return custom;},cam:cam};
 frame();
 })();
 </script>

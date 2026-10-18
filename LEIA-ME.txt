@@ -30,7 +30,7 @@ qualquer botão com a página aberta (Chrome/Edge recomendados).
   X: pular / agarrar parede / saltar da parede   |  Círculo: soltar da parede
   Quadrado ou R1: atacar (correndo: chute voador) |  Triângulo: transformar
   L3 (clique) ou R2 segurado: correr              |  Direcional ↑/↓: zoom
-  Direcional ←: trocar combo   |  Direcional →: trocar voz
+  Direcional ←: invencibilidade
   Options: pausar   |  Create: ligar/desligar inimigos   |  Touchpad (clique): som
   O controle vibra ao acertar um golpe e ao levar dano.
 
@@ -40,7 +40,8 @@ esquerda e botões à direita.
 
 Testes: I (ou o botão "Inimigos") liga e desliga os inimigos; T coloca a
 personagem na posição T, com dedos esticados, e T de novo volta ao jogo;
-M alterna entre o combo B (atual) e o combo A (anterior); P (ou o botão
+G (ou o botão "Invencível") liga e desliga a invencibilidade: a vida não cai, mas os
+golpes dos inimigos continuam interrompendo, empurrando e atordoando; P (ou o botão
 "Pausar") congela a personagem e os inimigos, com a câmera livre para girar e dar zoom;
 O (ou o botão "Som") liga e desliga o som.
 
@@ -52,22 +53,18 @@ dano). Os parâmetros ficam no objeto SOUND do index.html.
 Vozes gravadas: se existirem os arquivos sons/golpe_1..4.mp3, dor_1..2.mp3, pulo_1.mp3 e
 morte_1..2.mp3, eles substituem a voz sintetizada (sorteados, sem repetir em seguida, com
 leve variação de tom). Sem os arquivos, o jogo usa a voz sintetizada.
-A tecla V alterna entre três versões: sons/tratada/ (compressão, corpo, presença, 2 semitons
-abaixo), sons/criatura/ (5 semitons abaixo, timbre mais grave, saturação) e sons/ (original).
 
 Estado de combate: começa no primeiro ataque e dura 4,5 s (COMBAT_HOLD) depois do último
 golpe. Nesse tempo a personagem fica em guarda, inclusive andando (caminhada agachada a
 2,8 m/s, com os pés seguindo a caminhada e o quadril baixo); correr ou pular suspende a
 guarda, que volta ao desacelerar ou aterrissar.
 
-Combate: dois combos de 5 golpes, alternados com a tecla M.
-- Combo B (atual, tabela ATT_B): abertura rápida, revés de baixo para cima,
+Combate: combo de 5 golpes (tabela ATT_B): abertura rápida, revés de baixo para cima,
   varrida pesada, salto girando com a garra esquerda em arco aberto (corpo da
   animação Sword And Shield Slash, braço esquerdo por cima via arcL) e bote com
   as duas garras. Ritmo e peso crescem
   a cada golpe, e cada golpe termina na pose em que o próximo começa.
-- Combo A (anterior, tabela ATT_A): golpes baseados nas referências e o salto do
-  Mixamo como golpe final. Os golpes são animados por código sobre o esqueleto,
+Os golpes são animados por código sobre o esqueleto,
 com IK de braços e pernas que respeita a dobra natural do cotovelo e do joelho.
 Os valores de cada golpe ficam na tabela ATT do index.html: dur é a duração em
 segundos, tw é a fração do tempo gasta na preparação e tf a fração em que o golpe
@@ -84,7 +81,7 @@ Animações do Mixamo (pasta animacoes/):
   dedos sob controle do jogo (garras) e transformando o avanço do quadril em
   movimento do corpo. Um golpe do combo usa a animação quando tem clip, c0/c1
   (recorte em segundos) e speed na tabela ATT.
-- Hoje: o golpe final do combo A usa "Sword And Shield Slash" (salto girando no ar)
+- Hoje: o golpe 4 usa o corpo da "Sword And Shield Slash" (salto girando no ar)
   e o ataque em corrida usa "Flying Kick" (tabela RUN_ATT).
 - Morte: cinco animações "Dying" (dying_1 a dying_5, lista DEATHS), sorteadas como um
   baralho: todas saem antes de repetir e nunca a mesma duas vezes seguidas.

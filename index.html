@@ -1436,6 +1436,34 @@ function loadBinary(url,onBuf,onFail,onProg){
   }
   tryLoad(0);
 }
+/* forma normal dos braços: bracos_normais.bin (gerado a partir do próprio modelo) guarda, para os vértices dos braços,
+   o deslocamento que recolhe as garras e os espetos de osso e encurta/arredonda os dedos, e uma cor que tinge as
+   partes de osso com o tom da pele. Vira um morph target (peso 1 = braços normais) e uma cor por vértice; a
+   transformação (st.morph) faz as garras crescerem de volta.
+   Formato: n (uint32), índices (uint32 × n), deslocamentos (float32 × 3n), cor (uint8 × 3n) */
+let armForm=null;
+function loadArmForms(root){
+  let mesh=null;root.traverse(function(o){if(o.isSkinnedMesh&&!mesh)mesh=o;});if(!mesh)return;
+  loadBinary('bracos_normais.bin',function(buf){
+    const g=mesh.geometry,nv=g.attributes.position.count,n=new Uint32Array(buf,0,1)[0];
+    const idx=new Uint32Array(buf,4,n),dl=new Float32Array(buf,4+4*n,3*n),tc=new Uint8Array(buf,4+16*n,3*n);
+    if(idx[n-1]>=nv)return;
+    const md=new Float32Array(nv*3);for(let i=0;i<n;i++){md[idx[i]*3]=dl[i*3];md[idx[i]*3+1]=dl[i*3+1];md[idx[i]*3+2]=dl[i*3+2];}
+    g.morphAttributes.position=[new THREE.BufferAttribute(md,3)];g.morphTargetsRelative=true;
+    const col=new Float32Array(nv*3).fill(1);g.setAttribute('color',new THREE.BufferAttribute(col,3));
+    [].concat(mesh.material).forEach(function(mm){mm.morphTargets=true;mm.vertexColors=true;mm.needsUpdate=true;});
+    mesh.updateMorphTargets();
+    armForm={mesh:mesh,idx:idx,tc:tc,col:col,last:-1};applyArmForm();
+  },function(){});
+}
+function applyArmForm(){
+  if(!armForm)return;
+  const k=1-st.morph;if(Math.abs(k-armForm.last)<.002)return;armForm.last=k;
+  armForm.mesh.morphTargetInfluences[0]=k;
+  const c=armForm.col,idx=armForm.idx,tc=armForm.tc;
+  for(let i=0;i<idx.length;i++){const j=idx[i]*3;c[j]=1+(tc[i*3]/255-1)*k;c[j+1]=1+(tc[i*3+1]/255-1)*k;c[j+2]=1+(tc[i*3+2]/255-1)*k;}
+  armForm.mesh.geometry.attributes.color.needsUpdate=true;
+}
 /* carrega o modelo que acompanha o jogo */
 loadBinary('aethelred_rig_leve.glb',function(buf){parseGLB(buf,'aethelred_rig_leve.glb');},
   function(){say('Não encontrei o modelo da personagem. Arraste um arquivo .glb para a tela ou toque em “Carregar modelo GLB”.');},
@@ -1467,6 +1495,7 @@ function useModel(gltf,name){
   m.scale.multiplyScalar(kk);
   m.position.x-=c.x*kk;m.position.z-=c.z*kk;m.position.y-=box.min.y*kk;
   m.traverse(function(o){if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;[].concat(o.material).forEach(function(mm){if(mm.metalness>.3)mm.metalness=.3;});}});
+  if(/aethelred_rig_leve/.test(name))loadArmForms(m);
   custom.add(m);hero.add(custom);hero.updateMatrixWorld(true);buildRig(m);
   hero.children.forEach(function(o){if(o!==custom&&o!==slash)o.visible=false;});
   renderer.outputEncoding=THREE.sRGBEncoding;
@@ -2275,6 +2304,7 @@ function tick(raw){
   updateTrail(dt,clawBase,clawTip,combo.active&&A&&pp>A.kw+.04&&pp<A.kf+.04);
   /* transformação */
   st.morph+=((st.morphOn?1:0)-st.morph)*Math.min(1,dt*6);
+  applyArmForm();
   arms.forEach(a=>{
     a.normal.visible=st.morph<.5;a.blight.visible=st.morph>=.5;
     const k=.6+.4*Math.min(1,(st.morph-.5)*2);
@@ -2306,7 +2336,7 @@ function tick(raw){
 }
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,get rig(){return rig;},get custom(){return custom;},cam:cam};
+window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},get rig(){return rig;},get custom(){return custom;},cam:cam};
 frame();
 })();
 </script>

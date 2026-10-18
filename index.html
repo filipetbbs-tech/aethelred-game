@@ -925,9 +925,27 @@ function endClimb(pos,rot,snap){
 let climbOut=null,climbCD=0;
 /* mortal para trás ao saltar da parede */
 const FLIP_DUR=.62;
+/* trecho da Stylish Flip usado: do balanço (cabeça caindo para trás) até a aterrissagem agachada */
+const SFLIP={c0:.35,c1:1.6,land:1.27,speed:1.2};
 let flip=null;
+function sflipDur(){return (SFLIP.c1-SFLIP.c0)/SFLIP.speed;}
+function poseFlipClip(dt){
+  const T=flip,R=clipSrc.sflip,k=Math.min(1,T.t/sflipDur()),ct=SFLIP.c0+(SFLIP.c1-SFLIP.c0)*k;
+  /* origem da personagem desce do ponto do salto até o chão, para a aterrissagem da animação cair no chão */
+  if(T.dy0===undefined){R.action.time=SFLIP.c0;R.mixer.update(0);R.src.updateMatrixWorld(true);T.dy0=(hero.worldToLocal(R.S.Hips.getWorldPosition(new THREE.Vector3())).y-R.hips0.y)*R.scale;}
+  const g=groundY(st.x,st.z),kl=Math.min(1,(ct-SFLIP.c0)/(SFLIP.land-SFLIP.c0));
+  st.y=(T.y0-T.dy0)+(g-(T.y0-T.dy0))*kl;st.vy=0;
+  hero.position.set(st.x,st.y,st.z);hero.rotation.y=st.rot;hero.updateMatrixWorld(true);
+  const rm=applyClip('sflip',ct,1);
+  if(rm&&T.rmPrev){const dx=rm.x-T.rmPrev.x,dz=rm.z-T.rmPrev.z,c=Math.cos(st.rot),sn=Math.sin(st.rot);st.x+=dx*c+dz*sn;st.z+=-dx*sn+dz*c;}
+  if(rm)T.rmPrev=rm;
+  /* ainda virado para a parede no impulso: o corpo gira 180° nos primeiros 0,25 s */
+  rotAxis(rig.B.Hips,UPV,-Math.PI*(1-sm(T.t/.25)));
+  if(T.I&&T.I.snap){T.I.t+=dt;inertBlend(T.I,.2);}
+  if(!T.landed&&ct>=SFLIP.land){T.landed=true;SOUND.land();shake=Math.max(shake,.12);}
+}
 function poseFlip(dt){
-  if(!flip||!rig)return;
+  if(!flip||!rig||flip.clip)return;
   const B=rig.B,k=Math.min(1,flip.t/FLIP_DUR);
   /* giro acelera no meio e desacelera para a aterrissagem; eixo lateral do corpo (o peito vai para trás) */
   const ang=Math.PI*2*(k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2);
@@ -973,6 +991,11 @@ function updateClimb(dt,ix,iz,spaceDown){
     endClimb(out,Math.atan2(-F.n.x,-F.n.z),snapBones());
     st.vy=7.6;st.vx=F.n.x*4.2;st.vz=F.n.z*4.2;SOUND.voice('jump');SOUND.whoosh&&SOUND.whoosh(1.2);
     flip={t:0};
+    if(clipSrc.sflip){
+      /* com a Stylish Flip: de costas para a parede, a animação faz o mortal e a descida até o chão */
+      st.vy=0;st.vx=st.vz=0;st.rot=st.rotT=Math.atan2(F.n.x,F.n.z);
+      flip={t:0,clip:true,y0:st.y,rmPrev:null,I:{snap:climbOut?climbOut.snap:null,off:null,t:0}};climbOut=null;
+    }
     return;
   }
   const run=runHeld(),sp=CLIMB_SPEED*(run?1.4:1);
@@ -1148,7 +1171,7 @@ function findAct(re){for(const k in acts){if(re.test(k))return acts[k];}return n
 /* animações do Mixamo (pasta animacoes/), transferidas para o esqueleto da personagem por retarget:
    cada osso copia a rotação do osso de mesmo nome no esqueleto do Mixamo, no espaço do personagem,
    descontando a diferença entre as poses de repouso dos dois esqueletos */
-const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'},die1:{file:'animacoes/dying_1.glb'},die2:{file:'animacoes/dying_2.glb'},die3:{file:'animacoes/dying_3.glb'},die4:{file:'animacoes/dying_4.glb'},die5:{file:'animacoes/dying_5.glb'},crawl:{file:'animacoes/running_crawl.glb'},hang:{file:'animacoes/braced_hang_to_crouch.glb'},aerial:{file:'animacoes/aerial_evade.glb'},qroll:{file:'animacoes/quick_roll_to_run.glb'}};
+const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'},die1:{file:'animacoes/dying_1.glb'},die2:{file:'animacoes/dying_2.glb'},die3:{file:'animacoes/dying_3.glb'},die4:{file:'animacoes/dying_4.glb'},die5:{file:'animacoes/dying_5.glb'},crawl:{file:'animacoes/running_crawl.glb'},hang:{file:'animacoes/braced_hang_to_crouch.glb'},aerial:{file:'animacoes/aerial_evade.glb'},qroll:{file:'animacoes/quick_roll_to_run.glb'},sflip:{file:'animacoes/stylish_flip.glb'}};
 const clipSrc={};
 function loadClips(){
   Object.keys(CLIPS).forEach(function(name){
@@ -1690,7 +1713,7 @@ function updateModel(dt){
     let jMid=acts['jump']||null;
     if(!jMid)for(const k in acts)if(/jump/.test(k)&&!/start|land/.test(k)){jMid=acts[k];break;}
     const any=acts[Object.keys(acts)[0]];
-    const air=!climb&&aboveGround()>.03;
+    const air=!climb&&!(flip&&flip.clip)&&aboveGround()>.03;
     if(air&&!wasAir){playAct(jStart||jMid,true);}
     else if(air&&jStart&&jMid&&curAct===jStart&&jStart.time>=jStart.getClip().duration-.05){playAct(jMid,false);}
     if(!air&&wasAir&&jLand){playAct(jLand,true);landT=jLand.getClip().duration-.12;st.speed=0;st.vx=st.vz=0;}
@@ -1709,6 +1732,7 @@ function updateModel(dt){
     hero.updateMatrixWorld(true);
     if(death&&clipSrc[death.name]){poseDeath();return;}
     if(dodge){poseDodge(dt);detectSteps(dt);return;}
+    if(flip&&flip.clip&&clipSrc.sflip){poseFlipClip(dt);return;}
     if(climb&&clipSrc.crawl){poseClimb(dt);detectSteps(dt);return;}
     if(window.CLIP_PREVIEW&&clipSrc[CLIP_PREVIEW.name]){applyClip(CLIP_PREVIEW.name,CLIP_PREVIEW.t,1);poseHands();return;}
     poseFull();
@@ -1774,7 +1798,9 @@ function tick(raw){
     if(Math.hypot(ix,iz)>.3&&combo.t/combo.cur.dur>.8&&!combo.queued&&!combo.cur.clip){combo.active=false;combo.pose=pose.slice();combo.grace=.35;combo.hold=0;}
     else{ix=0;iz=0;}
   }
-  if(flip){flip.t+=dt;ix=0;iz=0;if(flip.t>=FLIP_DUR||(flip.t>.15&&aboveGround()<.02))flip=null;}
+  if(flip){flip.t+=dt;ix=0;iz=0;st.vx=st.vz=0;
+    if(flip.clip){if(flip.t>=sflipDur()){st.y=groundY(st.x,st.z);st.vy=0;climbOut={snap:snapBones(),off:null,t:0};flip=null;landT=0;wasAir=false;plantFeet();}}
+    else if(flip.t>=FLIP_DUR||(flip.t>.15&&aboveGround()<.02))flip=null;}
   if(dodgeKey){dodgeKey=false;if(!climb)startDodge(ix,iz);}
   if(dodge){
     dodge.t+=dt;ix=0;iz=0;
@@ -1800,7 +1826,7 @@ function tick(raw){
   climbCD-=dt;
   if(spaceDown&&tryClimb(1.15,.3)){updateModel(dt);return;}
   /* no meio do pulo: agarra a parede ao encostar nela, indo ou olhando na direção dela */
-  if(aboveGround()>.25){
+  if(aboveGround()>.25&&!flip){
     let mx=0,mz=0;if(Math.hypot(ix,iz)>.1){mx=-Math.sin(st.yaw)*iz+Math.cos(st.yaw)*ix;mz=-Math.cos(st.yaw)*iz-Math.sin(st.yaw)*ix;}
     if(tryClimb(.75,.25,mx,mz)){updateModel(dt);return;}
   }

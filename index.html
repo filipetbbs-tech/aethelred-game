@@ -934,7 +934,7 @@ function poseFlipRev(dt){
   const T=flip,k=Math.min(1,T.t/flipRevDur()),ct=FLIPREV.c0+(FLIPREV.c1-FLIPREV.c0)*k,R=clipSrc.sflip;
   /* altura: a origem fica onde o salto começou menos a altura do quadril no primeiro quadro; a subida e o giro vêm da animação */
   if(T.dy0===undefined){R.action.time=FLIPREV.c0;R.mixer.update(0);R.src.updateMatrixWorld(true);T.dy0=(hero.worldToLocal(R.S.Hips.getWorldPosition(new THREE.Vector3())).y-R.hips0.y)*R.scale;}
-  st.y=T.y0-T.dy0;st.vy=0;hero.position.set(st.x,st.y,st.z);hero.rotation.y=st.rot;hero.updateMatrixWorld(true);
+  st.y=T.y0-T.dy0;st.vy=0;hero.position.set(st.x,st.y,st.z);hero.rotation.set(0,st.rot,0);hero.updateMatrixWorld(true);
   const rm=applyClip('sflip',ct,1);
   if(rm&&T.rmPrev){const dx=rm.x-T.rmPrev.x,dz=rm.z-T.rmPrev.z,c=Math.cos(st.rot),sn=Math.sin(st.rot);st.x+=dx*c+dz*sn;st.z+=-dx*sn+dz*c;}
   if(rm)T.rmPrev=rm;
@@ -965,6 +965,12 @@ const TOP_SPEED=1.15,TOP_UP=.35,TOP_LEDGE=1.65;
 function updateClimb(dt,ix,iz,spaceDown){
   const C=climb;C.t+=dt;
   const F=wallFrame(C);
+  /* segurança: se o estado da escalada ficar incoerente (longe da parede que deveria estar segurando, ou valores
+     inválidos), sai da escalada em pé no chão em vez de ficar presa na orientação da parede */
+  const off=hero.position.clone().sub(F.p);off.y=0;
+  if(!C.mantle&&C.t>.3&&(!isFinite(C.y)||!isFinite(hero.position.x)||off.length()>1.6)){
+    const out=F.p.clone().addScaledVector(F.n,.6);out.y=groundY(out.x,out.z);endClimb(out,Math.atan2(-F.n.x,-F.n.z),snapBones());return;
+  }
   if(C.mantle){
     const M=C.mantle;M.t+=dt;
     const dur1=clipSrc.hang.clip.duration/TOP_SPEED;
@@ -1809,7 +1815,7 @@ function tick(raw){
     dodge.t+=dt;ix=0;iz=0;
     if(dodge.t>=dodgeDur()){if(dodge.D.roll&&rig){
       /* passa o giro do quadril para a direção da personagem sem mudar a pose vista */
-      rotAxis(rig.B.Hips,UPV,-(dodge.phi||0));st.rot=st.rotT=st.rot+(dodge.phi||0);hero.rotation.y=st.rot;hero.updateMatrixWorld(true);}climbOut={snap:snapBones(),off:null,t:0};dodge=null;plantFeet();}
+      rotAxis(rig.B.Hips,UPV,-(dodge.phi||0));st.rot=st.rotT=st.rot+(dodge.phi||0);hero.rotation.set(0,st.rot,0);hero.updateMatrixWorld(true);}climbOut={snap:snapBones(),off:null,t:0};dodge=null;plantFeet();}
   }
   /* recuperação da aterrissagem: parado até a animação de pouso terminar */
   const landing=landT>0&&!climb;
@@ -1855,7 +1861,9 @@ function tick(raw){
   updateComboState(dt);
   resolve();
   updateCombat(dt);
-  hero.position.set(st.x,st.y,st.z);hero.rotation.y=st.rot;
+  /* fora da escalada a personagem fica sempre em pé: só a direção (rot) varia. Zera qualquer inclinação que tenha
+     sobrado de outro estado (parede, transição interrompida), senão ela andaria deitada para sempre */
+  hero.position.set(st.x,st.y,st.z);hero.rotation.set(0,st.rot,0);
   updateModel(dt);
   hitFlash();
   const A=combo.cur,pp=combo.active&&A?progA(A,combo.t):0;

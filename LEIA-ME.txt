@@ -41,6 +41,13 @@ com a "Standing Melee Attack Backhand" (0,45 a 1,9 s, bh* na tabela GRAB): segur
 pela cabeça, gira o braço esquerdo num revés e solta quando a mão passa pela frente. Solta se outro inimigo acertar a personagem. Sem inimigo ao alcance, completa o puxão no vazio.
 Parâmetros na tabela GRAB do index.html. O R1 deixou de atacar (ataque só no Quadrado).
 
+Inimigo arremessador (cor de ferrugem, um pouco maior, vida 5): nasce menos — no máximo um
+vivo, 30% das vezes que um inimigo nasce. Chegando perto, anuncia o agarrão (para, ergue os
+braços e pisca em laranja por 0,6 s; dá para esquivar). Se o herói ainda estiver ao alcance,
+agarra e arremessa: o herói usa a "Getting Thrown" (segurado, voa, cai com 15 de dano — zero
+com invencibilidade — e se levanta), sem controle e imune a outros golpes até ficar de pé.
+Parâmetros na tabela THROWN do index.html.
+
 Dano: quando um inimigo acerta, o golpe em andamento é cortado e o combo volta ao primeiro
 golpe. A personagem leva um tranco na direção do golpe (tronco e cabeça vão para trás, braços
 ficam para trás do corpo, joelhos cedem; de lado o tronco gira), recua uns 45 cm e fica

@@ -31,7 +31,7 @@ canvas{display:block}
 <body>
 <div id="hud">
   <h1>Aethelred, protótipo de blocos</h1>
-  <p>WASD move, Shift corre, Espaço pula.<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. C alterna entre o combo novo (B) e o anterior (A). P pausa a personagem (a câmera continua livre).</p>
+  <p>WASD move, Shift corre, Espaço pula.<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. M alterna entre o combo novo (B) e o anterior (A). P pausa a personagem (a câmera continua livre).</p>
   <p id="state">Forma normal</p>
   <p id="vida">Vida 100   Abatidos 0</p>
   <p id="combo"></p>
@@ -180,7 +180,7 @@ const arms=[-1,1].map(s=>{
 let tpose=false;
 const st={x:0,z:8,y:0,vy:0,rot:Math.PI,rotT:Math.PI,yaw:0,pitch:.35,camD:6.5,t:0,speed:0,morph:0,morphOn:false};
 const keys={};const joy={x:0,y:0};
-addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyC')toggleCombo();if(e.code==='KeyP')togglePause();});
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyM')toggleCombo();if(e.code==='KeyP')togglePause();});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 const stateEl=document.getElementById('state');
 function toggle(){st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
@@ -327,6 +327,7 @@ const ATT_B=[
   {name:'Golpe final: bote com as duas garras',right:true,both:true,dur:1.2,tw:.48,tf:.7,hit:.66,chain:1,kw:.52,ki:.66,kf:.76,dmg:4,range:3.0,arc:6.3,knock:14,finisher:true,lunge:[1.3,.48,.66],
    steps:[{f:'s',t0:.48,t1:.66,to:[.3,.26],lift:.42},{f:'o',t0:.48,t1:.68,to:[.32,-.16],lift:.36}],
    keys:[
+    {t:.18,e:'io',s:[.88,-.3,.12],o:[.88,-.3,.12],yaw:.15,pitch:.3,roll:0,drop:.22,fwd:-.02,side:0},
     {t:.4,e:'io',s:[.5,.95,-.35],o:[.5,.95,-.35],yaw:.3,pitch:.15,roll:0,drop:.3,fwd:-.08,side:0},
     {t:.52,e:'o',s:[.45,1.0,-.2],o:[.45,1.0,-.2],yaw:.2,pitch:-.35,roll:0,drop:-.3,fwd:.02,side:0},
     {t:.58,e:'io',s:[.35,.9,.25],o:[.35,.9,.25],yaw:.1,pitch:-.15,roll:0,drop:-.34,fwd:.1,side:0},
@@ -334,7 +335,7 @@ const ATT_B=[
     {t:.76,e:'o',s:[-.5,-.95,.5],o:[-.5,-.95,.5],yaw:0,pitch:1.1,roll:0,drop:.46,fwd:.28,side:0},
     {t:1,e:'io',s:GUARD.s,o:GUARD.o,yaw:0,pitch:.4,roll:0,drop:.2,fwd:.05,side:0}]}
 ];
-/* combo em uso: a tecla C alterna entre o B (atual) e o A (anterior) */
+/* combo em uso: a tecla M alterna entre o B (atual) e o A (anterior) */
 let ATT=ATT_B,msgHold=0;
 /* tempo real -> tempo da tabela: a preparação ocupa até tw do golpe, o golpe e a continuação vão até tf */
 function progA(A,t){
@@ -821,6 +822,20 @@ function ikHinge(A,Bn,C,target,pole,w,key){
   if(e.lengthSq()>1e-10&&pp.lengthSq()>1e-10)rotAxis(A,d,Math.atan2(_x.crossVectors(e,pp).dot(d),e.dot(pp)));
   if(w<1){A.quaternion.copy(qa.slerp(A.quaternion,w));Bn.quaternion.copy(qb.slerp(Bn.quaternion,w));A.updateMatrixWorld(true);}
 }
+/* a mão nunca passa por dentro do tronco ou da cabeça: ao cruzar o corpo fica à frente do peito, atrás das costas
+   é empurrada para fora, e nunca chega perto demais do ombro (o que dobraria o braço ao meio).
+   x para fora do ombro, y para cima, z para frente, em comprimentos de braço */
+const _sh=[0,0,0];
+function safeHand(x,y,z){
+  const band=sm((y+1.15)/.2)*(1-sm((y-.85)/.2));
+  const cross=sm((.1-x)/.6);
+  z=z+(Math.max(z,.2+.25*cross)-z)*band*sm((.1-x)/.25);
+  const back=sm(-z/.25);
+  x=x+(Math.max(x,.3)-x)*back*band;
+  const r=Math.hypot(x,y,z);
+  if(r<.45&&r>1e-4){const k=.45/r;x*=k;y*=k;z*=k;}
+  _sh[0]=x;_sh[1]=y;_sh[2]=z;return _sh;
+}
 const fr={fwd:new THREE.Vector3(),right:new THREE.Vector3(),up:new THREE.Vector3(0,1,0)};
 function updateFrame(){
   custom.getWorldQuaternion(_wq);
@@ -950,7 +965,8 @@ function applyProc(A,p,w){
   ['Right','Left'].forEach(function(s){
     const o=s==='Right'?0:3,out=s==='Right'?rY:rY.clone().negate();
     const sh=wp(B[s+'Arm']);
-    _tg.copy(sh).addScaledVector(out,pose[o]*rig.armLen).addScaledVector(fr.up,pose[o+1]*rig.armLen).addScaledVector(fY,pose[o+2]*rig.armLen);
+    const hx=safeHand(pose[o],pose[o+1],pose[o+2]);
+    _tg.copy(sh).addScaledVector(out,hx[0]*rig.armLen).addScaledVector(fr.up,hx[1]*rig.armLen).addScaledVector(fY,hx[2]*rig.armLen);
     /* clavícula puxa um pouco na direção do golpe */
     const cl=wp(B[s+'Shoulder']),from=sh.clone().sub(cl).normalize(),to=_tg.clone().sub(cl).normalize();
     aimBone(B[s+'Shoulder'],from,from.clone().lerp(to,.22*w).normalize());

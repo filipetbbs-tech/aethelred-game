@@ -16,10 +16,10 @@ esquerda e botões à direita.
 
 Testes: I (ou o botão "Inimigos") liga e desliga os inimigos; T coloca a
 personagem na posição T, com dedos esticados, e T de novo volta ao jogo;
-C alterna entre o combo B (atual) e o combo A (anterior); P (ou o botão
+M alterna entre o combo B (atual) e o combo A (anterior); P (ou o botão
 "Pausar") congela a personagem e os inimigos, com a câmera livre para girar e dar zoom.
 
-Combate: dois combos de 5 golpes, alternados com a tecla C.
+Combate: dois combos de 5 golpes, alternados com a tecla M.
 - Combo B (atual, tabela ATT_B): abertura rápida, revés de baixo para cima,
   varrida pesada, rodopio de 360° e bote com as duas garras. Ritmo e peso crescem
   a cada golpe, e cada golpe termina na pose em que o próximo começa.

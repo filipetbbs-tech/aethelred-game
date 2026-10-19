@@ -86,6 +86,22 @@ ok=np.isfinite(dd_);ii_=np.where(ok,ii_,0)
 dots=((PC[ii_]-Q2[cand][:,None,:])*Nw[cand][:,None,:]).sum(2)
 covered=(ok&(dots>-.004)).sum(1)>=3
 capeHide=np.zeros(len(Q2),bool);capeHide[cand[covered]]=True
+# o resto da capa do humano também sai (senão as tiras ficam presas às pernas e ao quadril e esticam com o corpo);
+# só fica a faixa da frente do peito, que a capa antiga não cobre. Eixos do corpo pelo esqueleto (o espaço é inclinado)
+_hip=BP[bi['Hips']];_up=BP[bi['Neck']]-_hip;_hn=nrm(_up);_up/=_hn
+_rt=BP[bi['LeftArm']]-BP[bi['RightArm']];_rt-=(_rt@_up)*_up;_rt/=nrm(_rt)
+_fw=np.cross(_rt,_up);_toe=BP[bi['LeftToeBase']]-BP[bi['LeftFoot']]
+if _toe@_fw<0:_fw=-_fw
+_h=(Q2-_hip)@_up/_hn;_f=(Q2-_hip)@_fw
+scarf=(_h>.55)&(_f>0)
+capeHide|=capeNewRaw&~scarf&~arm&~extra
+# fecha as tiras que sobram no meio da capa escondida (dilata e erode pela superfície)
+_A,_inv,_n=_adj(Q2,I2);_m=np.zeros(_n,bool);_m[_inv[capeHide]]=True
+for _ in range(6):_m=_m|((_A@_m.astype(float))>0)
+_o=~_m
+for _ in range(6):_o=_o|((_A@_o.astype(float))>0)
+capeHide|=(~_o)[_inv]&~scarf&~arm&~extra
+print('altura/frente ok', round(float(_h.max()),2))
 print('capa antiga',capeOld.sum(),'capa humana escondida',capeHide.sum())
 def _bits(m):return base64.b64encode(np.packbits(m.astype(np.uint8),bitorder='little').tobytes()).decode()
 blobs=[];views=[];accs=[]

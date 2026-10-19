@@ -23,6 +23,7 @@ canvas{display:block}
 #foesBtn{right:18px;top:calc(76px + env(safe-area-inset-top,0px));bottom:auto}
 #pauseBtn{right:18px;top:calc(138px + env(safe-area-inset-top,0px));bottom:auto}
 #soundBtn{right:18px;top:calc(200px + env(safe-area-inset-top,0px));bottom:auto}
+#musicBtn{right:18px;top:calc(256px + env(safe-area-inset-top,0px));bottom:auto}
 #godBtn{right:18px;top:calc(262px + env(safe-area-inset-top,0px));bottom:auto}
 #dodgeBtn{right:18px;top:calc(324px + env(safe-area-inset-top,0px));bottom:auto}
 #dodgeBtn.on{border-color:#d8b25a;color:#f0d68a}
@@ -53,6 +54,7 @@ canvas{display:block}
 <button class="btn" id="foesBtn">Inimigos: ligados</button>
 <button class="btn" id="pauseBtn">Pausar</button>
 <button class="btn" id="soundBtn">Som: ligado</button>
+<button class="btn" id="musicBtn">Música: ligada</button>
 <button class="btn" id="godBtn">Invencível: não</button>
 <button class="btn" id="dodgeBtn">Esquiva: nova</button>
 <input type="file" id="glbIn" accept=".glb" hidden>
@@ -320,12 +322,24 @@ const SOUND={
 const soundBtn=document.getElementById('soundBtn');
 function toggleSound(){audioInit();SFX.on=!SFX.on;soundBtn.textContent='Som: '+(SFX.on?'ligado':'desligado');soundBtn.blur();}
 soundBtn.onclick=toggleSound;
+/* música de fundo (musica/confronto_no_escuro.mp3, em loop): começa no primeiro toque/tecla (o navegador só deixa tocar
+   som depois de uma interação). M, o botão Música ou o direcional para a direita no controle liga e desliga */
+const MUSIC={on:true,el:null,vol:.35};
+const musicBtn=document.getElementById('musicBtn');
+loadBinary('musica/confronto_no_escuro.mp3',function(buf){
+  MUSIC.el=new Audio(URL.createObjectURL(new Blob([buf],{type:'audio/mpeg'})));MUSIC.el.loop=true;MUSIC.el.volume=MUSIC.vol;musicKick();
+},function(){musicBtn.style.display='none';});
+function musicKick(){if(MUSIC.el&&MUSIC.on&&MUSIC.el.paused){const p=MUSIC.el.play();if(p&&p.catch)p.catch(function(){});}}
+function toggleMusic(){MUSIC.on=!MUSIC.on;musicBtn.textContent='Música: '+(MUSIC.on?'ligada':'desligada');musicBtn.blur();
+  if(MUSIC.el){if(MUSIC.on)musicKick();else MUSIC.el.pause();}}
+musicBtn.onclick=toggleMusic;
+['pointerdown','keydown','touchstart'].forEach(function(ev){addEventListener(ev,musicKick,{passive:true});});
 
 /* estado */
 let tpose=false;
 const st={x:0,z:8,y:0,vy:0,rot:Math.PI,rotT:Math.PI,yaw:0,pitch:.35,camD:6.5,t:0,speed:0,morph:0,morphOn:false};
 const keys={};const joy={x:0,y:0};
-addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyG')toggleGod();if(e.code==='KeyK')dodgeKey=true;if(e.code==='KeyE')grabKey();if(e.code==='KeyL')toggleDodgeVer();if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();});
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyG')toggleGod();if(e.code==='KeyK')dodgeKey=true;if(e.code==='KeyE')grabKey();if(e.code==='KeyL')toggleDodgeVer();if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();if(e.code==='KeyM')toggleMusic();});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 const stateEl=document.getElementById('state');
 function toggle(){st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
@@ -420,6 +434,8 @@ function pollGamepad(raw){
   }
   if(hit(14))toggleGod();
   if(hit(8))toggleFoes();
+  if(hit(15))toggleMusic();
+  if(hit(15)||hit(9)||hit(0))musicKick();
   gp.prev=b;
 }
 
@@ -2306,7 +2322,7 @@ function tick(raw){
 }
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},get rig(){return rig;},get custom(){return custom;},cam:cam};
+window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},cam:cam};
 frame();
 })();
 </script>

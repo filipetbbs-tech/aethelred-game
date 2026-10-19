@@ -47,6 +47,39 @@ JF=top.astype(np.uint8);WF=np.clip(np.round(tw*255),0,255).astype(np.uint8)
 # corrige o arredondamento para a soma dar 255
 WF[:,0]+=(255-WF.astype(int).sum(1)).astype(np.uint8)
 print('vertices',len(Q2),'braços',arm.sum())
+# --- capa: a do modelo monstruoso é usada também na forma humana ---
+# segmentação pela cor (vermelho saturado do tecido), suavizada pela superfície para virar regiões contínuas
+import scipy.sparse as sp,base64
+from PIL import Image as _Im;import io as _io
+_img=j['images'][0];_bv=j['bufferViews'][_img['bufferView']];_o=b0+_bv.get('byteOffset',0)
+_tex=np.asarray(_Im.open(_io.BytesIO(d[_o:_o+_bv['byteLength']])).convert('RGB')).astype(np.float64)/255
+Co=_tex[np.clip((UV[:,1]%1)*_tex.shape[0],0,_tex.shape[0]-1).astype(int),np.clip((UV[:,0]%1)*_tex.shape[1],0,_tex.shape[1]-1).astype(int)]
+def _adj(X,T):
+    q=np.round(X/1e-5).astype(np.int64);_,inv=np.unique(q,axis=0,return_inverse=True);inv=inv.ravel()
+    Tw=inv[T];n=inv.max()+1
+    return sp.coo_matrix((np.ones(Tw.size*2),(Tw[:,[0,1,2,1,2,0]].ravel(),Tw[:,[1,2,0,0,1,2]].ravel())),shape=(n,n)).tocsr(),inv,n
+def _score(Cc):
+    r,g,b=Cc.T;mx=Cc.max(1);mn=Cc.min(1);sat=(mx-mn)/np.maximum(mx,1e-6)
+    return np.clip((r/np.maximum(g,1e-3)-1.25)/.5,0,1)*np.clip((sat-.3)/.2,0,1)
+def _seg(X,T,Cc,it=25,th=.25,close=0):
+    A_,inv,n=_adj(X,T);sc=np.zeros(n);cn=np.zeros(n);np.add.at(sc,inv,_score(Cc));np.add.at(cn,inv,1);sc/=cn
+    dg=np.asarray(A_.sum(1)).ravel()+1
+    for _ in range(it):sc=(A_@sc+sc)/dg
+    m=sc>th
+    if close:
+        for _ in range(close):m=m|((A_@m.astype(float))>0)
+        o_=~m
+        for _ in range(close):o_=o_|((A_@o_.astype(float))>0)
+        m=~o_
+    return m[inv]
+headW=sum((W*(J==bi[n])).sum(1) for n in ['Head','Neck'])
+capeOld=_seg(P,I,Co)&~hide&(headW<.5)
+capeNewRaw=_seg(Q2,I2,C2,close=4)
+# do humano só some o que fica coberto pela capa antiga (perto dela); o resto (faixa do peito etc.) continua
+dC,_=cKDTree(P[capeOld]).query(Q2)
+capeHide=((capeNewRaw&(dC<.05))|(dC<.015))&~arm&~extra
+print('capa antiga',capeOld.sum(),'capa humana escondida',capeHide.sum())
+def _bits(m):return base64.b64encode(np.packbits(m.astype(np.uint8),bitorder='little').tobytes()).decode()
 blobs=[];views=[];accs=[]
 def add(arr,typ,ct,target=None,minmax=False,normalized=False):
     off=sum(len(b) for b in blobs);b=arr.tobytes();pad=(4-len(b)%4)%4;blobs.append(b+b'\0'*pad)
@@ -65,7 +98,7 @@ off=sum(len(b) for b in blobs);pad=(4-len(jpg)%4)%4;blobs.append(jpg+b'\0'*pad);
 binb=b''.join(blobs)
 gl={'asset':{'version':'2.0','generator':'aethelred modelo humano'},'scene':0,'scenes':[{'nodes':[0]}],'nodes':[{'name':'humano','mesh':0}],
  'meshes':[{'name':'humano','primitives':[{'attributes':{'POSITION':iP,'NORMAL':iN,'TEXCOORD_0':iU,'JOINTS_0':iJ,'WEIGHTS_0':iW},'indices':iI,'material':0}],
-   'extras':{'inverseBind':[float(x) for x in IB.transpose(0,2,1).ravel()]}}],
+   'extras':{'inverseBind':[float(x) for x in IB.transpose(0,2,1).ravel()],'capeOld':_bits(capeOld),'capeHide':_bits(capeHide)}}],
  'materials':[{'name':'humano','doubleSided':True,'pbrMetallicRoughness':{'baseColorTexture':{'index':0},'metallicFactor':0,'roughnessFactor':.85}}],
  'textures':[{'source':0}],'images':[{'bufferView':len(views)-1,'mimeType':'image/jpeg'}],
  'accessors':accs,'bufferViews':views,'buffers':[{'byteLength':len(binb)}]}

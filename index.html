@@ -1470,7 +1470,14 @@ function loadHumanModel(mesh){
       const hm=new THREE.SkinnedMesh(src.geometry,mat);hm.castShadow=true;hm.receiveShadow=true;hm.frustumCulled=false;
       mesh.parent.add(hm);hm.position.copy(mesh.position);hm.quaternion.copy(mesh.quaternion);hm.scale.copy(mesh.scale);
       hm.updateMatrixWorld(true);hm.bind(new THREE.Skeleton(bones,inv),mesh.bindMatrix);
-      armForm.human={mesh:hm,shown:null};armForm.last=-1;applyArmForm();
+      /* capa: na forma humana a capa do modelo monstruoso fica por cima. extras.capeOld marca os vértices da capa do
+         modelo atual e extras.capeHide os do modelo humano que ficam embaixo dela (bits, base64) */
+      const bits=function(b64,n){const bin=atob(b64||''),out=new Uint8Array(n);for(let i=0;i<n;i++)out[i]=(bin.charCodeAt(i>>3)>>(i&7))&1;return out;};
+      const oldG=mesh.geometry,oldFull=oldG.index,cO=bits(src.userData.capeOld,oldG.attributes.position.count),cH=bits(src.userData.capeHide,src.geometry.attributes.position.count);
+      const oa=oldFull.array,capeT=[];for(let t=0;t<oa.length;t+=3)if(cO[oa[t]]+cO[oa[t+1]]+cO[oa[t+2]]>=2)capeT.push(oa[t],oa[t+1],oa[t+2]);
+      const ha=src.geometry.index.array,keepT=[];for(let t=0;t<ha.length;t+=3)if(!cH[ha[t]]&&!cH[ha[t+1]]&&!cH[ha[t+2]])keepT.push(ha[t],ha[t+1],ha[t+2]);
+      if(keepT.length)src.geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(keepT),1));
+      armForm.human={mesh:hm,shown:null,oldFull:oldFull,oldCape:capeT.length?new THREE.BufferAttribute(new Uint32Array(capeT),1):null};armForm.last=-1;applyArmForm();
     },function(){});
   },function(){});
 }
@@ -1479,7 +1486,9 @@ function applyArmForm(){
   /* com o modelo humano: até a metade da transformação ele aparece; depois entra o modelo atual, que começa com os braços
      recolhidos e termina com as garras e os espetos crescidos */
   const H=armForm.human,human=H&&st.morph<.5;
-  if(H&&H.shown!==human){H.shown=human;H.mesh.visible=human;armForm.mesh.visible=!human;}
+  if(H&&H.shown!==human){H.shown=human;H.mesh.visible=human;
+    /* na forma humana o modelo atual continua visível só na capa */
+    if(H.oldCape){armForm.mesh.visible=true;armForm.mesh.geometry.setIndex(human?H.oldCape:H.oldFull);}else armForm.mesh.visible=!human;}
   const k=H?Math.max(0,Math.min(1,(1-st.morph)*2)):1-st.morph;if(Math.abs(k-armForm.last)<.002)return;armForm.last=k;
   armForm.mesh.morphTargetInfluences[0]=k;
   const c=armForm.col,idx=armForm.idx,tc=armForm.tc;

@@ -52,18 +52,16 @@ Caminhada em guarda: usa os passos da caminhada normal com o quadril só um pouc
 (GUARD_WALK_RISE: joelhos levemente dobrados, não agachado), passos mais rasantes (GUARD_WALK_LIFT),
 base um pouco mais larga (GUARD_WALK_WIDE), joelhos um pouco para fora (GUARD_WALK_KNEE) e a ponta
 dos pés ~20° para fora, alinhada com o joelho (GUARD_WALK_TOE). Constantes no index.html.
-Transformação (F / Triângulo): troca o modelo inteiro. Na forma normal o personagem é o modelo humano
-rogue_warrior_leve.glb (com texturas PBR: cor, normal e metal/rugosidade), preso ao esqueleto atual por
-ferramentas/rig_rogue.py, que gera aethelred_humano_rig.glb:
-- alinha o modelo ao atual pelo corpo; acha a cadeia de cada braço pela cor da pele e gira os ossos do braço
-  para essa pose (matrizes de ligação próprias); braços com pesos pela cadeia (mão inteira presa ao osso da mão);
-- capa = tecido fino (face de trás a menos de 2,5 cm) e vermelho: presa ao tronco pela altura, e abaixo do
-  quadril acompanha um pouco a coxa do mesmo lado (mais na aba da frente); nunca presa só às pernas;
-- resto do corpo: pesos dos pontos mais próximos do modelo atual.
-Ao transformar, na metade da transição entra o modelo atual, que começa com os braços recolhidos
-(bracos_normais.bin) e termina com as garras e os espetos crescidos. As mãos humanas não mexem os dedos.
-(Scripts antigos: rig_modelo_humano.py/encaixar_bracos_humanos.py faziam o mesmo com o modelo humano anterior,
-aethelred_bracos_humanos_leve.glb; rodar um deles sobrescreve aethelred_humano_rig.glb.)
+Personagem e transformação (F / Triângulo): de aethelred_rig_leve.glb só o esqueleto e as animações são usados
+(a malha dele fica escondida). O corpo é modelos/rogue_warrior_t_pose_leve.glb, preso ao esqueleto por
+ferramentas/rig_tpose.py (gera aethelred_corpo_rig.glb): acha as juntas no corpo em T (proporções do esqueleto
+pela altura, refinadas pelo centro do tronco e das pernas, linha do braço, punho pela munhequeira, 4 dedos lado
+a lado e o polegar à frente), gira cada osso da pose antiga para a nova e dá pesos pela distância aos ossos,
+suavizados pela superfície; os 5 dedos de cada mão ficam ligados (abrem e fecham nos golpes).
+Os braços mutantes são modelos/mutated_arm_claw_leve.glb (braço direito; o esquerdo é ele espelhado), presos aos
+ossos do braço por ferramentas/rig_braco.py (gera aethelred_braco_mutante_rig.glb), na escala do braço do corpo.
+Na metade da transformação os braços humanos somem (extras.armHide do corpo) e os mutantes aparecem.
+Funções comuns dos scripts: ferramentas/esqueleto.py. Rode rig_tpose.py e depois rig_braco.py se os modelos mudarem.
 Mira dos golpes: sem tocar no analógico esquerdo (ou WASD), cada golpe vira para o inimigo mais
 próximo (lock-on automático). Com o analógico apontado na hora do golpe (inclusive o próximo golpe
 do combo), ele vira para aquele lado: trava no inimigo mais próximo dentro de um cone de ~50° para

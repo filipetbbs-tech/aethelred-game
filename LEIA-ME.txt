@@ -52,6 +52,27 @@ Caminhada em guarda: usa os passos da caminhada normal com o quadril só um pouc
 (GUARD_WALK_RISE: joelhos levemente dobrados, não agachado), passos mais rasantes (GUARD_WALK_LIFT),
 base um pouco mais larga (GUARD_WALK_WIDE), joelhos um pouco para fora (GUARD_WALK_KNEE) e a ponta
 dos pés ~20° para fora, alinhada com o joelho (GUARD_WALK_TOE). Constantes no index.html.
+A PRISÃO (dungeon, versão bruta) — botão "Ir para a Prisão" (ou tecla N; ou abrir o link com #prisao no fim).
+A arena continua como sala de testes ("Voltar à Arena"). Mapa contínuo, sem telas de carregamento, em 3 andares:
+- Andar 1, Bloco das Celas (chão): cela inicial, corredor (inimigos um a um), galeria das celas (grupo, pilares),
+  corredor de pilares com arremessador, Pátio de Execução (tranca e solta 2 ondas), altar "Garras Cravadas".
+- Andar 2, o Poço: fosso com chaminé (salto de parede em parede), pilares, rastejantes e agarrador; sai-se escalando
+  o beiral (6 m). Ponte estreita sobre outro fosso, com inimigos em cima; cair = escalar de volta. Altar "Punho de Ferro".
+- Andar 3, Bloco do Carcereiro (laje a 6 m): corredor de escudeiros, sala das armadilhas (espetos que sobem 1 s a cada
+  3 s; a placa avermelha antes; machucam inimigos também), nicho lateral com o altar "Sangue Antigo", parede rachada
+  (só quebra com golpe transformado), corredor com um pesado, sala do Carcereiro (tranca) e a saída.
+Progressão por habilidades: começa só com combo, chute em corrida, esquiva e pulo. Escalada (com salto de parede e
+ataque aéreo), agarrão e transformação são liberados nos altares, nessa ordem.
+Inimigos novos (tabela ETYPE no index.html): escudeiro (bloqueia golpe comum pela frente; passa golpe final,
+transformado, agarrão ou por trás), arremessador (fica longe e joga ossos), pesado (lento, pancada em área anunciada,
+fica tonto depois: só então pode ser agarrado), rastejante (pequeno e rápido). O Carcereiro: fase 1 pancadas; com 2/3
+da vida pula para a plataforma central e atira ossos (escale até ele); com 1/3 desce, bate mais rápido e fica tonto
+depois de cada pancada — agarrão nele tonto dá uma pancada forte.
+Fogueiras: ponto de retorno e vida cheia. Ao morrer, volta à última fogueira: inimigos vivos voltam ao lugar, salas
+de ondas não terminadas e o chefe recomeçam (os já mortos continuam mortos).
+Inimigos só acordam quando você entra na sala deles. Minimapa à esquerda: salas visitadas, fogueiras (laranja),
+altares (azul), inimigos acordados e o chefe (vermelho). Teclas 1 a 6 (na prisão): vão direto a cada trecho com as
+habilidades daquele ponto, para testar o level design. O botão Inimigos desliga todos (para explorar o mapa).
 Mira dos golpes: sem tocar no analógico esquerdo (ou WASD), cada golpe vira para o inimigo mais
 próximo (lock-on automático). Com o analógico apontado na hora do golpe (inclusive o próximo golpe
 do combo), ele vira para aquele lado: trava no inimigo mais próximo dentro de um cone de ~50° para

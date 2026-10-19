@@ -23,9 +23,14 @@ canvas{display:block}
 #foesBtn{right:18px;top:calc(76px + env(safe-area-inset-top,0px));bottom:auto}
 #pauseBtn{right:18px;top:calc(138px + env(safe-area-inset-top,0px));bottom:auto}
 #soundBtn{right:18px;top:calc(200px + env(safe-area-inset-top,0px));bottom:auto}
-#musicBtn{right:18px;top:calc(256px + env(safe-area-inset-top,0px));bottom:auto}
-#godBtn{right:18px;top:calc(262px + env(safe-area-inset-top,0px));bottom:auto}
-#dodgeBtn{right:18px;top:calc(324px + env(safe-area-inset-top,0px));bottom:auto}
+#musicBtn{right:18px;top:calc(262px + env(safe-area-inset-top,0px));bottom:auto}
+#godBtn{right:18px;top:calc(324px + env(safe-area-inset-top,0px));bottom:auto}
+#dodgeBtn{right:18px;top:calc(386px + env(safe-area-inset-top,0px));bottom:auto}
+#mapBtn{right:18px;top:calc(448px + env(safe-area-inset-top,0px));bottom:auto}
+#obj{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);max-width:min(560px,calc(100% - 32px));text-align:center;pointer-events:none;font-size:15px;line-height:1.45;text-shadow:0 1px 5px #000;color:var(--bone);display:none}
+#obj b{color:#f0d68a;font-weight:normal}
+#pmsg{position:fixed;left:50%;top:32%;transform:translate(-50%,-50%);max-width:calc(100% - 32px);text-align:center;pointer-events:none;font-size:24px;text-shadow:0 2px 8px #000;color:#f0d68a;opacity:0;transition:opacity .4s}
+#mini{position:fixed;left:16px;bottom:calc(170px + env(safe-area-inset-bottom,0px));pointer-events:none;display:none;opacity:.85}
 #dodgeBtn.on{border-color:#d8b25a;color:#f0d68a}
 #godBtn.on{border-color:#d8b25a;color:#f0d68a}
 #glbMsg{margin-top:8px;font-size:13px;color:var(--bone);opacity:.85}
@@ -47,6 +52,9 @@ canvas{display:block}
   <p id="combo"></p>
   <p id="glbMsg">Carregando o modelo da personagem...</p>
 </div>
+<div id="obj"></div>
+<div id="pmsg"></div>
+<canvas id="mini" width="96" height="300"></canvas>
 <div id="pad"><div id="knob"></div></div>
 <button class="btn" id="jump">Pular</button>
 <button class="btn" id="atk">Atacar</button>
@@ -55,6 +63,7 @@ canvas{display:block}
 <button class="btn" id="pauseBtn">Pausar</button>
 <button class="btn" id="soundBtn">Som: ligado</button>
 <button class="btn" id="musicBtn">Música: ligada</button>
+<button class="btn" id="mapBtn">Ir para a Prisão</button>
 <button class="btn" id="godBtn">Invencível: não</button>
 <button class="btn" id="dodgeBtn">Esquiva: nova</button>
 <input type="file" id="glbIn" accept=".glb" hidden>
@@ -75,12 +84,12 @@ document.body.appendChild(renderer.domElement);
 const cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,200);
 
 /* luzes */
-scene.add(new THREE.HemisphereLight(0x556080,0x1a1412,.55));
+const hemi=new THREE.HemisphereLight(0x556080,0x1a1412,.55);scene.add(hemi);
 const moon=new THREE.DirectionalLight(0x9fb0d8,.7);
 moon.position.set(-14,24,10);moon.castShadow=true;
 moon.shadow.mapSize.set(1024,1024);
 Object.assign(moon.shadow.camera,{left:-30,right:30,top:30,bottom:-30,near:1,far:70});
-scene.add(moon);
+scene.add(moon);scene.add(moon.target);
 const torches=[];
 [[-9,-19.5],[9,-19.5],[-28,-6],[28,-6]].forEach(p=>{
   const l=new THREE.PointLight(0xff8a3a,1.2,16,2);l.position.set(p[0],3.2,p[1]);scene.add(l);torches.push(l);
@@ -339,10 +348,10 @@ musicBtn.onclick=toggleMusic;
 let tpose=false;
 const st={x:0,z:8,y:0,vy:0,rot:Math.PI,rotT:Math.PI,yaw:0,pitch:.35,camD:6.5,t:0,speed:0,morph:0,morphOn:false};
 const keys={};const joy={x:0,y:0};
-addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyG')toggleGod();if(e.code==='KeyK')dodgeKey=true;if(e.code==='KeyE')grabKey();if(e.code==='KeyL')toggleDodgeVer();if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();if(e.code==='KeyM')toggleMusic();});
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyG')toggleGod();if(e.code==='KeyK')dodgeKey=true;if(e.code==='KeyE')grabKey();if(e.code==='KeyL')toggleDodgeVer();if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();if(e.code==='KeyM')toggleMusic();if(e.code==='KeyN')toggleWorld();if(WORLD==='prison'&&/^Digit[1-6]$/.test(e.code))prisonWarp(+e.code.slice(5)-1);});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 const stateEl=document.getElementById('state');
-function toggle(){st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
+function toggle(){if(!abil.morph&&!st.morphOn){flashMsg('A transformação ainda está selada. Procure o altar.',1.6);return;}st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
 document.getElementById('morph').onclick=toggle;
 function jump(){if(st.y<=groundY(st.x,st.z)+.001&&st.vy<=0&&!combo.active&&!tpose&&!death&&!climb){st.vy=8;SOUND.voice('jump');}}
 document.getElementById('jump').onpointerdown=jump;
@@ -442,8 +451,18 @@ function pollGamepad(raw){
 /* colisão */
 function resolve(){
   const R=.4,high=st.y>8.5;
-  st.x=Math.max(high?-30.5:-28.05,Math.min(high?30.5:28.05,st.x));
-  st.z=Math.max(high?-23.4:-20.05,Math.min(27,st.z));
+  if(WORLD==='arena'){
+    st.x=Math.max(high?-30.5:-28.05,Math.min(high?30.5:28.05,st.x));
+    st.z=Math.max(high?-23.4:-20.05,Math.min(27,st.z));
+  }else{st.x=Math.max(PX-22,Math.min(PX+22,st.x));st.z=Math.max(-178,Math.min(20,st.z));}
+  /* blocos (paredes, lajes): empurra para fora pela lateral; degraus de até ~0,55 m são subidos pelo chão */
+  boxes.forEach(function(b){
+    if(st.y>b.h-.55)return;
+    const qx=Math.max(b.x-b.hw,Math.min(b.x+b.hw,st.x)),qz=Math.max(b.z-b.hd,Math.min(b.z+b.hd,st.z)),dx=st.x-qx,dz=st.z-qz,d=Math.hypot(dx,dz);
+    if(d>=R)return;
+    if(d>1e-6){st.x=qx+dx/d*R;st.z=qz+dz/d*R;}
+    else{const px=b.hw+R-Math.abs(st.x-b.x),pz=b.hd+R-Math.abs(st.z-b.z);if(px<pz)st.x+=(st.x>=b.x?1:-1)*px;else st.z+=(st.z>=b.z?1:-1)*pz;}
+  });
   circles.forEach(c=>{
     if(st.y>c.h-.15)return;
     const dx=st.x-c.x,dz=st.z-c.z,d=Math.hypot(dx,dz),m=c.r+R;
@@ -565,14 +584,14 @@ const comboEl=document.getElementById('combo');
    com distância pesada pelo desvio do ângulo, para preferir quem está bem na direção */
 function enemyInCone(dir,maxD,ang){
   let best=null,bs=1e9;
-  enemies.forEach(function(e){if(e.dead)return;const dx=e.g.position.x-st.x,dz=e.g.position.z-st.z,d=Math.hypot(dx,dz);if(d>maxD)return;
+  enemies.forEach(function(e){if(e.dead||Math.abs(e.g.position.y-st.y)>2.5)return;const dx=e.g.position.x-st.x,dz=e.g.position.z-st.z,d=Math.hypot(dx,dz);if(d>maxD)return;
     let a=Math.atan2(dx,dz)-dir;while(a>Math.PI)a-=Math.PI*2;while(a<-Math.PI)a+=Math.PI*2;a=Math.abs(a);if(a>ang)return;
     const sc=d*(1+a*1.5);if(sc<bs){bs=sc;best=[dx,dz];}});
   return best;
 }
 function nearestEnemy(maxD){
   let best=null,bd=maxD;
-  enemies.forEach(function(e){if(e.dead)return;const dx=e.g.position.x-st.x,dz=e.g.position.z-st.z,d=Math.hypot(dx,dz);if(d<bd){bd=d;best=[dx,dz];}});
+  enemies.forEach(function(e){if(e.dead||Math.abs(e.g.position.y-st.y)>2.5)return;const dx=e.g.position.x-st.x,dz=e.g.position.z-st.z,d=Math.hypot(dx,dz);if(d<bd){bd=d;best=[dx,dz];}});
   return best;
 }
 function startAttack(i,A){
@@ -674,19 +693,33 @@ function updateComboState(dt){
 }
 
 /* combate */
+let WORLD='arena';const abil={climb:true,grab:true,morph:true};
 const enemies=[];let foesOn=true,hp=100,kills=0,hurt=0,spawnT=2,msgT=0,hitStop=0,shake=0;
 const vidaEl=document.getElementById('vida');
 /* type 'grab': inimigo arremessador (cor de ferrugem, maior, mais vida), agarra e arremessa o herói */
+/* tipos: basic (comum), grab (agarrador), shield (escudeiro: bloqueia pela frente), ranged (arremessador de ossos),
+   heavy (pesado: lento, pancada em área, fica tonto depois), crawler (rastejante: pequeno e rápido), boss (Carcereiro) */
+const ETYPE={basic:{hp:3,sc:1,sk:0x6f7f62,cl:0x3a3328,sp:[1.5,2.4],dmg:8},grab:{hp:5,sc:1.15,sk:0x9a4a26,cl:0x2a1712,sp:[1.6,1.6],dmg:8},
+  shield:{hp:4,sc:1.05,sk:0x5f6c7a,cl:0x262a33,sp:[1.3,1.3],dmg:8},ranged:{hp:2,sc:.95,sk:0x8a7a9a,cl:0x2b2333,sp:[1.8,1.8],dmg:6},
+  heavy:{hp:10,sc:1.5,sk:0x6a5038,cl:0x2a2018,sp:[1.0,1.0],dmg:16},crawler:{hp:1,sc:.62,sk:0xbcb39c,cl:0x3a3530,sp:[3.1,3.6],dmg:4},
+  boss:{hp:45,sc:2.2,sk:0x4f4843,cl:0x1a1816,sp:[1.6,1.6],dmg:16}};
 function makeEnemy(type){
+  const T=ETYPE[type]||ETYPE.basic;
   const g=new THREE.Group();g.rotation.order='YXZ';
-  const gr=type==='grab',sk=mat(gr?0x9a4a26:0x6f7f62,.9),cl=mat(gr?0x2a1712:0x3a3328,1);
+  const sk=mat(T.sk,.9),cl=mat(T.cl,1);
   const add=function(geo,m,x,y,z,p){const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);o.castShadow=true;(p||g).add(o);return o;};
   add(new THREE.BoxGeometry(.6,.8,.34),cl,0,1.35,0);
   add(new THREE.SphereGeometry(.17,10,10),sk,0,1.9,.03);
   const L=[-1,1].map(function(s){const l=new THREE.Group();l.position.set(s*.16,.95,0);g.add(l);add(new THREE.BoxGeometry(.22,.95,.24),cl,0,-.47,0,l);return l;});
   const A=[-1,1].map(function(s){const a=new THREE.Group();a.position.set(s*.4,1.65,0);a.rotation.x=-1.35;g.add(a);add(new THREE.BoxGeometry(.16,.75,.16),sk,0,-.37,0,a);return a;});
-  if(gr)g.scale.setScalar(1.15);
-  return {g:g,L:L,A:A,type:gr?'grab':'basic',mats:[sk,cl],hp:gr?5:3,vx:0,vz:0,dead:0,cd:0,gcd:1.5,gw:0,ph:Math.random()*6,sp:gr?1.6:1.5+Math.random()*.9,flash:0,stun:0};
+  if(type==='shield')add(new THREE.BoxGeometry(.75,.95,.08),mat(0x5a4330,.8),0,1.3,.34);
+  if(type==='ranged')add(new THREE.BoxGeometry(.07,.07,.5),mat(0xe6dcc3,.4),0,-.75,.15,A[1]);
+  if(type==='boss'){[-1,1].forEach(function(s){add(new THREE.ConeGeometry(.12,.4,6),mat(0x8a8070,.5,.4),s*.3,1.85,0).rotation.z=-s*.6;});
+    add(new THREE.BoxGeometry(.7,.25,.4),mat(0x3c3c40,.5,.7),0,1.75,0);
+    [-1,1].forEach(function(s){add(new THREE.SphereGeometry(.035,6,6),new THREE.MeshBasicMaterial({color:0xff5020}),s*.06,1.93,.17);});}
+  g.scale.setScalar(T.sc);
+  const sp=T.sp[0]+Math.random()*(T.sp[1]-T.sp[0]);
+  return {g:g,L:L,A:A,type:ETYPE[type]?type:'basic',mats:[sk,cl],hp:T.hp,maxhp:T.hp,dmg:T.dmg,sc:T.sc,vx:0,vz:0,dead:0,cd:0,gcd:1.5,gw:0,ph:Math.random()*6,sp:sp,flash:0,stun:0,fy:0,zone:null};
 }
 function spawnEnemy(type){
   const a=Math.random()*6.283,d=13+Math.random()*5;
@@ -709,16 +742,24 @@ foesBtn.onclick=function(){toggleFoes();foesBtn.blur();};
 function pushOut(p,R){circles.forEach(function(c){const dx=p.x-c.x,dz=p.z-c.z,d=Math.hypot(dx,dz),m=c.r+R;if(d<m&&d>0){p.x=c.x+dx/d*m;p.z=c.z+dz/d*m;}});}
 function hitEnemies(A){
   const fx=Math.sin(st.rot),fz=Math.cos(st.rot),dmg=A.dmg*(st.morphOn?2:1),R=A.range+(st.morphOn?.8:0),cosArc=Math.cos(A.arc/2);
-  let any=false;
+  let any=false,blocked=false;
   enemies.forEach(function(e){
     if(e.dead)return;
     const dx=e.g.position.x-st.x,dz=e.g.position.z-st.z,d=Math.hypot(dx,dz);
-    if(d>R+.3)return;
+    if(d>R+.3+(e.sc>1.4?.5:0))return;
+    if(Math.abs(e.g.position.y-st.y)>1.8)return;
     if(d>.9&&(dx*fx+dz*fz)/d<cosArc)return;
-    any=true;e.hp-=dmg;e.flash=.18;e.stun=A.finisher?.9:.45;
-    const k=d>0?1/d:0;e.vx=dx*k*A.knock;e.vz=dz*k*A.knock;
+    /* escudeiro: golpe comum pela frente bate no escudo (passa o golpe final, o transformado e quem vem por trás) */
+    if(e.type==='shield'&&!A.finisher&&!st.morphOn&&!(e.stun>0)){const ex=Math.sin(e.g.rotation.y),ez=Math.cos(e.g.rotation.y);
+      if(d<.01||(-dx*ex-dz*ez)/d>.35){blocked=true;e.vx=dx/(d||1)*3;e.vz=dz/(d||1)*3;return;}}
+    any=true;e.hp-=dmg;e.flash=.18;
+    const armor=e.type==='heavy'||e.type==='boss';
+    if(!armor||e.groggy>0)e.stun=A.finisher?.9:.45;
+    const k=(d>0?1/d:0)*(armor?.1:1);e.vx=dx*k*A.knock;e.vz=dz*k*A.knock;
     if(e.hp<=0){e.dead=.001;kills++;}
   });
+  if(blocked&&!any){SOUND.impact(false);flashMsg('Bloqueado! Agarre (E/R1), use o golpe final ou ataque por trás.',1.2);rumble(.3,.2,80);}
+  crackCheck(R);
   if(any)SOUND.slash(A.finisher||A.dmg>=2);
   if(any){hitStop=A.finisher?.15:.09;shake=A.finisher?.34:.19;rumble(A.finisher?.9:.5,A.finisher?.6:.35,A.finisher?180:110);}
 }
@@ -829,6 +870,7 @@ const GRAB={reach:.35,hold:.47,missEnd:.82,speed:1.25,range:1.9,arc:1.3,upEnd:1.
 let grab=null;
 function grabKey(){
   if(heroThrown)return;
+  if(!abil.grab&&!grab){flashMsg('Você ainda não tem força para agarrar. Procure o altar.',1.6);return;}
   if(grab){if(grab.phase==='hold')releaseGrab(true);return;}
   if(!clipSrc.upc||!rig||death||climb||dodge||airAtk||flip||tpose||aboveGround()>.05)return;
   if(hitR&&hitR.t<HIT_LOCK)return;
@@ -840,7 +882,15 @@ function grabTry(){
   /* inimigo mais próximo à frente, ao alcance da mão */
   const fx=Math.sin(st.rot),fz=Math.cos(st.rot);let best=null,bd=1e9;
   enemies.forEach(function(e){if(e.dead||e.held)return;const dx=e.g.position.x-st.x,dz=e.g.position.z-st.z,d=Math.hypot(dx,dz);
-    if(d>GRAB.range||(d>.5&&(dx*fx+dz*fz)/d<Math.cos(GRAB.arc/2)))return;if(d<bd){bd=d;best=e;}});
+    if(Math.abs(e.g.position.y-st.y)>1.5)return;
+    if(d>GRAB.range+(e.sc>1.4?.6:0)||(d>.5&&(dx*fx+dz*fz)/d<Math.cos(GRAB.arc/2)))return;if(d<bd){bd=d;best=e;}});
+  /* pesado só pode ser agarrado tonto; o chefe tonto leva uma pancada forte em vez de ser segurado */
+  if(best&&best.type==='heavy'&&!(best.groggy>0)){flashMsg('Grande demais. Espere ele ficar tonto depois da pancada.',1.4);return null;}
+  if(best&&best.type==='boss'){
+    if(best.groggy>0){best.hp-=7*(st.morphOn?1.5:1);best.groggy=0;best.flash=.3;best.vy=3;SOUND.impact(true);SOUND.voice('growl');shake=Math.max(shake,.5);hitStop=Math.max(hitStop,.12);rumble(1,1,260);
+      flashMsg('Pancada no Carcereiro!',1);if(best.hp<=0){best.dead=.001;kills++;}}
+    else flashMsg('O Carcereiro escapa do agarrão. Só tonto, depois da pancada dele.',1.4);
+    return null;}
   return best;
 }
 function releaseGrab(push){
@@ -1037,14 +1087,18 @@ function updateCombat(dt){
   hurt-=dt;msgT-=dt;
   spawnT-=dt;
   const alive=enemies.filter(function(e){return !e.dead;}).length;
-  if(foesOn&&alive<6&&spawnT<=0){spawnEnemy();spawnT=2.5;}
+  pmsgT-=dt;if(pmsgT<=0&&pmsgEl.style.opacity!=='0')pmsgEl.style.opacity=0;
+  if(WORLD==='prison')prisonUpdate(dt);
+  updateProjs(dt);
+  if(WORLD==='arena'&&foesOn&&alive<6&&spawnT<=0){spawnEnemy();spawnT=2.5;}
   for(let i=enemies.length-1;i>=0;i--){
     const e=enemies[i],p=e.g.position;
     if(e.held){e.g.rotation.x=.25;continue;}
     /* altura: cai depois de solto ou lançado pelo gancho */
-    if(p.y>0||e.vy){e.vy=(e.vy||0)-22*dt;p.y=Math.max(0,p.y+e.vy*dt);if(p.y<=0){e.vy=0;}}
+    if(p.y>e.fy||e.vy){e.vy=(e.vy||0)-22*dt;p.y=Math.max(e.fy,p.y+e.vy*dt);if(p.y<=e.fy){e.vy=0;}}
     if(e.dead){e.dead+=dt;e.g.rotation.x=e.thrown&&p.y>0?e.g.rotation.x-dt*9:-Math.min(e.dead/.4,1)*1.5;p.x+=e.vx*dt;p.z+=e.vz*dt;const f=Math.max(0,1-dt*(p.y>0?.3:6));e.vx*=f;e.vz*=f;if(e.dead>3){scene.remove(e.g);enemies.splice(i,1);}continue;}
     const dx=st.x-p.x,dz=st.z-p.z,d=Math.hypot(dx,dz)||1;
+    if(enemyAI(e,dt,dx,dz,d))continue;
     e.stun-=dt;
     /* arremessador: anuncia o agarrão (braços sobem, pisca laranja) e, se o herói ainda estiver perto, agarra e arremessa */
     if(e.type==='grab'){e.gcd-=dt;
@@ -1058,15 +1112,14 @@ function updateCombat(dt){
     if(e.stun<=0){
       e.g.rotation.y=Math.atan2(dx,dz);e.g.rotation.x=0;
       if(d>1){p.x+=dx/d*e.sp*dt;p.z+=dz/d*e.sp*dt;}
-      else if(!death&&!climb&&st.y<1.2){e.cd-=dt;if(e.cd<=0&&hurt<=0){e.cd=1;takeHit(p.x,p.z,8);}}
+      else if(!death&&!climb&&Math.abs(st.y-p.y)<1.2){e.cd-=dt;if(e.cd<=0&&hurt<=0){e.cd=1;takeHit(p.x,p.z,8);}}
     }else e.g.rotation.x=Math.min(e.stun,.4)*.6;
     p.x+=e.vx*dt;p.z+=e.vz*dt;
     const f=Math.max(0,1-dt*8);e.vx*=f;e.vz*=f;
     e.ph+=dt*e.sp*4;e.L[0].rotation.x=Math.sin(e.ph)*.6;e.L[1].rotation.x=-Math.sin(e.ph)*.6;
     e.flash=Math.max(0,e.flash-dt);
     const em=e.flash>0?0x661111:0;e.mats.forEach(function(m){m.emissive.setHex(em);});
-    p.x=Math.max(-27,Math.min(27,p.x));p.z=Math.max(-19.5,Math.min(27,p.z));
-    pushOut(p,.4);
+    clampEnemy(e);
   }
   for(let i=0;i<enemies.length;i++)for(let j=i+1;j<enemies.length;j++){
     const a=enemies[i].g.position,b=enemies[j].g.position;
@@ -1100,6 +1153,7 @@ function startDeath(){
   return true;
 }
 function respawn(){
+  if(WORLD==='prison'){prisonRespawn();return;}
   if(heroThrown&&heroThrown.e)heroThrown.e.throwing=false;heroThrown=null;
   if(grab&&grab.e)grab.e.held=false;grab=null;wallFall=false;airAtk=null;flip=null;dodge=null;
   death=null;hp=100;kills=0;enemies.forEach(function(e){scene.remove(e.g);});enemies.length=0;
@@ -1141,12 +1195,13 @@ function nearestWall(px,pz,py,maxD){
   return best;
 }
 /* altura do chão sob um ponto (topo das pilastras e das muralhas) */
-function groundY(x,z){
+function groundAt(x,z,y){
   let g=0;
-  circles.forEach(function(c){if(Math.hypot(x-c.x,z-c.z)<(c.vr||c.r)-.05&&st.y>c.h-.6)g=Math.max(g,c.h);});
-  boxes.forEach(function(b){if(Math.abs(x-b.x)<b.hw&&Math.abs(z-b.z)<b.hd&&st.y>b.h-.6)g=Math.max(g,b.h);});
+  circles.forEach(function(c){if(Math.hypot(x-c.x,z-c.z)<(c.vr||c.r)-.05&&y>c.h-.6)g=Math.max(g,c.h);});
+  boxes.forEach(function(b){if(Math.abs(x-b.x)<b.hw&&Math.abs(z-b.z)<b.hd&&y>b.h-.6)g=Math.max(g,b.h);});
   return g;
 }
+function groundY(x,z){return groundAt(x,z,st.y);}
 function aboveGround(){return st.y-groundY(st.x,st.z);}
 function wallFrame(C){
   const o=C.o;let px,pz,nx,nz;
@@ -1163,6 +1218,7 @@ function snapBones(){return baseBones?baseBones.map(function(b){return [b.quater
 /* maxD/minToward: distância até a parede e quanto a personagem precisa estar virada para ela
    (no chão é preciso apertar pulo de frente; no ar ela agarra sozinha ao encostar) */
 function tryClimb(maxD,minToward,dx,dz){
+  if(!abil.climb)return false;
   if(climb||death||combo.active||tpose||!clipSrc.crawl||!rig||climbCD>0)return false;
   const W=nearestWall(st.x,st.z,st.y,maxD);if(!W)return false;
   let fx=Math.sin(st.rot),fz=Math.cos(st.rot);
@@ -2204,6 +2260,8 @@ function frame(){
   camDist+=(cd-camDist)*Math.min(1,raw*(cd<camDist?20:4));
   cam.position.set(tx+cdx*camDist+(Math.random()-.5)*sk,Math.max(.6,ty+cdy*camDist)+(Math.random()-.5)*sk,tz+cdz*camDist);
   cam.lookAt(tx,ty,tz);
+  moon.position.set(st.x-14,st.y+24,st.z+10);moon.target.position.set(st.x,st.y,st.z);moon.target.updateMatrixWorld();
+  if(WORLD==='prison')drawMini();
   renderer.render(scene,cam);
 }
 /* um passo da lógica do jogo (personagem, combate, inimigos) */
@@ -2320,9 +2378,399 @@ function tick(raw){
   /* tochas */
   torches.forEach((l,i)=>{l.intensity=1.1+Math.sin(st.t*9+i*2)*.18+Math.random()*.08;});
 }
+/* ===================== PRISÃO: dungeon contínua de 3 andares =====================
+   Fuga da prisão até a torre do Carcereiro. Fica em x≈PX (longe da arena, que continua como sala de testes).
+   Andar 1, Bloco das Celas (chão): combate básico; termina no altar da escalada.
+   Andar 2, o Poço: escalada e salto de parede para sair do fosso, ponte estreita; termina no altar do agarrão.
+   Andar 3, Bloco do Carcereiro (laje a 6 m): escudeiros, armadilhas, altar da transformação, parede rachada e o chefe.
+   Mapa em coordenadas locais (x a partir de PX; z vai ficando mais negativo conforme avança). */
+const PX=200,WT=.8,F3=6;
+const prison={built:false,group:null,rects:[],torches:[],cps:[],altars:[],locks:[],cracks:[],spikes:[],spec:[],cp:0,boss:null,done:false,fx:[],seen:{}};
+const PM={wall:mat(0x34312d,1),slab:mat(0x2c2a26,1),floor:mat(0x1f1d1a,1),iron:mat(0x45454a,.45,.75),crack:mat(0x55473a,1),stub:mat(0x2e2c29,1),plate:mat(0x302a26,.8,.3)};
+let projs=[];
+function pRect(id,x0,z0,x1,z1,f){const r={id:id,x0:PX+x0,z0:z0,x1:PX+x1,z1:z1,f:f};prison.rects.push(r);prison.seen[id]=false;return r;}
+function pbox(x,z,w,h,d,m,solid){
+  const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);b.position.set(PX+x,h/2,z);b.castShadow=b.receiveShadow=true;prison.group.add(b);
+  const col={x:PX+x,z:z,hw:w/2,hd:d/2,h:h,mesh:b};if(solid)boxes.push(col);return col;
+}
+/* sala retangular: paredes centradas nas bordas, com vãos [centro, largura]; lado ausente = sem parede (feita pelo vizinho).
+   As paredes norte/sul fecham os cantos; as laterais vão só de borda a borda (sem sobrepor a parede do vizinho) */
+function room(id,x0,z0,x1,z1,f,top,walls,noSlab){
+  const r=pRect(id,x0,z0,x1,z1,f);
+  if(f>0&&!noSlab)pbox((x0+x1)/2,(z0+z1)/2,x1-x0,f,z1-z0,PM.slab,true);
+  ['n','s','w','e'].forEach(function(sd){
+    const gaps=walls[sd];if(gaps===undefined)return;
+    const hz=sd==='n'||sd==='s',a0=hz?x0-WT/2:z0,a1=hz?x1+WT/2:z1,fix=sd==='n'?z0:sd==='s'?z1:sd==='w'?x0:x1;
+    let cur=a0;const segs=[];
+    gaps.slice().sort(function(p,q){return p[0]-q[0];}).forEach(function(g){const g0=g[0]-g[1]/2,g1=g[0]+g[1]/2;if(g0>cur)segs.push([cur,g0]);cur=Math.max(cur,g1);});
+    if(a1>cur)segs.push([cur,a1]);
+    segs.forEach(function(sg){const c=(sg[0]+sg[1])/2,L=sg[1]-sg[0];if(L<.05)return;if(hz)pbox(c,fix,L,top,WT,PM.wall,true);else pbox(fix,c,WT,top,L,PM.wall,true);});
+  });
+  /* tochas nas paredes laterais (as 4 luzes mais próximas da personagem acendem de verdade) */
+  if(walls.w!==undefined&&walls.e!==undefined&&id!=='ponte'){const zm=(z0+z1)/2;[[x0+.55,zm],[x1-.55,zm]].forEach(function(p){addTorch(p[0],p[1],f+2.6);});}
+  return r;
+}
+function addTorch(x,z,y,big){
+  const fl=new THREE.Mesh(new THREE.SphereGeometry(big?.32:.13,8,8),new THREE.MeshBasicMaterial({color:big?0xff9a40:0xffb060}));
+  fl.position.set(PX+x,y,z);prison.group.add(fl);prison.torches.push({x:PX+x,y:y,z:z,fl:fl,big:!!big});return fl;
+}
+/* porta de grades num vão: aparece e bloqueia quando a sala tranca */
+function bars(x,z,w,f,horiz){
+  const g=new THREE.Group();const n=Math.max(3,Math.round(w/.35));
+  for(let i=0;i<n;i++){const c=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,4.4,6),PM.iron);const o=-w/2+(i+.5)*w/n;c.position.set(horiz?o:0,f+2.2,horiz?0:o);g.add(c);}
+  const beam=new THREE.Mesh(new THREE.BoxGeometry(horiz?w:.14,.14,horiz?.14:w),PM.iron);beam.position.y=f+4.4;g.add(beam);
+  g.position.set(PX+x,0,z);prison.group.add(g);g.visible=false;
+  return {g:g,box:{x:PX+x,z:z,hw:horiz?w/2:.2,hd:horiz?.2:w/2,h:f+4.5}};
+}
+function lockRoom(L,closed){
+  if(L.closed===closed)return;L.closed=closed;
+  L.bars.forEach(function(b){b.g.visible=closed;const i=boxes.indexOf(b.box);if(closed&&i<0)boxes.push(b.box);if(!closed&&i>=0)boxes.splice(i,1);});
+  SOUND.impact(true);shake=Math.max(shake,.2);
+}
+function buildPrison(){
+  if(prison.built)return;prison.built=true;
+  prison.group=new THREE.Group();scene.add(prison.group);
+  const fl=new THREE.Mesh(new THREE.PlaneGeometry(48,200),PM.floor);fl.rotation.x=-Math.PI/2;fl.position.set(PX,.005,-78);fl.receiveShadow=true;prison.group.add(fl);
+  const T1=4.5,TP=10.5,T3=F3+4.5;
+  /* ---------- Andar 1: Bloco das Celas ---------- */
+  room('cela',-4,8,4,18,0,T1,{n:[[0,3.8]],s:[],w:[],e:[]});
+  room('c1',-1.5,0,1.5,8,0,T1,{w:[],e:[]});
+  room('galeria',-10,-14,10,0,0,T1,{s:[[0,3.8]],n:[[0,3.8]],w:[],e:[]});
+  [-11,-7,-3].forEach(function(z){pbox(-8.5,z,3,T1,.4,PM.stub,true);pbox(8.5,z,3,T1,.4,PM.stub,true);});
+  [[-4,-4],[4,-4],[-4,-10],[4,-10]].forEach(function(p){const c=new THREE.Mesh(new THREE.CylinderGeometry(.6,.7,T1,10),PM.wall);c.position.set(PX+p[0],T1/2,p[1]);c.castShadow=c.receiveShadow=true;prison.group.add(c);circles.push({x:PX+p[0],z:p[1],r:.8,vr:.65,h:T1});});
+  room('c2',-3,-28,3,-14,0,T1,{w:[],e:[]});
+  [[-1.4,-18],[1.4,-22],[-1.4,-26]].forEach(function(p){pbox(p[0],p[1],1.2,T1,1.2,PM.wall,true);});
+  const R3=room('patio',-9,-46,9,-28,0,T1,{s:[[0,3.8]],n:[[0,3.8]],w:[],e:[]});
+  room('altar1',-3,-54,3,-46,0,T1,{n:[[0,3.8]],w:[],e:[]});
+  prison.locks.push({rect:R3,bars:[bars(0,-28,3.8,0,true),bars(0,-46,3.8,0,true)],closed:false,cleared:false,wave:-1,active:[],
+    waves:[['basic','basic','basic','basic'],['basic','basic','ranged','ranged','crawler','crawler','crawler']],name:'Pátio de Execução'});
+  /* ---------- Andar 2: o Poço ---------- */
+  room('poco',-8,-70,8,-54,0,TP,{s:[[0,6.8]],w:[],e:[]});
+  pbox(-5.6,-62,.6,7,8,PM.wall,true);pbox(-2.4,-62,.6,7,8,PM.wall,true);   /* chaminé: salto de parede em parede */
+  pbox(5,-61,2.2,3,2.2,PM.wall,true);pbox(5.2,-66,1.6,4.5,1.6,PM.wall,true);
+  room('beiral',-8,-74,8,-70,F3,TP,{w:[],e:[]});
+  room('fosso',-8,-90,8,-74,0,TP,{n:[[0,3.8]],w:[],e:[]});
+  room('ponte',-1.5,-90,1.5,-74,F3,TP,{});
+  /* ---------- Andar 3: Bloco do Carcereiro (tudo sobre uma laje a 6 m) ---------- */
+  pbox(1,-130,30,F3,80,PM.slab,true);
+  room('altar2',-4,-98,4,-90,F3,T3,{n:[[0,3.8]],w:[],e:[]},true);
+  room('c3',-1.5,-110,1.5,-98,F3,T3,{w:[],e:[]},true);
+  const R6=room('armadilhas',-9,-128,9,-110,F3,T3,{s:[[0,3.8]],n:[[0,3.8]],w:[],e:[[-118,8.8]]},true);
+  room('nicho',9,-122,15,-114,F3,T3,{w:[[-118,3.8]],n:[],s:[],e:[]},true);
+  const ck=pbox(0,-128,3.8,T3,WT,PM.crack,true);ck.crack=true;prison.cracks.push(ck);
+  [[-.9,0],[.4,.6],[1.1,-.5]].forEach(function(q){const l=new THREE.Mesh(new THREE.BoxGeometry(.06,2.6,.05),new THREE.MeshBasicMaterial({color:0x140c08}));l.position.set(PX+q[0],F3+2.2+q[1],-127.57);l.rotation.z=q[1]+.3;prison.group.add(l);ck.lines=(ck.lines||[]).concat(l);});
+  [[-6,-114],[-2,-114],[2,-114],[6,-114],[-6,-124],[-2,-124],[2,-124],[6,-124]].forEach(function(p,i){
+    const g=new THREE.Group();const plate=new THREE.Mesh(new THREE.BoxGeometry(1.6,.06,1.6),mat(0x302a26,.8,.3));plate.position.y=.03;g.add(plate);
+    const sp=new THREE.Group();for(let a=0;a<3;a++)for(let b=0;b<3;b++){const c=new THREE.Mesh(new THREE.ConeGeometry(.09,.6,6),PM.iron);c.position.set(-.5+a*.5,.3,-.5+b*.5);sp.add(c);}
+    g.add(sp);g.position.set(PX+p[0],F3,p[1]);prison.group.add(g);
+    prison.spikes.push({x:PX+p[0],z:p[1],f:F3,sp:sp,plate:plate,ph:(i%4)*.75,cd:0});});
+  room('c4',-1.5,-138,1.5,-128,F3,T3,{w:[],e:[]},true);
+  const R7=room('chefe',-12,-162,12,-138,F3,T3,{s:[[0,3.8]],n:[[0,3.8]],w:[],e:[]},true);
+  pbox(0,-150,5,F3+4.5,5,PM.wall,true);
+  [[-7,-144],[7,-144],[-7,-156],[7,-156]].forEach(function(p){const c=new THREE.Mesh(new THREE.CylinderGeometry(.8,.9,F3+6,10),PM.wall);c.position.set(PX+p[0],(F3+6)/2,p[1]);c.castShadow=c.receiveShadow=true;prison.group.add(c);circles.push({x:PX+p[0],z:p[1],r:1,vr:.85,h:F3+6});});
+  prison.R7=R7;prison.plat={x0:PX-2.5,x1:PX+2.5,z0:-152.5,z1:-147.5,f:F3+4.5};
+  prison.bossIn={rect:R7,bars:[bars(0,-138,3.8,F3,true)],closed:false};
+  prison.bossOut={rect:R7,bars:[bars(0,-162,3.8,F3,true)],closed:false};
+  room('saida',-3,-170,3,-162,F3,T3,{n:[],w:[],e:[]},true);
+  addTorch(0,-168,F3+1.2,true);
+  /* ---------- fogueiras (pontos de retorno) e altares (habilidades) ---------- */
+  [[2.6,13,0],[-2,-48.5,0],[-2.6,-93,F3],[11.4,-115.4,F3],[0,-131,F3]].forEach(function(p,i){
+    const g=new THREE.Group();const base=new THREE.Mesh(new THREE.CylinderGeometry(.45,.55,.5,10),PM.iron);base.position.y=.25;g.add(base);
+    g.position.set(PX+p[0],p[2],p[1]);prison.group.add(g);
+    const fl=addTorch(p[0],p[1],p[2]+.75,true);fl.scale.setScalar(.6);
+    prison.cps.push({x:PX+p[0],z:p[1],f:p[2],fl:fl,lit:i===0});});
+  [['climb',0,-52,0,'Garras Cravadas','Escalada: pule numa parede para agarrar. Na parede: Espaço salta para longe; atacar logo depois do salto faz o ataque aéreo.'],
+   ['grab',0,-96,F3,'Punho de Ferro','Agarrão: E / R1 segura o inimigo. Segurando: Quadrado/J dá o gancho, correr arrasta, E solta. Quebra a guarda dos escudeiros.'],
+   ['morph',13.6,-118,F3,'Sangue Antigo','Transformação: F / Triângulo. Dano em dobro, alcance maior, quebra paredes rachadas e passa pelos escudos.']].forEach(function(a){
+    const g=new THREE.Group();const col=new THREE.Mesh(new THREE.CylinderGeometry(.35,.45,1.3,8),PM.wall);col.position.y=.65;g.add(col);
+    const gem=new THREE.Mesh(new THREE.OctahedronGeometry(.28),new THREE.MeshBasicMaterial({color:0x7fd0ff}));gem.position.y=1.65;g.add(gem);
+    g.position.set(PX+a[1],a[3],a[2]);prison.group.add(g);
+    prison.altars.push({key:a[0],x:PX+a[1],z:a[2],f:a[3],name:a[4],desc:a[5],gem:gem,taken:false});});
+  /* ---------- inimigos fixos (tipo, x, z, sala) ---------- */
+  prison.spec=[
+    ['basic',0,4.5,'c1'],['basic',0,1,'c1'],
+    ['basic',-5,-3,'galeria'],['basic',5,-6,'galeria'],['basic',-6,-9,'galeria'],['basic',6,-11,'galeria'],['basic',0,-12,'galeria'],
+    ['ranged',0,-27,'c2'],['basic',1.6,-19.5,'c2'],['basic',-1.6,-23.5,'c2'],
+    ['crawler',-1,-60,'poco'],['crawler',1,-63,'poco'],['crawler',3,-57,'poco'],['basic',5,-68,'poco'],['grab',-7,-56,'poco'],['basic',-1,-67,'poco'],
+    ['basic',0,-78,'ponte'],['grab',0,-84,'ponte'],['basic',0,-88,'ponte'],
+    ['crawler',-5,-82,'fosso'],['crawler',5,-86,'fosso'],
+    ['shield',0,-103,'c3'],['shield',0,-107,'c3'],
+    ['shield',-4,-116,'armadilhas'],['shield',4,-121,'armadilhas'],['ranged',6,-126,'armadilhas'],['heavy',0,-119,'armadilhas'],['basic',-6,-112,'armadilhas'],
+    ['heavy',0,-133,'c4'],
+    ['boss',0,-142.5,'chefe']];
+}
+function rectById(id){return prison.rects.find(function(r){return r.id===id;});}
+function addEnemy(type,x,z,zone,fy){
+  const e=makeEnemy(type);e.g.position.set(x,fy,z);e.fy=fy;e.zone=zone;e.home={x:x,z:z,fy:fy,zone:zone};
+  if(type==='boss'){e.B={phase:1,st:'chase',t:0,cd:1,started:false};prison.boss=e;}
+  scene.add(e.g);enemies.push(e);return e;
+}
+function prisonPopulate(){
+  enemies.forEach(function(e){scene.remove(e.g);});enemies.length=0;prison.boss=null;
+  if(!foesOn)return;
+  prison.spec.forEach(function(sp){const r=rectById(sp[3]);addEnemy(sp[0],PX+sp[1],sp[2],r,r.f);});
+}
+function inZone(z,x,zz,m){return x>z.x0-m&&x<z.x1+m&&zz>z.z0-m&&zz<z.z1+m;}
+function curRect(){let best=null;prison.rects.forEach(function(r){if(inZone(r,st.x,st.z,.05)&&st.y>r.f-.6&&(!best||r.f>best.f))best=r;});return best;}
+/* ---------- IA dos inimigos (na prisão também para os tipos comuns) ---------- */
+function clampEnemy(e){const p=e.g.position;
+  if(e.leap)return;
+  if(e.zone){const z=e.zone,m=(e.zone.id==='ponte'?.2:.4+WT/2)+.25*(e.sc||1);p.x=Math.max(z.x0+m,Math.min(z.x1-m,p.x));p.z=Math.max(z.z0+m,Math.min(z.z1-m,p.z));}
+  else if(WORLD==='arena'){p.x=Math.max(-27,Math.min(27,p.x));p.z=Math.max(-19.5,Math.min(27,p.z));}
+  const R=.4*(e.sc||1);pushOut(p,R);
+  boxes.forEach(function(b){if(b.h<=e.fy+.55)return;const qx=Math.max(b.x-b.hw,Math.min(b.x+b.hw,p.x)),qz=Math.max(b.z-b.hd,Math.min(b.z+b.hd,p.z)),dx=p.x-qx,dz=p.z-qz,d=Math.hypot(dx,dz);
+    if(d<R&&d>1e-6){p.x=qx+dx/d*R;p.z=qz+dz/d*R;}});
+}
+function enemyPost(e,dt,idle){const p=e.g.position;
+  p.x+=e.vx*dt;p.z+=e.vz*dt;const f=Math.max(0,1-dt*8);e.vx*=f;e.vz*=f;
+  if(!idle){e.ph+=dt*e.sp*4;e.L[0].rotation.x=Math.sin(e.ph)*.6;e.L[1].rotation.x=-Math.sin(e.ph)*.6;}
+  e.flash=Math.max(0,e.flash-dt);const em=e.flash>0?0x661111:(e.warn?0x5a2c00:0);e.mats.forEach(function(m){m.emissive.setHex(em);});
+  clampEnemy(e);
+}
+function enemyAI(e,dt,dx,dz,d){
+  const p=e.g.position,dy=st.y-p.y;
+  if(e.zone&&e.type!=='boss'){
+    const near=!death&&d<11&&Math.abs(dy)<2.5&&inZone(e.zone,st.x,st.z,1.5);
+    if(near)e.aggro=true;else if(death||!inZone(e.zone,st.x,st.z,4)||Math.abs(dy)>3)e.aggro=false;
+    if(!e.aggro){e.L[0].rotation.x*=.9;e.L[1].rotation.x*=.9;e.warn=0;e.gw=0;enemyPost(e,dt,true);return true;}
+  }
+  if(e.type==='basic'||e.type==='grab')return false;
+  const face=Math.atan2(dx,dz);e.stun-=dt;
+  if(e.type==='crawler'){
+    if(e.stun<=0){e.g.rotation.y=face;e.g.rotation.x=0;if(d>.8){p.x+=dx/d*e.sp*dt;p.z+=dz/d*e.sp*dt;}
+      else if(!death&&!climb&&Math.abs(dy)<1.2){e.cd-=dt;if(e.cd<=0&&hurt<=0){e.cd=.8;takeHit(p.x,p.z,e.dmg);}}}
+    else e.g.rotation.x=Math.min(e.stun,.4)*.6;
+    enemyPost(e,dt);return true;}
+  if(e.type==='shield'){
+    if(e.stun<=0){const df=normAng(face-e.g.rotation.y);e.g.rotation.y+=Math.max(-2*dt,Math.min(2*dt,df));e.g.rotation.x=0;
+      if(d>1.15){p.x+=Math.sin(e.g.rotation.y)*e.sp*dt;p.z+=Math.cos(e.g.rotation.y)*e.sp*dt;}
+      else if(!death&&!climb&&Math.abs(dy)<1.2&&Math.abs(df)<.7){e.cd-=dt;if(e.cd<=0&&hurt<=0){e.cd=1.2;takeHit(p.x,p.z,e.dmg);}}}
+    else e.g.rotation.x=Math.min(e.stun,.4)*.6;
+    enemyPost(e,dt);return true;}
+  if(e.type==='ranged'){
+    if(e.stun<=0){e.g.rotation.y=face;e.g.rotation.x=0;e.cd-=dt;
+      if(e.wind>0){e.wind-=dt;e.A[1].rotation.x=-2.7;e.warn=1;if(e.wind<=0){e.warn=0;throwBone(e,false);e.cd=2.3;e.A[1].rotation.x=-1.35;}}
+      else{if(d<5){p.x-=dx/d*e.sp*dt;p.z-=dz/d*e.sp*dt;}else if(d>9){p.x+=dx/d*e.sp*dt;p.z+=dz/d*e.sp*dt;}
+        if(e.cd<=0&&d<15&&Math.abs(dy)<3&&!death)e.wind=.55;}}
+    else{e.g.rotation.x=Math.min(e.stun,.4)*.6;e.wind=0;e.warn=0;}
+    enemyPost(e,dt);return true;}
+  if(e.type==='heavy'){heavyAI(e,dt,dx,dz,d,face,dy);enemyPost(e,dt,e.groggy>0||e.wind>0);return true;}
+  if(e.type==='boss'){bossAI(e,dt,dx,dz,d,face,dy);enemyPost(e,dt,e.B.st!=='chase'||e.groggy>0);return true;}
+  return false;
+}
+function slamFx(p,r){
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.2,.45,24),new THREE.MeshBasicMaterial({color:0xc9a070,transparent:true,opacity:.7,side:THREE.DoubleSide}));
+  ring.rotation.x=-Math.PI/2;ring.position.set(p.x,p.y+.05,p.z);scene.add(ring);prison.fx.push({m:ring,t:0,r:r});
+  SOUND.impact(true);SOUND.land();
+  const dd=Math.hypot(st.x-p.x,st.z-p.z);if(dd<10){shake=Math.max(shake,.35*(1-dd/10));rumble(.6*(1-dd/10),.4,160);}
+}
+function heavyAI(e,dt,dx,dz,d,face,dy){const p=e.g.position;
+  e.groggy=Math.max(0,(e.groggy||0)-dt);
+  if(e.groggy>0){e.g.rotation.x=.3;e.A.forEach(function(a){a.rotation.x=-.3;});e.warn=0;return;}
+  e.g.rotation.x=0;
+  if(e.wind>0){e.wind-=dt;const k=1-e.wind/.85;e.A.forEach(function(a){a.rotation.x=-1.35-1.7*k;});e.warn=(Math.floor(e.wind*10)%2)?1:0;
+    if(e.wind<=0){e.warn=0;e.A.forEach(function(a){a.rotation.x=-.3;});slamFx(p,2.6);
+      const fx=Math.sin(e.g.rotation.y),fz=Math.cos(e.g.rotation.y);
+      if(!death&&d<2.8&&Math.abs(dy)<1.3&&(dx*fx+dz*fz)/d>-.3)takeHit(p.x,p.z,e.dmg);
+      e.groggy=1.7;}
+    return;}
+  e.g.rotation.y=face;e.A.forEach(function(a){a.rotation.x+=(-1.35-a.rotation.x)*Math.min(1,dt*5);});e.cd-=dt;
+  if(d>2.1){p.x+=dx/d*e.sp*dt;p.z+=dz/d*e.sp*dt;}
+  if(d<2.5&&e.cd<=0&&Math.abs(dy)<1.3&&!death){e.wind=.85;e.cd=2.4;}
+}
+/* Carcereiro: fase 1 pancadas no chão; fase 2 (2/3 da vida) pula para a plataforma central e atira ossos, e só apanha
+   de quem escalar até lá; fase 3 (1/3) desce, bate mais rápido e fica tonto depois de cada pancada (hora do agarrão) */
+function bossAI(e,dt,dx,dz,d,face,dy){const B=e.B,p=e.g.position;B.t+=dt;
+  if(!B.started){if(!death&&inZone(prison.R7,st.x,st.z,-1.5)&&Math.abs(st.y-F3)<2){B.started=true;lockRoom(prison.bossIn,true);flashMsg('O CARCEREIRO',2.2);SOUND.voice('growl');}
+    else{e.L[0].rotation.x=0;e.L[1].rotation.x=0;return;}}
+  if(death){B.st='chase';return;}
+  if(B.st==='leap'){const u=Math.min(1,B.t/1.05);p.x=B.ax+(B.bx-B.ax)*u;p.z=B.az+(B.bz-B.az)*u;p.y=B.ay+(B.by-B.ay)*u+Math.sin(Math.PI*u)*4.5;e.vy=0;e.fy=Math.min(B.ay,B.by);
+    if(u>=1){e.leap=false;B.st='chase';B.t=0;B.cd=1.2;e.fy=B.by;p.y=B.by;e.zone=B.zone;slamFx(p,3.4);
+      if(Math.hypot(st.x-p.x,st.z-p.z)<3.2&&Math.abs(st.y-p.y)<1.5)takeHit(p.x,p.z,10);}
+    return;}
+  if(B.phase===1&&e.hp<=e.maxhp*.66){bossLeap(e,prison.plat,(prison.plat.x0+prison.plat.x1)/2,(prison.plat.z0+prison.plat.z1)/2);B.phase=2;flashMsg('Ele subiu na plataforma. Escale até ele!',2.5);return;}
+  if(B.phase===2&&e.hp<=e.maxhp*.33){bossLeap(e,prison.R7,PX,-143);B.phase=3;flashMsg('Furioso! Depois de cada pancada ele fica tonto: agarre!',2.8);return;}
+  e.groggy=Math.max(0,(e.groggy||0)-dt);
+  if(e.groggy>0){e.g.rotation.x=.25;e.warn=0;e.A.forEach(function(a){a.rotation.x=-.25;});return;}
+  e.g.rotation.x=0;
+  if(B.st==='wind'){const k=Math.min(1,B.t/B.wt);e.A.forEach(function(a){a.rotation.x=-1.35-1.7*k;});e.warn=(Math.floor(B.t*10)%2)?1:0;
+    if(B.t>=B.wt){e.warn=0;e.A.forEach(function(a){a.rotation.x=-.3;});slamFx(p,3.4);
+      const fx=Math.sin(e.g.rotation.y),fz=Math.cos(e.g.rotation.y);
+      if(d<3.6&&Math.abs(dy)<1.5&&(dx*fx+dz*fz)/Math.max(d,.01)>-.3)takeHit(p.x,p.z,e.dmg);
+      B.st='chase';B.t=0;B.cd=B.phase===3?1.3:1.9;if(B.phase===3)e.groggy=2.2;}
+    return;}
+  e.g.rotation.y=face;e.A.forEach(function(a){a.rotation.x+=(-1.35-a.rotation.x)*Math.min(1,dt*5);});B.cd-=dt;
+  const same=Math.abs(dy)<1.5;
+  if(B.phase===2&&!same){B.tc=(B.tc===undefined?1:B.tc)-dt;if(B.tc<=0){throwBone(e,true);B.tc=1.35;}return;}
+  if(d>2.7&&same||B.phase!==2&&d>2.7){const sp=B.phase===3?2.1:1.6;p.x+=dx/d*sp*dt;p.z+=dz/d*sp*dt;}
+  if(d<3.1&&B.cd<=0&&same){B.st='wind';B.t=0;B.wt=B.phase===3?.6:.85;}
+}
+function bossLeap(e,zone,x,z){const B=e.B,p=e.g.position;B.st='leap';B.t=0;B.ax=p.x;B.az=p.z;B.ay=p.y;B.bx=x;B.bz=z;B.by=zone.f;B.zone=zone;e.leap=true;e.groggy=0;e.warn=0;SOUND.voice('growl');}
+/* ---------- projéteis (ossos) ---------- */
+function throwBone(e,big){const p=e.g.position,sy=p.y+1.6*(e.sc||1);
+  const tx=st.x,ty=st.y+1.1,tz=st.z,dx=tx-p.x,dz=tz-p.z,dd=Math.hypot(dx,dz)||1,spd=big?12:11,Tt=dd/spd,vy=(ty-sy)/Tt+.5*7*Tt;
+  const m=new THREE.Mesh(new THREE.SphereGeometry(big?.22:.14,8,8),M.bone);m.position.set(p.x,sy,p.z);m.castShadow=true;scene.add(m);
+  projs.push({m:m,vx:dx/dd*spd,vy:vy,vz:dz/dd*spd,t:0,dmg:big?12:6});SOUND.swish(.6);
+}
+function insideBox(x,y,z){return boxes.some(function(b){return y<b.h&&Math.abs(x-b.x)<b.hw&&Math.abs(z-b.z)<b.hd;});}
+function updateProjs(dt){
+  for(let i=projs.length-1;i>=0;i--){const q=projs[i],m=q.m;q.t+=dt;q.vy-=7*dt;m.position.x+=q.vx*dt;m.position.y+=q.vy*dt;m.position.z+=q.vz*dt;m.rotation.x+=dt*9;
+    const hx=st.x-m.position.x,hy=st.y+1.1-m.position.y,hz=st.z-m.position.z;let kill=false;
+    if(!death&&Math.hypot(hx,hy,hz)<.75){takeHit(m.position.x-q.vx,m.position.z-q.vz,q.dmg);kill=true;}
+    else if(q.t>5||m.position.y<0||insideBox(m.position.x,m.position.y,m.position.z))kill=true;
+    if(kill){scene.remove(m);projs.splice(i,1);}}
+}
+/* ---------- paredes rachadas: só quebram com o golpe transformado ---------- */
+function crackCheck(R){
+  if(WORLD!=='prison')return;
+  prison.cracks.forEach(function(c){if(c.broken)return;
+    const qx=Math.max(c.x-c.hw,Math.min(c.x+c.hw,st.x)),qz=Math.max(c.z-c.hd,Math.min(c.z+c.hd,st.z));
+    if(Math.hypot(st.x-qx,st.z-qz)>R+.8||st.y>c.h)return;
+    if(st.morphOn){c.broken=true;const i=boxes.indexOf(c);if(i>=0)boxes.splice(i,1);c.mesh.visible=false;(c.lines||[]).forEach(function(l){l.visible=false;});
+      for(let k=0;k<14;k++){const s=.25+Math.random()*.35,r=new THREE.Mesh(new THREE.BoxGeometry(s,s*.7,s),PM.crack);r.position.set(c.x+(Math.random()-.5)*3.4,F3+s*.35,c.z+(Math.random()-.5)*1.6);r.rotation.y=Math.random()*3;prison.group.add(r);}
+      SOUND.impact(true);SOUND.land();shake=Math.max(shake,.6);hitStop=Math.max(hitStop,.12);rumble(1,1,300);flashMsg('A parede desabou!',1.6);}
+    else if(!c.told){c.told=true;flashMsg('A parede racha, mas não cede. Precisa da força transformada.',2.4);}
+  });
+}
+/* ---------- mensagens ---------- */
+const pmsgEl=document.getElementById('pmsg'),objEl=document.getElementById('obj');let pmsgT=0;
+function flashMsg(t,dur){pmsgEl.innerHTML=t;pmsgEl.style.opacity=1;pmsgT=dur||2;}
+/* ---------- lógica por quadro ---------- */
+function prisonUpdate(dt){
+  const cr=curRect();if(cr)prison.seen[cr.id]=true;
+  /* fogueiras */
+  prison.cps.forEach(function(c,i){c.fl.scale.setScalar(c.lit?.75+Math.sin(st.t*12+i)*.06:.35);
+    if(!death&&Math.hypot(st.x-c.x,st.z-c.z)<2.2&&Math.abs(st.y-c.f)<1.5){
+      if(!c.lit||prison.cp!==i){c.lit=true;prison.cp=i;flashMsg('Fogueira acesa: ponto de retorno salvo.',2);}
+      if(hp<100)hp=100;}});
+  /* altares */
+  prison.altars.forEach(function(a){a.gem.rotation.y+=dt*1.5;a.gem.position.y=1.65+Math.sin(st.t*2)*.08;a.gem.visible=!a.taken;
+    if(!a.taken&&!death&&Math.hypot(st.x-a.x,st.z-a.z)<1.9&&Math.abs(st.y-a.f)<1.5){a.taken=true;abil[a.key]=true;
+      flashMsg('<b>'+a.name+'</b><br><span style="font-size:16px;color:#e8e0d0">'+a.desc+'</span>',6);SOUND.voice('growl');rumble(.6,.6,300);}});
+  /* salas que trancam (ondas) */
+  prison.locks.forEach(function(L){if(L.cleared)return;
+    if(!L.closed){if(!death&&inZone(L.rect,st.x,st.z,-1.3)&&Math.abs(st.y-L.rect.f)<1.5){lockRoom(L,true);L.wave=-1;nextWave(L);}}
+    else if(L.active.every(function(e){return e.dead;})){
+      if(L.wave<L.waves.length-1)nextWave(L);else{L.cleared=true;lockRoom(L,false);flashMsg(L.name+': portas abertas.',2);}}});
+  /* chefe derrotado */
+  if(prison.boss&&prison.boss.dead&&!prison.done){prison.done=true;lockRoom(prison.bossIn,false);lockRoom(prison.bossOut,false);flashMsg('O Carcereiro caiu. A saída está aberta!',4);}
+  if(prison.done&&!prison.won&&st.z<-164&&st.y>F3-1){prison.won=true;flashMsg('Você escapou da prisão!<br><span style="font-size:16px;color:#e8e0d0">Teclas 1 a 6 levam a cada trecho para testar de novo.</span>',8);}
+  /* armadilhas: espetos sobem 1 s a cada 3 s (a placa avermelha antes) */
+  prison.spikes.forEach(function(s){const t=(st.t+s.ph)%3,up=t<1;s.sp.position.y+=((up?0:-.62)-s.sp.position.y)*Math.min(1,dt*(up?28:6));
+    s.plate.material.emissive.setHex(t>2.45?0x551010:0);s.cd-=dt;
+    if(up&&s.sp.position.y>-.2){
+      if(!death&&s.cd<=0&&Math.abs(st.x-s.x)<.85&&Math.abs(st.z-s.z)<.85&&Math.abs(st.y-s.f)<.35&&!climb){s.cd=.9;takeHit(s.x,s.z,10);}
+      enemies.forEach(function(e){if(e.dead||e.type==='boss'||e.type==='heavy')return;const p=e.g.position;
+        if(Math.abs(p.x-s.x)<.85&&Math.abs(p.z-s.z)<.85&&Math.abs(p.y-s.f)<.35&&!(e.scd>0)){e.scd=.7;e.hp-=1.5;e.flash=.2;if(e.hp<=0){e.dead=.001;kills++;}}});}});
+  enemies.forEach(function(e){if(e.scd>0)e.scd-=dt;});
+  /* efeitos de pancada */
+  for(let i=prison.fx.length-1;i>=0;i--){const f=prison.fx[i];f.t+=dt;const k=f.t/.45;f.m.scale.setScalar(1+k*f.r*2);f.m.material.opacity=.7*(1-k);if(k>=1){scene.remove(f.m);prison.fx.splice(i,1);}}
+  /* luzes: as 4 tochas mais próximas acendem */
+  prison.lightT=(prison.lightT||0)-dt;
+  if(prison.lightT<=0){prison.lightT=.25;
+    const near=prison.torches.slice().sort(function(a,b){return Math.hypot(a.x-st.x,a.z-st.z,(a.y-st.y)*2)-Math.hypot(b.x-st.x,b.z-st.z,(b.y-st.y)*2);});
+    torches.forEach(function(l,i){const t=near[i];if(t){l.position.set(t.x,t.y,t.z);l.distance=t.big?12:15;}});}
+  /* objetivo */
+  let o;
+  const B=prison.boss;
+  if(prison.won)o='<b>Fuga completa.</b> Teclas 1–6: voltar a um trecho.';
+  else if(prison.done)o='Saia pela porta ao norte da sala do Carcereiro.';
+  else if(B&&B.B.started&&!B.dead)o='<b>O Carcereiro</b>  '+'█'.repeat(Math.max(0,Math.ceil(B.hp/B.maxhp*20)))+'░'.repeat(20-Math.max(0,Math.ceil(B.hp/B.maxhp*20)))+(B.B.phase===2?'<br>Escale a plataforma central':B.B.phase===3?'<br>Agarre-o quando ficar tonto':'');
+  else if(!abil.climb)o='Andar 1, Bloco das Celas: fuja das celas e chegue ao altar no fim do bloco.';
+  else if(!abil.grab)o='Andar 2, o Poço: escale para sair do fosso e atravesse a ponte.';
+  else if(!abil.morph)o='Andar 3: escudeiros só caem com agarrão, golpe final ou por trás. Procure o altar no nicho lateral.';
+  else o='Quebre a parede rachada transformado e enfrente o Carcereiro.';
+  const ab='<br><span style="font-size:13px;opacity:.8">Escalada '+(abil.climb?'✓':'✗')+'  ·  Agarrão '+(abil.grab?'✓':'✗')+'  ·  Transformação '+(abil.morph?'✓':'✗')+'</span>';
+  if(objEl.innerHTML!==o+ab)objEl.innerHTML=o+ab;
+}
+function nextWave(L){L.wave++;L.active=[];const r=L.rect;
+  L.waves[L.wave].forEach(function(t){let x,z,k=0;do{x=r.x0+1.5+Math.random()*(r.x1-r.x0-3);z=r.z0+1.5+Math.random()*(r.z1-r.z0-3);k++;}while(Math.hypot(x-st.x,z-st.z)<5&&k<20);
+    const e=addEnemy(t,x,z,r,r.f);e.aggro=true;e.wave=L;L.active.push(e);});
+  flashMsg(L.name+': onda '+(L.wave+1)+' de '+L.waves.length,1.6);
+}
+function prisonRespawn(){
+  if(heroThrown&&heroThrown.e)heroThrown.e.throwing=false;heroThrown=null;
+  if(grab&&grab.e)grab.e.held=false;grab=null;wallFall=false;airAtk=null;flip=null;dodge=null;climb=null;hero.quaternion.set(0,0,0,1);
+  death=null;hp=100;combo.active=false;combo.i=-1;combo.w=0;combo.hold=0;st.vy=0;st.vx=st.vz=0;
+  const c=prison.cps[prison.cp];st.x=c.x;st.z=c.z+1.6;st.y=c.f;st.rot=st.rotT=Math.PI;st.yaw=0;
+  projs.forEach(function(q){scene.remove(q.m);});projs=[];
+  /* salas de ondas não terminadas recomeçam; inimigos vivos voltam ao lugar com vida cheia; o chefe recomeça */
+  prison.locks.forEach(function(L){if(L.cleared)return;lockRoom(L,false);L.wave=-1;L.active=[];});
+  for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];
+    if(e.wave&&!e.wave.cleared){scene.remove(e.g);enemies.splice(i,1);continue;}
+    if(e.dead)continue;
+    e.hp=e.maxhp;e.g.position.set(e.home.x,e.home.fy,e.home.z);e.fy=e.home.fy;e.zone=e.home.zone;e.aggro=false;e.stun=0;e.groggy=0;e.wind=0;e.warn=0;e.vx=e.vz=e.vy=0;e.leap=false;e.held=false;e.throwing=false;
+    if(e.B)e.B={phase:1,st:'chase',t:0,cd:1,started:false};}
+  if(!prison.done)lockRoom(prison.bossIn,false);
+  msgT=2.5;plantFeet();
+}
+/* ---------- entrar e sair ---------- */
+const helpEl=document.querySelector('#hud p'),mapBtn=document.getElementById('mapBtn'),miniEl=document.getElementById('mini'),miniCtx=miniEl.getContext('2d');
+const ARENA_TORCH=torches.map(function(l){return l.position.clone();});
+function clearWorld(){
+  if(heroThrown&&heroThrown.e)heroThrown.e.throwing=false;heroThrown=null;
+  if(grab&&grab.e)grab.e.held=false;grab=null;climb=null;flip=null;airAtk=null;dodge=null;death=null;wallFall=false;hero.quaternion.set(0,0,0,1);
+  enemies.forEach(function(e){scene.remove(e.g);});enemies.length=0;projs.forEach(function(q){scene.remove(q.m);});projs=[];
+  combo.active=false;combo.i=-1;combo.w=0;combo.hold=0;st.vy=0;st.vx=st.vz=0;st.morphOn=false;hp=100;
+}
+function enterPrison(){
+  buildPrison();clearWorld();WORLD='prison';
+  abil.climb=abil.grab=abil.morph=false;
+  prison.altars.forEach(function(a){a.taken=false;});prison.cps.forEach(function(c,i){c.lit=i===0;});prison.cp=0;prison.done=false;prison.won=false;
+  prison.locks.forEach(function(L){L.cleared=false;L.closed=true;lockRoom(L,false);L.wave=-1;L.active=[];});
+  prison.bossIn.closed=true;lockRoom(prison.bossIn,false);prison.bossOut.closed=false;lockRoom(prison.bossOut,true);
+  prison.cracks.forEach(function(c){if(c.broken){c.broken=false;boxes.push(c);c.mesh.visible=true;(c.lines||[]).forEach(function(l){l.visible=true;});}c.told=false;});
+  Object.keys(prison.seen).forEach(function(k){prison.seen[k]=false;});
+  prisonPopulate();
+  st.x=PX;st.z=11;st.y=0;st.rot=st.rotT=Math.PI;st.yaw=0;
+  hemi.intensity=.32;moon.intensity=.28;
+  mapBtn.textContent='Voltar à Arena';objEl.style.display='block';miniEl.style.display='block';helpEl.style.display='none';
+  flashMsg('A Prisão<br><span style="font-size:16px;color:#e8e0d0">Fuja das celas até a torre do Carcereiro.</span>',3.5);
+  plantFeet();
+}
+function enterArena(){
+  clearWorld();WORLD='arena';abil.climb=abil.grab=abil.morph=true;
+  st.x=0;st.z=8;st.y=0;st.rot=st.rotT=Math.PI;
+  torches.forEach(function(l,i){l.position.copy(ARENA_TORCH[i]);l.distance=16;});
+  hemi.intensity=.55;moon.intensity=.7;
+  mapBtn.textContent='Ir para a Prisão';helpEl.style.display='';objEl.style.display='none';miniEl.style.display='none';pmsgEl.style.opacity=0;
+  if(foesOn)for(let i=0;i<3;i++)spawnEnemy();
+  plantFeet();
+}
+function toggleWorld(){if(WORLD==='arena')enterPrison();else enterArena();mapBtn.blur();}
+mapBtn.onclick=toggleWorld;
+/* teclas 1–6 na prisão: vai direto a cada trecho (com as habilidades daquele ponto), para testar o level design */
+function prisonWarp(i){
+  /* [fogueira, x, z, chão, habilidades já ganhas (0–3)] */
+  const pts=[[0,0,9.6,0,0],[1,-2,-48.5,0,0],[1,0,-58,0,1],[2,-2.6,-93,F3,1],[3,11.4,-115.4,F3,2],[4,0,-131,F3,3]];
+  const w=pts[i];if(!w)return;clearWorld();
+  abil.climb=w[4]>=1;abil.grab=w[4]>=2;abil.morph=w[4]>=3;
+  prison.altars.forEach(function(a){a.taken=!!abil[a.key];});
+  prison.cp=Math.min(w[0],prison.cps.length-1);prison.cps.forEach(function(c,k){c.lit=k<=prison.cp;});
+  prison.done=false;prison.won=false;
+  prison.locks.forEach(function(L){L.cleared=i>=1;L.closed=!L.cleared;lockRoom(L,false);L.wave=-1;L.active=[];});
+  prison.bossIn.closed=true;lockRoom(prison.bossIn,false);prison.bossOut.closed=false;lockRoom(prison.bossOut,true);
+  if(i===5)prison.cracks.forEach(function(c){if(!c.broken){c.broken=true;const k=boxes.indexOf(c);if(k>=0)boxes.splice(k,1);c.mesh.visible=false;(c.lines||[]).forEach(function(l){l.visible=false;});}});
+  prisonPopulate();
+  st.x=PX+w[1];st.z=w[2]+1.4;st.y=w[3];st.rot=st.rotT=Math.PI;st.yaw=0;plantFeet();
+  flashMsg('Trecho '+(i+1),1.2);
+}
+/* minimapa: salas visitadas, personagem (vermelho), inimigos acordados, fogueiras e altares */
+function drawMini(){
+  const W=miniEl.width,H=miniEl.height,zt=20,zb=-172,xs=-17,xe=17,k=Math.min(W/(xe-xs),H/(zt-zb));
+  const tx=function(x){return (x-PX-xs)*k;},tz=function(z){return (zt-z)*k;};
+  miniCtx.clearRect(0,0,W,H);miniCtx.fillStyle='rgba(10,9,12,.55)';miniCtx.fillRect(0,0,W,H);
+  prison.rects.forEach(function(r){miniCtx.fillStyle=prison.seen[r.id]?(r.f>0?'#6d6458':'#5a5248'):'rgba(90,82,72,.18)';
+    miniCtx.fillRect(tx(r.x0),tz(r.z1),(r.x1-r.x0)*k,(r.z1-r.z0)*k);});
+  prison.cps.forEach(function(c){miniCtx.fillStyle=c.lit?'#ffa040':'#6a4a2a';miniCtx.fillRect(tx(c.x)-1.5,tz(c.z)-1.5,3,3);});
+  prison.altars.forEach(function(a){if(a.taken)return;miniCtx.fillStyle='#7fd0ff';miniCtx.fillRect(tx(a.x)-1.5,tz(a.z)-1.5,3,3);});
+  enemies.forEach(function(e){if(e.dead||!(e.aggro||e.type==='boss'))return;miniCtx.fillStyle=e.type==='boss'?'#ff3030':'#c07070';miniCtx.fillRect(tx(e.g.position.x)-1,tz(e.g.position.z)-1,e.type==='boss'?4:2,e.type==='boss'?4:2);});
+  miniCtx.fillStyle='#ff4040';miniCtx.beginPath();miniCtx.arc(tx(st.x),tz(st.z),2.6,0,6.3);miniCtx.fill();
+}
+if(/prisao|prison/i.test(location.hash))setTimeout(enterPrison,0);
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},cam:cam};
+window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes};
 frame();
 })();
 </script>

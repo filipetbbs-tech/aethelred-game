@@ -1436,11 +1436,11 @@ function loadBinary(url,onBuf,onFail,onProg){
   }
   tryLoad(0);
 }
-/* personagem: do aethelred_rig_leve.glb só o esqueleto e as animações são usados (a malha dele fica escondida).
-   O corpo é aethelred_corpo_rig.glb e os braços mutantes aethelred_braco_mutante_rig.glb (direito e o esquerdo espelhado),
-   gerados por ferramentas/rig_tpose.py e ferramentas/rig_braco.py: cada um traz JOINTS/WEIGHTS para os ossos deste
-   esqueleto e as próprias matrizes de ligação (extras.inverseBind). Na transformação os braços humanos do corpo são
-   escondidos (extras.armHide: vértices dos braços, em bits base64) e os mutantes aparecem */
+/* personagem: aethelred_personagem.glb (corpo rigado no Mixamo, texturas PBR e as animações básicas, montado por
+   ferramentas/montar_personagem.py). Os braços mutantes ficam em aethelred_braco_mutante_rig.glb (direito e o esquerdo
+   espelhado, de ferramentas/rig_braco.py), com JOINTS/WEIGHTS para os ossos deste esqueleto e as próprias matrizes de
+   ligação (extras.inverseBind). Na transformação os braços humanos do corpo são escondidos (extras.armHide do corpo:
+   vértices dos braços, em bits base64) e os mutantes aparecem */
 let armForm=null;
 function loadSkinned(url,mesh,cb){
   loadBinary(url,function(buf){
@@ -1457,13 +1457,10 @@ function loadSkinned(url,mesh,cb){
 }
 function loadArmForms(root){
   let mesh=null;root.traverse(function(o){if(o.isSkinnedMesh&&!mesh)mesh=o;});if(!mesh)return;
-  mesh.visible=false;armForm={mesh:mesh,shown:null};
-  loadSkinned('aethelred_corpo_rig.glb',mesh,function(sm,ud){
-    const g=sm.geometry,full=g.index,n=g.attributes.position.count,bin=atob(ud.armHide||''),hide=new Uint8Array(n);
-    for(let i=0;i<n;i++)hide[i]=(bin.charCodeAt(i>>3)>>(i&7))&1;
-    const a=full.array,keep=[];for(let t=0;t<a.length;t+=3)if(!hide[a[t]]&&!hide[a[t+1]]&&!hide[a[t+2]])keep.push(a[t],a[t+1],a[t+2]);
-    armForm.body=sm;armForm.full=full;armForm.noArm=new THREE.BufferAttribute(new Uint32Array(keep),1);armForm.shown=null;applyArmForm();
-  });
+  const g=mesh.geometry,full=g.index,n=g.attributes.position.count,bin=atob((mesh.userData&&mesh.userData.armHide)||''),hide=new Uint8Array(n);
+  for(let i=0;i<n;i++)hide[i]=(bin.charCodeAt(i>>3)>>(i&7))&1;
+  const a=full.array,keep=[];for(let t=0;t<a.length;t+=3)if(!hide[a[t]]&&!hide[a[t+1]]&&!hide[a[t+2]])keep.push(a[t],a[t+1],a[t+2]);
+  armForm={mesh:mesh,body:mesh,full:full,noArm:new THREE.BufferAttribute(new Uint32Array(keep),1),shown:null};
   loadSkinned('aethelred_braco_mutante_rig.glb',mesh,function(sm){sm.visible=false;armForm.claws=sm;armForm.shown=null;applyArmForm();});
 }
 function applyArmForm(){
@@ -1472,7 +1469,7 @@ function applyArmForm(){
   armForm.body.geometry.setIndex(mon?armForm.noArm:armForm.full);if(armForm.claws)armForm.claws.visible=mon;
 }
 /* carrega o modelo que acompanha o jogo */
-loadBinary('aethelred_rig_leve.glb',function(buf){parseGLB(buf,'aethelred_rig_leve.glb');},
+loadBinary('aethelred_personagem.glb',function(buf){parseGLB(buf,'aethelred_personagem.glb');},
   function(){say('Não encontrei o modelo da personagem. Arraste um arquivo .glb para a tela ou toque em “Carregar modelo GLB”.');},
   function(f){say('Carregando o modelo da personagem... '+Math.round(f*100)+'%');});
 /* remove quadros-chave com tempo repetido: as animações do modelo têm alguns, e o Three.js
@@ -1502,7 +1499,7 @@ function useModel(gltf,name){
   m.scale.multiplyScalar(kk);
   m.position.x-=c.x*kk;m.position.z-=c.z*kk;m.position.y-=box.min.y*kk;
   m.traverse(function(o){if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;[].concat(o.material).forEach(function(mm){if(mm.metalness>.3)mm.metalness=.3;});}});
-  if(/aethelred_rig_leve/.test(name))loadArmForms(m);
+  if(/aethelred_personagem/.test(name))loadArmForms(m);
   custom.add(m);hero.add(custom);hero.updateMatrixWorld(true);buildRig(m);
   hero.children.forEach(function(o){if(o!==custom&&o!==slash)o.visible=false;});
   renderer.outputEncoding=THREE.sRGBEncoding;
@@ -2067,6 +2064,7 @@ function applyProc(A,p,w,mv){
   if(!combo.snap)groundFeet();
 }
 /* mãos: abertas e relaxadas o tempo todo, dedos se movendo devagar; no golpe fecham em garra */
+const CLAW_CURL=.3;
 const SPREAD={Thumb:.18,Index:.04,Middle:0,Ring:-.1,Pinky:-.2};
 function poseHands(){
   if(!rig)return;
@@ -2076,12 +2074,14 @@ function poseHands(){
     const open=isS&&combo.cur.openClaw;
     const openAmt=open?1.1:Math.min(1,.7+sw*.15+(isS?wd*.2:0))*calm;
     const c=(isS&&!open?sk*.9:0)-openAmt;
+    /* com os braços mutantes as garras compridas dobram bem menos (dobrando como dedos elas se embolam) */
+    const ck=armForm&&armForm.shown?CLAW_CURL:1;
     A.fingers.forEach(function(fg,fi){
       const th=fg.f==='Thumb'?.5:1;
       for(let i=0;i<3;i++){
         const kk=c<0?[.3,1.1,.45][i]:[.35,.6,.4][i];
         const wave=Math.sin(t*1.1+fi*.9+i*.55+off)*[.12,.3,.22][i]*calm*th;
-        twistB(fg.b[i],fg.ax[i],c*kk*th+wave);
+        twistB(fg.b[i],fg.ax[i],(c*kk*th+wave)*ck);
       }
       /* abertura lateral: polegar abre, anelar e mínimo vêm para junto do médio */
       const spread=open?SPREAD[fg.f]*.3+(fg.f==='Index'?.12:fg.f==='Ring'?-.05:fg.f==='Pinky'?.02:0)+(fg.f==='Thumb'?.2:0):SPREAD[fg.f]+(fg.f==='Ring'||fg.f==='Pinky'?-.06*sk:0);

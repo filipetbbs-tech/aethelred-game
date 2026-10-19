@@ -75,7 +75,25 @@ Aq,inv,nq=adj(Q,IR);dg=np.asarray(Aq.sum(1)).ravel()+1
 redsc=np.clip((r/np.maximum(g,1e-3)-1.25)/.5,0,1)*np.clip((sat-.3)/.2,0,1)
 sc_=np.zeros(nq);cn=np.zeros(nq);np.add.at(sc_,inv,redsc);np.add.at(cn,inv,1);sc_/=cn
 for _ in range(15):sc_=(Aq@sc_+sc_)/dg
-cape=(sc_>.3)[inv]
+# capa = tecido fino (a face de trás está a menos de 2,5 cm, procurando vizinhos atrás de cada ponto, na direção
+# oposta à normal) E vermelho; a armadura de escamas também é avermelhada mas tem volume por dentro
+import trimesh
+vn=trimesh.Trimesh(Q,IR,process=False).vertex_normals;tQ=cKDTree(Q);thick=np.full(len(Q),9.)
+for s0 in range(0,len(Q),4000):
+    for k_,lst in enumerate(tQ.query_ball_point(Q[s0:s0+4000],.05)):
+        i=s0+k_
+        if len(lst)<2:continue
+        dv=Q[lst]-Q[i];al=-(dv@vn[i]);lat=np.sqrt(np.maximum((dv*dv).sum(1)-al**2,0))
+        ok=(al>.002)&(lat<.008+al*.15)&((vn[lst]@vn[i])<-.2)
+        if ok.any():thick[i]=al[ok].min()
+s0_=(thick<.025).astype(float)*np.clip(redsc*1.5,0,1)
+sc_=np.zeros(nq);cn=np.zeros(nq);np.add.at(sc_,inv,s0_);np.add.at(cn,inv,1);sc_/=cn
+for _ in range(20):sc_=(Aq@sc_+sc_)/dg
+mm=sc_>.2
+for _ in range(3):mm=mm|((Aq@mm.astype(float))>0)
+oo=~mm
+for _ in range(3):oo=oo|((Aq@oo.astype(float))>0)
+cape=(~oo)[inv]
 # --- 2) cadeias dos braços e matrizes de ligação ---
 def rot_between(a,b_):
     a=a/nrm(a);b_=b_/nrm(b_);v=np.cross(a,b_);c=a@b_
@@ -107,7 +125,10 @@ for side,sg in [('Left',1),('Right',-1)]:
         if kq==0:rr=np.where(t<-.02,9,rr)
         s_m=rr<best_;best_[s_m]=rr[s_m];pos[s_m]=base+tc[s_m];base+=L_
     Hc=Wn+Hd*hand*.5;ball=nrm(Q-Hc,axis=1)<hand*.65
-    sel=((best_<.075)|ball)&(Q[:,0]*sg>.08)&~cape
+    # braço: perto da cadeia (raio de braço musculoso) e mais perto dela do que do eixo do tronco
+    hipP=BP[bi['Hips']];nkP=BP[bi['Neck']];ua=(nkP-hipP)/nrm(nkP-hipP);dq=Q-hipP
+    dSpine=nrm(dq-np.outer(dq@ua,ua),axis=1)
+    sel=(((best_<.11)&(best_<dSpine*.75))|ball)&(Q[:,0]*sg>.08)&~cape
     Larm=nrm(E-S);Lfa=nrm(Wn-E);bl=.035
     wE=np.clip((pos-(Larm-bl))/(2*bl),0,1);wW=np.clip((pos-(Larm+Lfa-bl))/(2*bl),0,1);wSh=np.clip(1-pos/.07,0,1)*.5
     v=np.nonzero(sel)[0]
@@ -121,6 +142,15 @@ capeOnly=cape&~armSel
 v=np.nonzero(capeOnly)[0];hv=hh[v]
 for name_,lo,hi_ in [('Hips',-9,.3),('Spine',.3,.6),('Spine1',.6,.85),('Spine2',.85,9)]:
     accW[v,bi[name_]]=((hv>=lo)&(hv<hi_)).astype(float)
+# abaixo do quadril a capa acompanha um pouco a coxa do mesmo lado (mais na aba da frente, que fica entre as pernas),
+# para as pernas não a atravessarem sem esticá-la como antes
+fw=np.cross(BP[bi['LeftArm']]-BP[bi['RightArm']],up);fw/=nrm(fw)
+if (BP[bi['LeftToeBase']]-BP[bi['LeftFoot']])@fw<0:fw=-fw
+lowv=hv<.3
+for side,sg in [('Left',1),('Right',-1)]:
+    sl=lowv&(Q[v,0]*sg>0)
+    kq=np.where(((Q[v]-hip)@fw)>0,.3,.1)*np.clip((.3-hv)/.4,0,1)
+    accW[v[sl],bi['Hips']]*=(1-kq[sl]);accW[v[sl],bi[side+'UpLeg']]+=kq[sl]
 # suaviza a transição entre os ossos do tronco na capa
 for _ in range(3):
     tmp=np.zeros((nq,NB));cnt=np.zeros(nq);np.add.at(tmp,inv[v],accW[v]);np.add.at(cnt,inv[v],1)

@@ -53,18 +53,17 @@ Caminhada em guarda: usa os passos da caminhada normal com o quadril só um pouc
 base um pouco mais larga (GUARD_WALK_WIDE), joelhos um pouco para fora (GUARD_WALK_KNEE) e a ponta
 dos pés ~20° para fora, alinhada com o joelho (GUARD_WALK_TOE). Constantes no index.html.
 Transformação (F / Triângulo): troca o modelo inteiro. Na forma normal o personagem é o modelo humano
-(aethelred_humano_rig.glb: aethelred_bracos_humanos_leve.glb, o mesmo personagem gerado com braços normais,
-preso ao esqueleto atual por ferramentas/rig_modelo_humano.py — alinha os dois modelos, dá aos braços pesos
-pela cadeia ombro-cotovelo-punho-mão e ao resto do corpo os pesos dos pontos mais próximos do modelo atual;
-usa ferramentas/encaixar_bracos_humanos.py para o alinhamento e os braços).
+rogue_warrior_leve.glb (com texturas PBR: cor, normal e metal/rugosidade), preso ao esqueleto atual por
+ferramentas/rig_rogue.py, que gera aethelred_humano_rig.glb:
+- alinha o modelo ao atual pelo corpo; acha a cadeia de cada braço pela cor da pele e gira os ossos do braço
+  para essa pose (matrizes de ligação próprias); braços com pesos pela cadeia (mão inteira presa ao osso da mão);
+- capa = tecido fino (face de trás a menos de 2,5 cm) e vermelho: presa ao tronco pela altura, e abaixo do
+  quadril acompanha um pouco a coxa do mesmo lado (mais na aba da frente); nunca presa só às pernas;
+- resto do corpo: pesos dos pontos mais próximos do modelo atual.
 Ao transformar, na metade da transição entra o modelo atual, que começa com os braços recolhidos
-(bracos_normais.bin, de ferramentas/gerar_bracos_normais.py) e termina com as garras e os espetos crescidos.
-Capa: a forma humana usa a capa do modelo monstruoso. O script marca a capa nos dois modelos pela cor
-(vermelho saturado, suavizado pela superfície); no jogo o modelo atual continua visível só na capa e
-o humano esconde só o que fica coberto por ela — capa antiga a até 6 cm, do lado de fora da superfície —
-para não abrir buracos, e o resto da capa humana também sai (só fica a faixa da frente do peito), para
-não sobrarem tiras presas às pernas (extras capeOld/capeHide). Os furos das capas são preenchidos.
-Se algum dos modelos mudar, rode os scripts de novo. As mãos do modelo humano não mexem os dedos.
+(bracos_normais.bin) e termina com as garras e os espetos crescidos. As mãos humanas não mexem os dedos.
+(Scripts antigos: rig_modelo_humano.py/encaixar_bracos_humanos.py faziam o mesmo com o modelo humano anterior,
+aethelred_bracos_humanos_leve.glb; rodar um deles sobrescreve aethelred_humano_rig.glb.)
 Mira dos golpes: sem tocar no analógico esquerdo (ou WASD), cada golpe vira para o inimigo mais
 próximo (lock-on automático). Com o analógico apontado na hora do golpe (inclusive o próximo golpe
 do combo), ele vira para aquele lado: trava no inimigo mais próximo dentro de um cone de ~50° para

@@ -73,11 +73,19 @@ def _seg(X,T,Cc,it=25,th=.25,close=0):
         m=~o_
     return m[inv]
 headW=sum((W*(J==bi[n])).sum(1) for n in ['Head','Neck'])
-capeOld=_seg(P,I,Co)&~hide&(headW<.5)
+capeOld=_seg(P,I,Co,close=5)&~hide&(headW<.5)
 capeNewRaw=_seg(Q2,I2,C2,close=4)
 # do humano só some o que fica coberto pela capa antiga (perto dela); o resto (faixa do peito etc.) continua
-dC,_=cKDTree(P[capeOld]).query(Q2)
-capeHide=((capeNewRaw&(dC<.05))|(dC<.015))&~arm&~extra
+# um ponto do humano só some se estiver coberto: existe capa antiga a até 6 cm dele, do lado de fora da superfície
+# (na direção da normal). Assim nada some onde a capa antiga não passa por cima (peito, pescoço) e não abre buraco
+PC=P[capeOld];tC=cKDTree(PC)
+dC,_=tC.query(Q2)
+cand=np.nonzero(((capeNewRaw&(dC<.05))|(dC<.015))&~arm&~extra)[0]
+dd_,ii_=tC.query(Q2[cand],k=24,distance_upper_bound=.06)
+ok=np.isfinite(dd_);ii_=np.where(ok,ii_,0)
+dots=((PC[ii_]-Q2[cand][:,None,:])*Nw[cand][:,None,:]).sum(2)
+covered=(ok&(dots>-.004)).sum(1)>=3
+capeHide=np.zeros(len(Q2),bool);capeHide[cand[covered]]=True
 print('capa antiga',capeOld.sum(),'capa humana escondida',capeHide.sum())
 def _bits(m):return base64.b64encode(np.packbits(m.astype(np.uint8),bitorder='little').tobytes()).decode()
 blobs=[];views=[];accs=[]

@@ -54,9 +54,9 @@ base um pouco mais larga (GUARD_WALK_WIDE), joelhos um pouco para fora (GUARD_WA
 dos pés ~20° para fora, alinhada com o joelho (GUARD_WALK_TOE). Constantes no index.html.
 Personagem e transformação (F / Triângulo): aethelred_personagem.glb = corpo rigado no Mixamo
 (modelos/rogue_mixamo_t_pose.fbx, convertido para modelos/rogue_mixamo_t_pose.glb com FBX2glTF), sem nenhuma
-alteração (malha, esqueleto, pesos e material do Mixamo) + as animações básicas (Idle, Walk, Sprint, Jump...)
-tiradas de aethelred_rig_leve.glb e passadas para este esqueleto (braços pela direção dos ossos, resto pela rotação a
-partir do repouso; quadril escalado pela altura). Monta com ferramentas/montar_personagem.py. Tecla T mostra a
+alteração (malha, esqueleto, pesos e material do Mixamo) + as animações básicas do Mixamo baixadas com este
+personagem (animacoes/base: idle, walking, sprint, jumping_up; andar e sprint sem o avanço do quadril, quem move é o
+jogo). Monta com ferramentas/montar_personagem.py (precisa do FBX2glTF; caminho em FBX2GLTF). Tecla T mostra a
 T-pose de repouso do Mixamo. Os 5 dedos de cada mão são animados.
 Braços mutantes: modelos/mutated_arm_claw_leve.glb (braço direito; o esquerdo é ele espelhado), presos aos ossos do
 braço por ferramentas/rig_braco.py (gera aethelred_braco_mutante_rig.glb). Na metade da transformação os braços

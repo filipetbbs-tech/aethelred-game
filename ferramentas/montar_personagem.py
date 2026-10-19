@@ -1,6 +1,5 @@
-"""Gera aethelred_personagem.glb: o corpo rigado no Mixamo (modelos/rogue_mixamo_t_pose.glb, convertido do FBX com
-FBX2glTF) com as texturas PBR do modelo original (modelos/rogue_warrior_t_pose_leve.glb: cor, normal, metal/rugosidade)
-e as animações embutidas de aethelred_rig_leve.glb (Idle, Walk, Sprint, Jump Start, Jump, Jump Land) passadas para
+"""Gera aethelred_personagem.glb: o arquivo do Mixamo sem nenhuma alteração (modelos/rogue_mixamo_t_pose.glb, convertido
+do FBX com FBX2glTF: malha, esqueleto, pesos e material dele) mais as animações embutidas de aethelred_rig_leve.glb (Idle, Walk, Sprint, Jump Start, Jump, Jump Land) passadas para
 este esqueleto: rotações copiadas osso a osso pelo nome (os dois são esqueletos do Mixamo); o quadril copia a
 orientação no mundo e o deslocamento dele é escalado pela altura do quadril; posições dos outros ossos e escalas
 saem (eram as proporções do modelo antigo). Também grava em extras.armHide os vértices dos braços (para a troca
@@ -30,7 +29,6 @@ def worldM(j,k):
     return M
 jN,bN=readglb(os.path.join(ROOT,'modelos','rogue_mixamo_t_pose.glb'))
 jO,bO=readglb(os.path.join(ROOT,'aethelred_rig_leve.glb'))
-jT,bT=readglb(os.path.join(ROOT,'modelos','rogue_warrior_t_pose_leve.glb'))
 blobs=[bytes(bN)]
 def addview(data,target=None):
     off=sum(len(x) for x in blobs);data=bytes(data);pad=(4-len(data)%4)%4;blobs.append(data+b'\0'*pad)
@@ -41,14 +39,7 @@ def addacc(arr,typ,ct,minmax=False):
     bv=addview(arr.tobytes());a={'bufferView':bv,'componentType':ct,'count':len(arr),'type':typ}
     if minmax:a['min']=arr.min(0).tolist();a['max']=arr.max(0).tolist()
     jN['accessors'].append(a);return len(jN['accessors'])-1
-# --- texturas PBR do original ---
-jN['images']=[];jN['textures']=[]
-for k,img in enumerate(jT['images']):
-    bv=jT['bufferViews'][img['bufferView']];data=bT[bv.get('byteOffset',0):bv.get('byteOffset',0)+bv['byteLength']]
-    jN['images'].append({'bufferView':addview(data),'mimeType':img.get('mimeType','image/jpeg')})
-jN['textures']=[{'source':t['source']} for t in jT['textures']]
-mat=json.loads(json.dumps(jT['materials'][0]));mat['name']='rogue';jN['materials']=[mat]
-jN.pop('samplers',None)
+# malha, esqueleto, pesos e material ficam exatamente como saíram do Mixamo (só as animações são acrescentadas)
 # --- animações antigas no esqueleto novo ---
 nodeN={clean(n.get('name','')):i for i,n in enumerate(jN['nodes'])}
 hipN=nodeN['Hips'];hipO=[i for i,n in enumerate(jO['nodes']) if clean(n.get('name',''))=='Hips'][0]

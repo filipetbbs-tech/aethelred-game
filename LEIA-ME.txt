@@ -53,8 +53,8 @@ Caminhada em guarda: usa os passos da caminhada normal com o quadril só um pouc
 base um pouco mais larga (GUARD_WALK_WIDE), joelhos um pouco para fora (GUARD_WALK_KNEE) e a ponta
 dos pés ~20° para fora, alinhada com o joelho (GUARD_WALK_TOE). Constantes no index.html.
 Personagem e transformação (F / Triângulo): aethelred_personagem.glb = corpo rigado no Mixamo
-(modelos/rogue_mixamo_t_pose.fbx, convertido para modelos/rogue_mixamo_t_pose.glb com FBX2glTF) + texturas PBR do
-modelo original (modelos/rogue_warrior_t_pose_leve.glb) + as animações básicas (Idle, Walk, Sprint, Jump...)
+(modelos/rogue_mixamo_t_pose.fbx, convertido para modelos/rogue_mixamo_t_pose.glb com FBX2glTF), sem nenhuma
+alteração (malha, esqueleto, pesos e material do Mixamo) + as animações básicas (Idle, Walk, Sprint, Jump...)
 tiradas de aethelred_rig_leve.glb e passadas para este esqueleto (braços pela direção dos ossos, resto pela rotação a
 partir do repouso; quadril escalado pela altura). Monta com ferramentas/montar_personagem.py. Tecla T mostra a
 T-pose de repouso do Mixamo. Os 5 dedos de cada mão são animados.

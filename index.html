@@ -1436,40 +1436,8 @@ function loadBinary(url,onBuf,onFail,onProg){
   }
   tryLoad(0);
 }
-/* personagem: aethelred_personagem.glb (corpo rigado no Mixamo, texturas PBR e as animações básicas, montado por
-   ferramentas/montar_personagem.py). Os braços mutantes ficam em aethelred_braco_mutante_rig.glb (direito e o esquerdo
-   espelhado, de ferramentas/rig_braco.py), com JOINTS/WEIGHTS para os ossos deste esqueleto e as próprias matrizes de
-   ligação (extras.inverseBind). Na transformação os braços humanos do corpo são escondidos (extras.armHide do corpo:
-   vértices dos braços, em bits base64) e os mutantes aparecem */
-let armForm=null;
-function loadSkinned(url,mesh,cb){
-  loadBinary(url,function(buf){
-    new THREE.GLTFLoader().parse(buf,'',function(g){
-      let src=null;g.scene.traverse(function(o){if(o.isMesh&&!src)src=o;});if(!src)return;
-      const ib=src.userData.inverseBind||[],bones=mesh.skeleton.bones,inv=bones.map(function(b,i){return new THREE.Matrix4().fromArray(ib,i*16);});
-      const mat=src.material;mat.skinning=true;mat.needsUpdate=true;
-      const sm=new THREE.SkinnedMesh(src.geometry,mat);sm.castShadow=true;sm.receiveShadow=true;sm.frustumCulled=false;
-      mesh.parent.add(sm);sm.position.copy(mesh.position);sm.quaternion.copy(mesh.quaternion);sm.scale.copy(mesh.scale);
-      sm.updateMatrixWorld(true);sm.bind(new THREE.Skeleton(bones,inv),mesh.bindMatrix);
-      cb(sm,src.userData);
-    },function(){});
-  },function(){});
-}
-function loadArmForms(root){
-  let mesh=null;root.traverse(function(o){if(o.isSkinnedMesh&&!mesh)mesh=o;});if(!mesh)return;
-  const g=mesh.geometry,full=g.index,n=g.attributes.position.count,bin=atob((mesh.userData&&mesh.userData.armHide)||''),hide=new Uint8Array(n);
-  for(let i=0;i<n;i++)hide[i]=(bin.charCodeAt(i>>3)>>(i&7))&1;
-  const a=full.array,keep=[];for(let t=0;t<a.length;t+=3)if(!hide[a[t]]&&!hide[a[t+1]]&&!hide[a[t+2]])keep.push(a[t],a[t+1],a[t+2]);
-  armForm={mesh:mesh,body:mesh,full:full,noArm:new THREE.BufferAttribute(new Uint32Array(keep),1),shown:null};
-  loadSkinned('aethelred_braco_mutante_rig.glb',mesh,function(sm){sm.visible=false;armForm.claws=sm;armForm.shown=null;applyArmForm();});
-}
-function applyArmForm(){
-  if(!armForm||!armForm.body)return;
-  const mon=st.morph>=.5&&!!armForm.claws;if(armForm.shown===mon)return;armForm.shown=mon;
-  armForm.body.geometry.setIndex(mon?armForm.noArm:armForm.full);if(armForm.claws)armForm.claws.visible=mon;
-}
 /* carrega o modelo que acompanha o jogo */
-loadBinary('aethelred_personagem.glb',function(buf){parseGLB(buf,'aethelred_personagem.glb');},
+loadBinary('aethelred_rig_leve.glb',function(buf){parseGLB(buf,'aethelred_rig_leve.glb');},
   function(){say('Não encontrei o modelo da personagem. Arraste um arquivo .glb para a tela ou toque em “Carregar modelo GLB”.');},
   function(f){say('Carregando o modelo da personagem... '+Math.round(f*100)+'%');});
 /* remove quadros-chave com tempo repetido: as animações do modelo têm alguns, e o Three.js
@@ -1499,7 +1467,6 @@ function useModel(gltf,name){
   m.scale.multiplyScalar(kk);
   m.position.x-=c.x*kk;m.position.z-=c.z*kk;m.position.y-=box.min.y*kk;
   m.traverse(function(o){if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;[].concat(o.material).forEach(function(mm){if(mm.metalness>.3)mm.metalness=.3;});}});
-  if(/aethelred_personagem/.test(name))loadArmForms(m);
   custom.add(m);hero.add(custom);hero.updateMatrixWorld(true);buildRig(m);
   hero.children.forEach(function(o){if(o!==custom&&o!==slash)o.visible=false;});
   renderer.outputEncoding=THREE.sRGBEncoding;
@@ -1627,8 +1594,8 @@ function buildRig(m){
   });
   r.hinge={};r.hingeSign={};
   hero.updateMatrixWorld(true);hero.getWorldQuaternion(_hq);_hqi.copy(_hq).invert();
-  r.restQ={};r.restP={};r.restL={};
-  Object.keys(B).forEach(function(n){r.restQ[n]=heroSpace(B[n],new THREE.Quaternion());r.restP[n]=hero.worldToLocal(wp(B[n]));r.restL[n]=B[n].position.clone();});
+  r.restQ={};r.restP={};
+  Object.keys(B).forEach(function(n){r.restQ[n]=heroSpace(B[n],new THREE.Quaternion());r.restP[n]=hero.worldToLocal(wp(B[n]));});
   rig=r;
   loadClips();
 }
@@ -2064,7 +2031,6 @@ function applyProc(A,p,w,mv){
   if(!combo.snap)groundFeet();
 }
 /* mãos: abertas e relaxadas o tempo todo, dedos se movendo devagar; no golpe fecham em garra */
-const CLAW_CURL=.3;
 const SPREAD={Thumb:.18,Index:.04,Middle:0,Ring:-.1,Pinky:-.2};
 function poseHands(){
   if(!rig)return;
@@ -2074,14 +2040,12 @@ function poseHands(){
     const open=isS&&combo.cur.openClaw;
     const openAmt=open?1.1:Math.min(1,.7+sw*.15+(isS?wd*.2:0))*calm;
     const c=(isS&&!open?sk*.9:0)-openAmt;
-    /* com os braços mutantes as garras compridas dobram bem menos (dobrando como dedos elas se embolam) */
-    const ck=armForm&&armForm.shown?CLAW_CURL:1;
     A.fingers.forEach(function(fg,fi){
       const th=fg.f==='Thumb'?.5:1;
       for(let i=0;i<3;i++){
         const kk=c<0?[.3,1.1,.45][i]:[.35,.6,.4][i];
         const wave=Math.sin(t*1.1+fi*.9+i*.55+off)*[.12,.3,.22][i]*calm*th;
-        twistB(fg.b[i],fg.ax[i],(c*kk*th+wave)*ck);
+        twistB(fg.b[i],fg.ax[i],c*kk*th+wave);
       }
       /* abertura lateral: polegar abre, anelar e mínimo vêm para junto do médio */
       const spread=open?SPREAD[fg.f]*.3+(fg.f==='Index'?.12:fg.f==='Ring'?-.05:fg.f==='Pinky'?.02:0)+(fg.f==='Thumb'?.2:0):SPREAD[fg.f]+(fg.f==='Ring'||fg.f==='Pinky'?-.06*sk:0);
@@ -2094,12 +2058,31 @@ function toggleTPose(){
   tpose=!tpose;
   combo.active=false;combo.w=0;combo.i=-1;comboEl.textContent=tpose?'Posição T (aperte T para voltar)':'';
 }
-/* posição T: o esqueleto volta à pose de repouso em que foi rigado (no Mixamo, a própria T-pose do modelo) */
 function poseT(){
-  const B=rig.B;hero.updateMatrixWorld(true);hero.getWorldQuaternion(_hq);
-  rig.m.traverse(function(o){if(!o.isBone)return;const n=o.name.replace(/^mixamorig[:_]?/,'');if(!rig.restQ[n])return;
-    if(n==='Hips')o.position.copy(rig.restL[n]);
-    setWorldQuat(o,_hq.clone().multiply(rig.restQ[n]));});
+  const B=rig.B;
+  rig.m.updateMatrixWorld(true);
+  updateFrame();
+  const dirTo=function(b,c,dir){const pb=wp(b),pc=wp(c);aimBone(b,pc.sub(pb).normalize(),dir);};
+  const up=fr.up,down=fr.up.clone().negate();
+  const sp=rig.spine.concat(['Neck','Head']).filter(function(n){return B[n];});
+  for(let i=0;i<sp.length-1;i++)dirTo(B[sp[i]],B[sp[i+1]],up);
+  ['Left','Right'].forEach(function(s){
+    const out=s==='Right'?fr.right.clone():fr.right.clone().negate();
+    const thumb=out.clone().add(fr.fwd).normalize();
+    dirTo(B[s+'Shoulder'],B[s+'Arm'],out);
+    dirTo(B[s+'Arm'],B[s+'ForeArm'],out);
+    dirTo(B[s+'ForeArm'],B[s+'Hand'],out);
+    if(B[s+'HandMiddle1'])dirTo(B[s+'Hand'],B[s+'HandMiddle1'],out);
+    ['Thumb','Index','Middle','Ring','Pinky'].forEach(function(f){
+      const d=f==='Thumb'?thumb:out;
+      for(let i=1;i<3;i++){const b=B[s+'Hand'+f+i],c=B[s+'Hand'+f+(i+1)];if(b&&c)dirTo(b,c,d);}
+      const b3=B[s+'Hand'+f+'3'],b2=B[s+'Hand'+f+'2'];
+      if(b3&&b2){b3.getWorldQuaternion(_wq);b2.getWorldQuaternion(_cq);setWorldQuat(b3,_cq);}
+    });
+    const legDir=down.clone().addScaledVector(out,.12).normalize();
+    dirTo(B[s+'UpLeg'],B[s+'Leg'],legDir);
+    dirTo(B[s+'Leg'],B[s+'Foot'],legDir);
+  });
 }
 /* passos: toca quando o pé desce até perto do chão (vale para andar, correr, passos dos golpes e aterrissagem) */
 const stepState={L:{armed:false,cd:0},R:{armed:false,cd:0}};
@@ -2292,7 +2275,6 @@ function tick(raw){
   updateTrail(dt,clawBase,clawTip,combo.active&&A&&pp>A.kw+.04&&pp<A.kf+.04);
   /* transformação */
   st.morph+=((st.morphOn?1:0)-st.morph)*Math.min(1,dt*6);
-  applyArmForm();
   arms.forEach(a=>{
     a.normal.visible=st.morph<.5;a.blight.visible=st.morph>=.5;
     const k=.6+.4*Math.min(1,(st.morph-.5)*2);
@@ -2324,7 +2306,7 @@ function tick(raw){
 }
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},get armForm(){return armForm;},get rig(){return rig;},get custom(){return custom;},cam:cam};
+window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},get rig(){return rig;},get custom(){return custom;},cam:cam};
 frame();
 })();
 </script>

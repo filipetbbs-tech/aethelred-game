@@ -67,25 +67,73 @@ hN=jointW(jN,'Hips')[1]-min(jointW(jN,'LeftToeBase')[1],jointW(jN,'LeftFoot')[1]
 restO=MpO@np.append(np.array(jO['nodes'][hipO].get('translation',[0,0,0])),1)
 restN=np.array(jN['nodes'][hipN].get('translation',[0,0,0]))
 print('altura do quadril (mundo): antigo',round(hO,4),'novo',round(hN,4))
+# retarget: R_novo(t)=R_velho(t)*R0v^-1*Swing*R0n (no mundo). Nos braços Swing alinha o eixo do osso antigo ao novo
+# (os dois repousos diferem: A e T); no resto Swing=identidade (o osso gira a partir do repouso como o antigo girava)
+def slerp_sample(T,Q,t):
+    k=np.clip(np.searchsorted(T,t)-1,0,len(T)-2);u=np.clip((t-T[k])/np.maximum(T[k+1]-T[k],1e-9),0,1)
+    q0=Q[k];q1=Q[k+1].copy();neg=(q0*q1).sum(1)<0;q1[neg]*=-1;q=q0*(1-u)[:,None]+q1*u[:,None];return q/nrm(q,axis=1)[:,None]
+def lerp_sample(T,V,t):
+    k=np.clip(np.searchsorted(T,t)-1,0,len(T)-2);u=np.clip((t-T[k])/np.maximum(T[k+1]-T[k],1e-9),0,1);return V[k]*(1-u)[:,None]+V[k+1]*u[:,None]
+nrm=np.linalg.norm
+def chainNames(j,root):
+    out=[];kids={}
+    def rec(k,p):
+        nm=clean(j['nodes'][k].get('name',''));out.append((nm,k,p))
+        for c in j['nodes'][k].get('children',[]):rec(c,k)
+    rec(root,None);return out
+ordO=chainNames(jO,hipO);ordN=chainNames(jN,hipN)
+nodeO={nm:k for nm,k,_ in ordO}
+def restWorldR(j,order,Rpar):
+    W={}
+    for nm,k,p in order:
+        Rl=Rr.from_quat(j['nodes'][k].get('rotation',[0,0,0,1])).as_matrix()
+        W[nm]=(W[clean(j['nodes'][p]['name'])] if p is not None else Rpar)@Rl
+    return W
+R0v=restWorldR(jO,ordO,RpO);R0n=restWorldR(jN,ordN,RpN)
+def yaxis(R):return R[:,1]
+OFF={}
+for nm,_,_ in ordN:
+    if nm not in R0v:continue
+    sw=np.eye(3)
+    a_=R0n[nm][:,1];b_=R0v[nm][:,1]
+    v=np.cross(a_,b_);c=a_@b_
+    if nrm(v)>1e-8:vx=np.array([[0,-v[2],v[1]],[v[2],0,-v[0]],[-v[1],v[0],0]]);sw=np.eye(3)+vx+vx@vx/(1+c)
+    # braços (repouso em A no esqueleto antigo e em T no novo): pela direção; o resto (tronco, cabeça, pernas): pela
+    # rotação a partir do repouso, porque a cabeça do esqueleto antigo já ficava inclinada para trás no repouso
+    armlike=any(x in nm for x in ['Arm','Hand'])
+    OFF[nm]=R0v[nm].T@(sw if armlike else np.eye(3))@R0n[nm]
 jN['animations']=[]
 for an in jO['animations']:
-    chans=[];samps=[]
+    rot={};tr=None;times=set()
     for ch in an['channels']:
-        nm=clean(jO['nodes'][ch['target']['node']].get('name',''));path=ch['target']['path']
-        if nm not in nodeN or path=='scale':continue
-        if path=='translation' and nm!='Hips':continue
-        sm=an['samplers'][ch['sampler']];T=acc(jO,bO,sm['input']).ravel().astype(np.float32);V=acc(jO,bO,sm['output']).astype(np.float64)
-        if path=='rotation' and nm=='Hips':
-            q=Rr.from_matrix(np.einsum('ij,njk->nik',RpN.T@RpO,Rr.from_quat(V).as_matrix())).as_quat();V=q
-        if path=='translation':
-            W=(MpO@np.hstack([V,np.ones((len(V),1))]).T).T[:,:3]   # posição do quadril no mundo antigo
-            dW=(W-restO[:3])*(hN/hO)                               # deslocamento escalado
-            V=restN+(RpN.T@dW.T).T/sN
-        iT=addacc(T,'SCALAR',5126,True);iV=addacc(V.astype(np.float32),'VEC4' if path=='rotation' else 'VEC3',5126)
-        samps.append({'input':iT,'output':iV,'interpolation':sm.get('interpolation','LINEAR')})
-        chans.append({'sampler':len(samps)-1,'target':{'node':nodeN[nm],'path':path}})
+        nm=clean(jO['nodes'][ch['target']['node']].get('name',''));sm=an['samplers'][ch['sampler']]
+        T=acc(jO,bO,sm['input']).ravel().astype(np.float64);V=acc(jO,bO,sm['output']).astype(np.float64)
+        if ch['target']['path']=='rotation':rot[nm]=(T,V);times.update(T.tolist())
+        elif ch['target']['path']=='translation' and nm=='Hips':tr=(T,V)
+    t=np.array(sorted(times));F=len(t)
+    WO={}
+    for nm,k,p in ordO:
+        if nm in rot:Rl=Rr.from_quat(slerp_sample(rot[nm][0],rot[nm][1],t)).as_matrix()
+        else:Rl=np.repeat(Rr.from_quat(jO['nodes'][k].get('rotation',[0,0,0,1])).as_matrix()[None],F,0)
+        Pw=WO[clean(jO['nodes'][p]['name'])] if p is not None else np.repeat(RpO[None],F,0)
+        WO[nm]=Pw@Rl
+    WN={};chans=[];samps=[]
+    iT=addacc(t.astype(np.float32),'SCALAR',5126,True)
+    for nm,k,p in ordN:
+        Pw=WN[clean(jN['nodes'][p]['name'])] if p is not None else np.repeat(RpN[None],F,0)
+        if nm in WO and nm in OFF:Wn=WO[nm]@OFF[nm]
+        else:Wn=Pw@Rr.from_quat(jN['nodes'][k].get('rotation',[0,0,0,1])).as_matrix()
+        WN[nm]=Wn
+        if nm not in WO:continue
+        q=Rr.from_matrix(np.einsum('nji,njk->nik',Pw,Wn)).as_quat()
+        iV=addacc(q.astype(np.float32),'VEC4',5126);samps.append({'input':iT,'output':iV,'interpolation':'LINEAR'})
+        chans.append({'sampler':len(samps)-1,'target':{'node':nodeN[nm],'path':'rotation'}})
+    if tr:
+        T,V=tr;Wp=(MpO@np.hstack([V,np.ones((len(V),1))]).T).T[:,:3];dW=(Wp-restO[:3])*(hN/hO);Vn=restN+(RpN.T@dW.T).T/sN
+        iT2=addacc(T.astype(np.float32),'SCALAR',5126,True);iV=addacc(Vn.astype(np.float32),'VEC3',5126)
+        samps.append({'input':iT2,'output':iV,'interpolation':'LINEAR'});chans.append({'sampler':len(samps)-1,'target':{'node':hipN,'path':'translation'}})
     jN['animations'].append({'name':an.get('name'),'channels':chans,'samplers':samps})
-    print('animação',an.get('name'),len(chans),'canais')
+    print('animação',an.get('name'),len(chans),'canais',F,'quadros')
 # --- vértices dos braços (para a troca pelos braços mutantes) ---
 mesh=jN['meshes'][0];p=mesh['primitives'][0]
 Jv=acc(jN,bN,p['attributes']['JOINTS_0']).astype(int);Wv=acc(jN,bN,p['attributes']['WEIGHTS_0']).astype(np.float64)

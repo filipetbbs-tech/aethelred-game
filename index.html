@@ -1627,8 +1627,8 @@ function buildRig(m){
   });
   r.hinge={};r.hingeSign={};
   hero.updateMatrixWorld(true);hero.getWorldQuaternion(_hq);_hqi.copy(_hq).invert();
-  r.restQ={};r.restP={};
-  Object.keys(B).forEach(function(n){r.restQ[n]=heroSpace(B[n],new THREE.Quaternion());r.restP[n]=hero.worldToLocal(wp(B[n]));});
+  r.restQ={};r.restP={};r.restL={};
+  Object.keys(B).forEach(function(n){r.restQ[n]=heroSpace(B[n],new THREE.Quaternion());r.restP[n]=hero.worldToLocal(wp(B[n]));r.restL[n]=B[n].position.clone();});
   rig=r;
   loadClips();
 }
@@ -2094,31 +2094,12 @@ function toggleTPose(){
   tpose=!tpose;
   combo.active=false;combo.w=0;combo.i=-1;comboEl.textContent=tpose?'Posição T (aperte T para voltar)':'';
 }
+/* posição T: o esqueleto volta à pose de repouso em que foi rigado (no Mixamo, a própria T-pose do modelo) */
 function poseT(){
-  const B=rig.B;
-  rig.m.updateMatrixWorld(true);
-  updateFrame();
-  const dirTo=function(b,c,dir){const pb=wp(b),pc=wp(c);aimBone(b,pc.sub(pb).normalize(),dir);};
-  const up=fr.up,down=fr.up.clone().negate();
-  const sp=rig.spine.concat(['Neck','Head']).filter(function(n){return B[n];});
-  for(let i=0;i<sp.length-1;i++)dirTo(B[sp[i]],B[sp[i+1]],up);
-  ['Left','Right'].forEach(function(s){
-    const out=s==='Right'?fr.right.clone():fr.right.clone().negate();
-    const thumb=out.clone().add(fr.fwd).normalize();
-    dirTo(B[s+'Shoulder'],B[s+'Arm'],out);
-    dirTo(B[s+'Arm'],B[s+'ForeArm'],out);
-    dirTo(B[s+'ForeArm'],B[s+'Hand'],out);
-    if(B[s+'HandMiddle1'])dirTo(B[s+'Hand'],B[s+'HandMiddle1'],out);
-    ['Thumb','Index','Middle','Ring','Pinky'].forEach(function(f){
-      const d=f==='Thumb'?thumb:out;
-      for(let i=1;i<3;i++){const b=B[s+'Hand'+f+i],c=B[s+'Hand'+f+(i+1)];if(b&&c)dirTo(b,c,d);}
-      const b3=B[s+'Hand'+f+'3'],b2=B[s+'Hand'+f+'2'];
-      if(b3&&b2){b3.getWorldQuaternion(_wq);b2.getWorldQuaternion(_cq);setWorldQuat(b3,_cq);}
-    });
-    const legDir=down.clone().addScaledVector(out,.12).normalize();
-    dirTo(B[s+'UpLeg'],B[s+'Leg'],legDir);
-    dirTo(B[s+'Leg'],B[s+'Foot'],legDir);
-  });
+  const B=rig.B;hero.updateMatrixWorld(true);hero.getWorldQuaternion(_hq);
+  rig.m.traverse(function(o){if(!o.isBone)return;const n=o.name.replace(/^mixamorig[:_]?/,'');if(!rig.restQ[n])return;
+    if(n==='Hips')o.position.copy(rig.restL[n]);
+    setWorldQuat(o,_hq.clone().multiply(rig.restQ[n]));});
 }
 /* passos: toca quando o pé desce até perto do chão (vale para andar, correr, passos dos golpes e aterrissagem) */
 const stepState={L:{armed:false,cd:0},R:{armed:false,cd:0}};

@@ -26,6 +26,7 @@ canvas{display:block}
 #modelBtn{right:18px;top:calc(386px + env(safe-area-inset-top,0px));bottom:auto}
 #mapBtn{right:18px;top:calc(448px + env(safe-area-inset-top,0px));bottom:auto}
 #slowBtn{right:18px;top:calc(510px + env(safe-area-inset-top,0px));bottom:auto}
+#armBtn{right:18px;top:calc(572px + env(safe-area-inset-top,0px));bottom:auto}
 #slowBtn.on{border-color:#d8b25a;color:#f0d68a}
 #obj{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);max-width:min(560px,calc(100% - 32px));text-align:center;pointer-events:none;font-size:15px;line-height:1.45;text-shadow:0 1px 5px #000;color:var(--bone);display:none}
 #obj b{color:#f0d68a;font-weight:normal}
@@ -60,6 +61,7 @@ canvas{display:block}
 <button class="btn" id="pauseBtn">Pausar</button>
 <button class="btn" id="soundBtn">Som: ligado</button>
 <button class="btn" id="musicBtn">Música: ligada</button>
+<button class="btn" id="armBtn">Braço mutante: novo</button>
 <button class="btn" id="slowBtn">Câmera lenta: não</button>
 <button class="btn" id="mapBtn">Ir para a Prisão</button>
 <button class="btn" id="godBtn">Invencível: não</button>
@@ -1683,8 +1685,20 @@ function loadArmForms(root){
   for(let i=0;i<n;i++)hide[i]=(bin.charCodeAt(i>>3)>>(i&7))&1;
   const a=full.array,keep=[];for(let t=0;t<a.length;t+=3)if(!hide[a[t]]&&!hide[a[t+1]]&&!hide[a[t+2]])keep.push(a[t],a[t+1],a[t+2]);
   armForm={mesh:mesh,body:mesh,full:full,noArm:new THREE.BufferAttribute(new Uint32Array(keep),1),shown:null};
-  loadSkinned('aethelred_braco_mutante_rig.glb',mesh,function(sm){sm.visible=false;armForm.claws=sm;armForm.shown=null;applyArmForm();});
+  loadArmModel();
 }
+/* modelos de braço mutante: o botão "Braço mutante" alterna entre eles (a escolha fica lembrada neste navegador) */
+const ARMS=[{file:'aethelred_braco_mutante_rig.glb',nome:'novo'},{file:'aethelred_braco_mutante_antigo.glb',nome:'antigo'}],armBtn=document.getElementById('armBtn');
+let armAt=0;try{const k=+localStorage.getItem('aeth_braco');if(ARMS[k])armAt=k;}catch(e){}
+armBtn.textContent='Braço mutante: '+ARMS[armAt].nome;
+function loadArmModel(){
+  if(!armForm)return;const af=armForm,i=armAt;
+  loadSkinned(ARMS[i].file,af.mesh,function(sm){
+    if(armForm!==af||armAt!==i){sm.parent&&sm.parent.remove(sm);return;}
+    if(af.claws&&af.claws.parent)af.claws.parent.remove(af.claws);
+    sm.visible=false;af.claws=sm;af.shown=null;applyArmForm();});
+}
+armBtn.onclick=function(){armAt=(armAt+1)%ARMS.length;armBtn.textContent='Braço mutante: '+ARMS[armAt].nome;try{localStorage.setItem('aeth_braco',String(armAt));}catch(e){}loadArmModel();armBtn.blur();};
 function applyArmForm(){
   if(!armForm||!armForm.body)return;
   const mon=st.morph>=.5&&!!armForm.claws;if(armForm.shown===mon)return;armForm.shown=mon;

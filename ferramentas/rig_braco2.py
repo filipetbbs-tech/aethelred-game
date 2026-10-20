@@ -69,6 +69,21 @@ for n,c in (('RightArm','RightForeArm'),('RightForeArm','RightHand'),('RightHand
         nn=n.replace('Right',side);cc=c.replace('Right',side)
         do=BP[cc]-BP[nn];dn=(NJ[c]-NJ[n])*mir;M=np.eye(4);M[:3,:3]=rot_between(do,dn)@BW[bi[nn]][:3,:3];M[:3,3]=NJ[n]*mir;IBa[bi[nn]]=np.linalg.inv(M)
 print('escala',round(s_,5))
+# --- proporção do braço antigo: antebraço mais grosso, braço um pouco mais grosso, mão e garras maiores ---
+# (engrossa em volta do eixo ombro-cotovelo-pulso e aumenta a mão a partir do pulso; ombro, peito e costas ficam iguais)
+GROSSO={'braco':1.12,'antebraco':1.45,'mao':1.22}
+sm0=lambda u:np.clip(u,0,1)**2*(3-2*np.clip(u,0,1))
+def deform(P_):
+    P_=np.array(P_,float);A,Bq,C=NJ['RightArm'],NJ['RightForeArm'],NJ['RightHand']
+    out=P_.copy()
+    for a,e,k0,k1 in ((A,Bq,GROSSO['braco'],GROSSO['antebraco']),(Bq,C,GROSSO['antebraco'],GROSSO['antebraco'])):
+        d=e-a;t=((P_-a)@d)/(d@d);inside=(t>=0)&(t<1)
+        k=k0+(k1-k0)*sm0(t)
+        if a is A:k=1+(k-1)*sm0(t/.25)          # sai do ombro sem mudar o encaixe
+        foot=a+np.outer(t,d);out=np.where(inside[:,None],foot+(P_-foot)*k[:,None],out)
+    d=C-Bq;t=((P_-Bq)@d)/(d@d);beyond=t>=1
+    out=np.where(beyond[:,None],C+(P_-C)*GROSSO['mao'],out)
+    return out
 # --- pesos ---
 Xr=toB(X);Nr=NA@Rm.T
 segs=[('RightArm',NJ['RightArm'],NJ['RightForeArm']),('RightForeArm',NJ['RightForeArm'],NJ['RightHand']),('RightHand',NJ['RightHand'],NJ['RightHandMiddle1']),
@@ -97,9 +112,10 @@ FJ={'Right':{},'Left':{}}
 for k,f in enumerate(FN):
     pts=[]
     for fr in (0,.3,.55,1.):
-        m=(fown==k)&((np.abs(fpar-fr)<.04) if fr<1 else (fpar>.97));pts.append(toB(Xq[m].mean(0)))
+        m=(fown==k)&((np.abs(fpar-fr)<.04) if fr<1 else (fpar>.97));pts.append(deform(toB(Xq[m].mean(0))[None])[0])
     FJ['Right'][f]=[p.tolist() for p in pts];FJ['Left'][f]=[(p*np.array([-1,1,1.])).tolist() for p in pts]
 mir=np.array([-1,1,1.]);nv=len(X)
+Xr=deform(Xr)
 Xall=np.vstack([Xr,Xr*mir]).astype(np.float32);Nall=np.vstack([Nr,Nr*mir]).astype(np.float32);UV=np.vstack([UVA,UVA])
 Tall=np.vstack([IA,IA[:,[0,2,1]]+nv]).astype(np.uint32)
 JF=np.vstack([topR,topL]).astype(np.uint8);WFq=np.clip(np.round(np.vstack([tw,tw])*255),0,255).astype(np.int32);WFq[:,0]+=255-WFq.sum(1);WFq=WFq.astype(np.uint8)

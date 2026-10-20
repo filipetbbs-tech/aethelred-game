@@ -1513,6 +1513,37 @@ function loadBinary(url,onBuf,onFail,onProg){
   }
   tryLoad(0);
 }
+/* perfil mixamo: braços mutantes na transformação. Os braços mutantes ficam em aethelred_braco_mutante_rig.glb (direito e o esquerdo
+   espelhado, de ferramentas/rig_braco.py), com JOINTS/WEIGHTS para os ossos deste esqueleto e as próprias matrizes de
+   ligação (extras.inverseBind). Na transformação os braços humanos do corpo são escondidos (extras.armHide do corpo:
+   vértices dos braços, em bits base64) e os mutantes aparecem */
+let armForm=null;
+function loadSkinned(url,mesh,cb){
+  loadBinary(url,function(buf){
+    new THREE.GLTFLoader().parse(buf,'',function(g){
+      let src=null;g.scene.traverse(function(o){if(o.isMesh&&!src)src=o;});if(!src)return;
+      const ib=src.userData.inverseBind||[],bones=mesh.skeleton.bones,inv=bones.map(function(b,i){return new THREE.Matrix4().fromArray(ib,i*16);});
+      const mat=src.material;mat.skinning=true;mat.needsUpdate=true;
+      const sm=new THREE.SkinnedMesh(src.geometry,mat);sm.castShadow=true;sm.receiveShadow=true;sm.frustumCulled=false;
+      mesh.parent.add(sm);sm.position.copy(mesh.position);sm.quaternion.copy(mesh.quaternion);sm.scale.copy(mesh.scale);
+      sm.updateMatrixWorld(true);sm.bind(new THREE.Skeleton(bones,inv),mesh.bindMatrix);
+      cb(sm,src.userData);
+    },function(){});
+  },function(){});
+}
+function loadArmForms(root){
+  let mesh=null;root.traverse(function(o){if(o.isSkinnedMesh&&!mesh)mesh=o;});if(!mesh)return;
+  const g=mesh.geometry,full=g.index,n=g.attributes.position.count,bin=atob((mesh.userData&&mesh.userData.armHide)||''),hide=new Uint8Array(n);
+  for(let i=0;i<n;i++)hide[i]=(bin.charCodeAt(i>>3)>>(i&7))&1;
+  const a=full.array,keep=[];for(let t=0;t<a.length;t+=3)if(!hide[a[t]]&&!hide[a[t+1]]&&!hide[a[t+2]])keep.push(a[t],a[t+1],a[t+2]);
+  armForm={mesh:mesh,body:mesh,full:full,noArm:new THREE.BufferAttribute(new Uint32Array(keep),1),shown:null};
+  loadSkinned('aethelred_braco_mutante_rig.glb',mesh,function(sm){sm.visible=false;armForm.claws=sm;armForm.shown=null;applyArmForm();});
+}
+function applyArmForm(){
+  if(!armForm||!armForm.body)return;
+  const mon=st.morph>=.5&&!!armForm.claws;if(armForm.shown===mon)return;armForm.shown=mon;
+  armForm.body.geometry.setIndex(mon?armForm.noArm:armForm.full);if(armForm.claws)armForm.claws.visible=mon;
+}
 /* modelos que acompanham o jogo; o botão "Modelo" alterna entre eles (a escolha fica lembrada neste navegador) */
 const MODELOS=[{file:'aethelred_personagem.glb',nome:'Mixamo'},{file:'aethelred_rig_rosto.glb',nome:'original'}],modelBuf={};
 const modelBtn=document.getElementById('modelBtn');
@@ -1610,7 +1641,7 @@ float skCell(vec3 p,out float id){vec3 i=floor(p),f=fract(p);float d=9.;id=0.;
   });
 }
 function useModel(gltf,name){
-  PERFIL=PERFIS[name]||'original';
+  PERFIL=PERFIS[name]||'original';armForm=null;
   const mx=PERFIL==='mixamo';ATT=mx?ATT_MIX:ATT_B;AIR=mx?AIRATK_MIX:AIRATK;AIRCLIP=mx?'mjump':'jatk';combo.active=false;combo.i=-1;combo.w=0;combo.hold=0;airAtk=null;
   if(custom)hero.remove(custom);
   custom=new THREE.Group();
@@ -1625,7 +1656,7 @@ function useModel(gltf,name){
   m.scale.multiplyScalar(kk);
   m.position.x-=c.x*kk;m.position.z-=c.z*kk;m.position.y-=box.min.y*kk;
   m.traverse(function(o){if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;[].concat(o.material).forEach(function(mm){if(mm.metalness>.3)mm.metalness=.3;});}});
-  custom.add(m);hero.add(custom);hero.updateMatrixWorld(true);if(PERFIL==='mixamo')addSkinDetail(m);buildRig(m);
+  custom.add(m);hero.add(custom);hero.updateMatrixWorld(true);if(PERFIL==='mixamo'){addSkinDetail(m);loadArmForms(m);}buildRig(m);
   hero.children.forEach(function(o){if(o!==custom&&o!==slash)o.visible=false;});
   renderer.outputEncoding=THREE.sRGBEncoding;
   scene.traverse(function(o){if(o.material){[].concat(o.material).forEach(function(mm){mm.needsUpdate=true;});}});
@@ -2444,6 +2475,7 @@ function tick(raw){
   updateTrail(dt,clawBase,clawTip,combo.active&&A&&pp>A.kw+.04&&pp<A.kf+.04);
   /* transformação */
   st.morph+=((st.morphOn?1:0)-st.morph)*Math.min(1,dt*6);
+  applyArmForm();
   arms.forEach(a=>{
     a.normal.visible=st.morph<.5;a.blight.visible=st.morph>=.5;
     const k=.6+.4*Math.min(1,(st.morph-.5)*2);
@@ -2865,7 +2897,7 @@ function drawMini(){
 if(/prisao|prison/i.test(location.hash))setTimeout(enterPrison,0);
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes};
+window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},get armForm(){return armForm;},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes};
 frame();
 })();
 </script>

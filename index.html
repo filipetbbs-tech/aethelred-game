@@ -1681,6 +1681,30 @@ function loadSkinned(url,mesh,cb){
   },function(){});
 }
 const ARM_KEEP=.22;
+/* textura de músculo (musculo.jpg, tirada do braço mutante) aplicada em projeção tripla sobre o ombro humano que sobra
+   na transformação, com a cor do músculo. MUSC.mm: tamanho de um ladrilho da textura em milímetros */
+const MUSC={mm:140,tex:null,uni:[],on:0};
+loadBinary('musculo.jpg',function(buf){const img=new Image();img.onload=function(){const t=new THREE.Texture(img);t.wrapS=t.wrapT=THREE.MirroredRepeatWrapping;t.encoding=THREE.sRGBEncoding;t.needsUpdate=true;MUSC.tex=t;MUSC.uni.forEach(function(u){u.uMuscTex.value=t;});};img.src=URL.createObjectURL(new Blob([buf],{type:'image/jpeg'}));},function(){});
+function addMuscleSkin(mesh){
+  const sc=mesh.getWorldScale(new THREE.Vector3()).x/hero.getWorldScale(new THREE.Vector3()).x;
+  [].concat(mesh.material).forEach(function(mat){
+    const prev=mat.onBeforeCompile;
+    mat.onBeforeCompile=function(sh,r){
+      if(prev)prev.call(this,sh,r);
+      sh.uniforms.uMuscTex={value:MUSC.tex};sh.uniforms.uMuscOn={value:MUSC.on};sh.uniforms.uMuscS={value:sc*1000/MUSC.mm};MUSC.uni.push(sh.uniforms);
+      sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute float aMusc;varying float vMusc;varying vec3 vMP,vMN;')
+        .replace('#include <begin_vertex>','#include <begin_vertex>\nvMusc=aMusc;vMP=position;vMN=normal;');
+      sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform sampler2D uMuscTex;uniform float uMuscOn,uMuscS;varying float vMusc;varying vec3 vMP,vMN;')
+        .replace('#include <map_fragment>',`#include <map_fragment>
+if(vMusc*uMuscOn>.001){
+  vec3 nw=abs(normalize(vMN));nw=pow(nw,vec3(4.));nw/=nw.x+nw.y+nw.z;vec3 q=vMP*uMuscS;
+  vec3 mc=texture2D(uMuscTex,q.yz).rgb*nw.x+texture2D(uMuscTex,q.xz).rgb*nw.y+texture2D(uMuscTex,q.xy).rgb*nw.z;
+  diffuseColor.rgb=mix(diffuseColor.rgb,pow(mc,vec3(2.2)),vMusc*uMuscOn);
+}`);
+    };
+    mat.needsUpdate=true;
+  });
+}
 function loadArmForms(root){
   let mesh=null;root.traverse(function(o){if(o.isSkinnedMesh&&!mesh)mesh=o;});if(!mesh)return;
   const g=mesh.geometry,full=g.index,n=g.attributes.position.count,bin=atob((mesh.userData&&mesh.userData.armHide)||''),hide=new Uint8Array(n);
@@ -1696,6 +1720,9 @@ function loadArmForms(root){
       if((s==='Left')!==(v.x>0))continue;
       const t=v.clone().sub(A).dot(d)/dd;if(t<ARM_KEEP)hide[i]=0;}
   });
+  /* o pedaço de pele humana que fica (ombro) ganha textura de músculo na transformação: marca esses vértices */
+  const mus=new Float32Array(n);for(let i=0;i<n;i++)mus[i]=((bin.charCodeAt(i>>3)>>(i&7))&1)&&!hide[i]?1:0;
+  g.setAttribute('aMusc',new THREE.BufferAttribute(mus,1));addMuscleSkin(mesh);
   const a=full.array,keep=[];for(let t=0;t<a.length;t+=3)if(!hide[a[t]]&&!hide[a[t+1]]&&!hide[a[t+2]])keep.push(a[t],a[t+1],a[t+2]);
   armForm={mesh:mesh,body:mesh,full:full,noArm:new THREE.BufferAttribute(new Uint32Array(keep),1),shown:null};
   loadArmModel();
@@ -1715,7 +1742,7 @@ armBtn.onclick=function(){armAt=(armAt+1)%ARMS.length;armBtn.textContent='Braço
 function applyArmForm(){
   if(!armForm||!armForm.body)return;
   const mon=st.morph>=.5&&!!armForm.claws;if(armForm.shown===mon)return;armForm.shown=mon;
-  armForm.body.geometry.setIndex(mon?armForm.noArm:armForm.full);if(armForm.claws)armForm.claws.visible=mon;
+  armForm.body.geometry.setIndex(mon?armForm.noArm:armForm.full);MUSC.on=mon?1:0;MUSC.uni.forEach(function(u){u.uMuscOn.value=MUSC.on;});if(armForm.claws)armForm.claws.visible=mon;
 }
 /* modelos que acompanham o jogo; o botão "Modelo" alterna entre eles (a escolha fica lembrada neste navegador) */
 const MODELOS=[{file:'aethelred_personagem.glb',nome:'Mixamo'},{file:'aethelred_rig_rosto.glb',nome:'original'}],modelBuf={};

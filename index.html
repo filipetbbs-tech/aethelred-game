@@ -1589,8 +1589,8 @@ function poseMorphWalk(dt,on){
    lado a lado com os joelhos abertos para fora, tronco inclinado com os ombros encolhidos e a cabeça erguida, braços
    abertos para os lados e para baixo, cotovelos para fora e as garras apontando para fora e para baixo.
    MGUARD: inclinação, distância dos pés ao centro (m), descida do quadril (m), joelhos para fora, mão à frente/abaixo/
-   para fora (em braços), ombros encolhidos (rad), cabeça erguida (rad) */
-const MGUARD={lean:.5,width:.5,drop:.3,bow:.9,fwd:.3,down:.55,out:.72,shrug:.22,headUp:.75,breathe:.025};
+   para fora (em braços), ombros encolhidos (rad), cabeça erguida (rad), giro das palmas para fora (rad) */
+const MGUARD={lean:.5,width:.44,drop:.14,bow:.9,fwd:.3,down:.55,out:.72,shrug:.22,headUp:.75,breathe:.025,palmOut:1.75};
 let mGuardW=0;
 function poseMorphGuard(dt,on){
   mGuardW+=((on?1:0)-mGuardW)*Math.min(1,dt*(on?5:8));if(mGuardW<.01)return;
@@ -1619,7 +1619,13 @@ function poseMorphGuard(dt,on){
   ['Left','Right'].forEach(function(s){const sg=s==='Right'?1:-1,sh=wp(B[s+'Arm']),L=rig.armLen,b=Math.sin(st.t*1.6+(sg>0?0:1.3))*.02;
     const t=sh.clone().addScaledVector(F,(MGUARD.fwd+b)*L).addScaledVector(UPV,-MGUARD.down*L).addScaledVector(R,sg*MGUARD.out*L);
     const pole=F.clone().multiplyScalar(-.5).addScaledVector(UPV,.2).addScaledVector(R,sg*1);
-    ikHinge(B[s+'Arm'],B[s+'ForeArm'],B[s+'Hand'],t,pole,w,s+'Arm');});
+    ikHinge(B[s+'Arm'],B[s+'ForeArm'],B[s+'Hand'],t,pole,w,s+'Arm');
+    /* palmas giradas para fora: gira o antebraço no próprio eixo, no sentido que leva a palma para o lado de fora */
+    const el=wp(B[s+'ForeArm']),hd=wp(B[s+'Hand']),d=hd.clone().sub(el).normalize();
+    const along=wp(B[s+'HandMiddle1']).sub(hd),across=wp(B[s+'HandIndex1']).sub(wp(B[s+'HandPinky1']));
+    const palm=new THREE.Vector3().crossVectors(along,across).multiplyScalar(sg>0?-1:1).normalize(),outv=R.clone().multiplyScalar(sg);
+    const a=MGUARD.palmOut*w,pa=palm.clone().applyAxisAngle(d,a).dot(outv),pb=palm.clone().applyAxisAngle(d,-a).dot(outv);
+    rotAxis(B[s+'ForeArm'],d,pa>=pb?a:-a);});
 }
 /* animação das garras: c = quanto fecham (-1 abertas e esticadas, 1 cerradas); s = quanto se abrem em leque */
 const CLAW={base:.18,curl:[.55,.65,.45],spread:.14};

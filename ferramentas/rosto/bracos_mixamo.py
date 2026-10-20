@@ -1,7 +1,9 @@
-# braços do personagem do Mixamo: projeta as 4 vistas de rostos/referencia_bracos.webp (cima/dorso, baixo/palma, frente/polegar, trás/mindinho)
-# uso: python3 ferramentas/rosto/bracos_mixamo.py (gera mix_tex_bracos.png; precisa de glb.py desta pasta) e depois ferramentas/trocar_textura.py
+# braços do personagem do Mixamo: projeta as 4 vistas de rostos/referencia_bracos.webp (cima/dorso, baixo/palma, frente/polegar, trás/mindinho),
+# tirando antes as sombras grandes da foto. Uso: python3 ferramentas/rosto/bracos_mixamo.py textura_sem_bracos.png
+# (gera mix_tex_bracos.png; precisa de glb.py desta pasta) e depois ferramentas/trocar_textura.py
 # projeta as vistas dorsal e palmar (arm_ref.webp) nos braços do personagem do Mixamo
-import numpy as np, io
+import numpy as np, io, sys
+BASE=sys.argv[1] if len(sys.argv)>1 else 'mix_tex.png'
 from PIL import Image, ImageFilter
 from glb import load, acc
 j,b=load('/home/user/aethelred-game/aethelred_personagem.glb')
@@ -11,7 +13,7 @@ I=acc(j,b,pr['indices']).ravel();Jn=acc(j,b,at['JOINTS_0']);W=acc(j,b,at['WEIGHT
 if W.max()>1.5:W/=255
 names=[j['nodes'][n]['name'].replace('mixamorig:','') for n in j['skins'][0]['joints']]
 v=j['bufferViews'][j['images'][0]['bufferView']];o=v.get('byteOffset',0)
-TEX=np.asarray(Image.open(io.BytesIO(b[o:o+v['byteLength']])).convert('RGB'),np.float32);TH,TW=TEX.shape[:2]
+TEX=np.asarray(Image.open(BASE).convert('RGB'),np.float32);TH,TW=TEX.shape[:2]   # textura sem a pintura dos braços;TH,TW=TEX.shape[:2]
 SRC=np.asarray(Image.open('/home/user/aethelred-game/rostos/referencia_bracos.webp').convert('RGB'),np.float32)
 armw=np.zeros(len(P))
 for k,n in enumerate(names):
@@ -29,6 +31,15 @@ VIEWS={'cima':dict(xs=XS,rows=(0,252),ax='z',sg=-1),'baixo':dict(xs=XS,rows=(258
        'frente':dict(xs=XS,rows=(505,752),ax='y',sg=1),'tras':dict(xs=XS,rows=(755,1012),ax='y',sg=1)}
 W_IMG=SRC.shape[1]
 mx=SRC.max(2);mn=SRC.min(2);msk=(mx-mn)>18
+# tira as sombras grandes pintadas na foto (manchas escuras no bíceps), mantendo veias, poros e pelos:
+# divide pela luminosidade média da vizinhança (só dentro do braço) e multiplica pela média geral
+from PIL import ImageFilter as _F
+from scipy.ndimage import gaussian_filter as _gf
+def _blur(a,r):return _gf(a.astype(np.float32),r)
+Lum=SRC.mean(2);mk=msk.astype(np.float32);ero=np.asarray(Image.fromarray((mk*255).astype(np.uint8)).filter(_F.MinFilter(7)),np.float32)/255
+Lb=_blur(Lum*ero,22)/np.maximum(_blur(ero,22),1e-3)
+FLAT=1.0
+SRC=SRC*(np.clip((Lum[ero>0.5].mean()/np.maximum(Lb,1)),0.6,1.8)**FLAT)[...,None]*msk[...,None]+SRC*(1-msk[...,None])
 def silh(V):
     r0,r1=V['rows'];m=msk[r0:r1];top=np.full(W_IMG,np.nan);bot=np.full(W_IMG,np.nan)
     for x in range(W_IMG):

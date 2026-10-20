@@ -6,8 +6,8 @@ Conteúdo:
   Idle, Walk, Sprint, Jump, Jump Start, Jump Land).
 - aethelred_rig_rosto.glb: o mesmo modelo com o rosto de rostos/rosto_aethelred.webp
   (textura própria em alta resolução só no rosto). É este que carrega ao abrir o jogo.
-  Armadura recolorida em marrom/vermelho (ref.: rostos/referencia_armadura.webp), capuz marrom escuro.
-  Ferramentas em ferramentas/rosto/: regions.py (regiões por osso), recolor.py (cores da roupa),
+  Cores originais, com fivelas douradas e cinto, bolsas e botas em marrom escuro.
+  Ferramentas em ferramentas/rosto/: regions.py (regiões por osso), paint.py (pinta peças por região 3D),
   build.py (projeta a foto do rosto), writeglb.py (grava o GLB).
 
 Como executar no computador:

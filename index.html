@@ -1641,7 +1641,9 @@ function animClaws(){
   if(combo.active&&combo.cur){const A=combo.cur,p=progA(A,combo.t);
     if(p<A.kw){const u=sm(p/Math.max(A.kw,.01));c+=(-.55-c)*u;s=u;}
     else if(p<A.kf){const u=sm((p-A.kw)/Math.max(A.ki-A.kw,.01));c=-.55+(.85+.55)*u;s=1-u;}
-    else{const u=sm((p-A.kf)/.25);c=.85+(CLAW.base-.85)*u;}}
+    else{const u=sm((p-A.kf)/.25);c=.85+(CLAW.base-.85)*u;}
+    /* golpes 2 a 4 (Dual Weapon Combo): no auge do golpe, quando o dano acontece, os dedos estão abertos */
+    if(A.clip==='dual')(A.hits||[A.hit]).forEach(function(h){const d=Math.abs(p-h),k=1-sm((d-.05)/.12);if(k>0){c+=(-.6-c)*k;s=Math.max(s,k);}});}
   else if(airAtk){c=-.5;s=1;}
   else if(combo.hold>0)c=.35+.05*Math.sin(st.t*2.1);
   const F=armForm.claws.userData.fingers,off={Pinky:-1.5,Ring:-.5,Middle:.5,Index:1.5,Thumb:0};

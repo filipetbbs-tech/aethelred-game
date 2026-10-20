@@ -3,6 +3,6 @@ Um arquivo aqui com o mesmo nome de um de animacoes/ (ex.: flying_kick.glb) subs
 comum só para esse personagem; o modelo original continua usando a de animacoes/.
 
 Combo do personagem do Mixamo (ATT_MIX no index.html):
-1 mutant_swiping.glb; 2, 3 e 4 trechos espelhados de dual_weapon_combo.glb (0-1,47 s, 1,47-2,33 s, 2,33-3,45 s);
+1 mutant_swiping.glb; 2, 3 e 4 trechos espelhados de dual_weapon_combo.glb (0-1,47 s, 1,47-2,33 s, 2,33-2,85 s);
 5 o 4º golpe do combo original (Sword And Shield Slash). Ataque pulando: mutant_jump_attack.glb.
 Idle: animação nova (Idle.fbx) embutida no aethelred_personagem.glb; a antiga virou "Guarda" (postura depois dos golpes).

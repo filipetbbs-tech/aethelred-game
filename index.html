@@ -1509,7 +1509,7 @@ function loadBinary(url,onBuf,onFail,onProg){
   tryLoad(0);
 }
 /* carrega o modelo que acompanha o jogo */
-loadBinary('aethelred_rig_leve.glb',function(buf){parseGLB(buf,'aethelred_rig_leve.glb');},
+loadBinary('aethelred_rig_rosto.glb',function(buf){parseGLB(buf,'aethelred_rig_rosto.glb');},
   function(){say('Não encontrei o modelo da personagem. Arraste um arquivo .glb para a tela ou toque em “Carregar modelo GLB”.');},
   function(f){say('Carregando o modelo da personagem... '+Math.round(f*100)+'%');});
 /* remove quadros-chave com tempo repetido: as animações do modelo têm alguns, e o Three.js

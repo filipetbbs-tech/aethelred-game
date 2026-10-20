@@ -3,7 +3,10 @@ AETHELRED — PROTÓTIPO 3D
 Conteúdo:
 - index.html: o jogo (Three.js r128 carregado de CDN, precisa de internet).
 - aethelred_rig_leve.glb: modelo rigado (esqueleto Mixamo + cauda, 6 clipes:
-  Idle, Walk, Sprint, Jump, Jump Start, Jump Land). Carrega sozinho ao abrir o jogo.
+  Idle, Walk, Sprint, Jump, Jump Start, Jump Land).
+- aethelred_rig_rosto.glb: o mesmo modelo com o rosto de rostos/rosto_aethelred.webp
+  (textura própria em alta resolução só no rosto). É este que carrega ao abrir o jogo.
+  Para trocar o rosto: ferramentas/rosto/ (build.py projeta a foto, writeglb.py grava o GLB).
 
 Como executar no computador:
 1. Abra um terminal na pasta do projeto.

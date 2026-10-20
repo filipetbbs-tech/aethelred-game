@@ -1565,13 +1565,19 @@ function poseMorphRun(dt){
   });
 }
 /* caminhada transformada: o contrário da corrida. Tronco só um pouco inclinado, braços ao lado do corpo, afastados
-   para as garras não encostarem nas pernas, e as palmas para a frente, giradas para dentro. MWALK: inclinação, afastamento,
-   balanço, giro da palma para dentro (rad) */
-const MWALK={lean:.2,out:.45,fwd:.08,sway:.1,palmIn:.785};
+   para as garras não encostarem nas pernas, mão e antebraço na rotação do idle, e joelhos levemente flexionados.
+   MWALK: inclinação, afastamento, balanço, quanto o quadril desce (m) */
+const MWALK={lean:.38,out:.6,fwd:.08,sway:.1,crouch:.09};
 let mWalkW=0;
 function poseMorphWalk(dt,on){
   mWalkW+=((on?1:0)-mWalkW)*Math.min(1,dt*(on?5:8));if(mWalkW<.01)return;
   const B=rig.B,w=sm(mWalkW),F=new THREE.Vector3(Math.sin(st.rot),0,Math.cos(st.rot)),R=new THREE.Vector3().crossVectors(F,UPV).normalize();
+  /* joelhos: o quadril desce e as pernas dobram para os pés continuarem onde a animação os pôs */
+  const ft={};['Left','Right'].forEach(function(s){ft[s]=wp(B[s+'Foot']);B[s+'Foot'].getWorldQuaternion(_cq);ft[s+'q']=_cq.clone();});
+  if(!B.Hips._p){B.Hips._p=B.Hips.position.clone();touchedP.push(B.Hips);}
+  const hw=wp(B.Hips).addScaledVector(UPV,-MWALK.crouch*w);B.Hips.position.copy(B.Hips.parent.worldToLocal(hw));B.Hips.updateMatrixWorld(true);
+  ['Left','Right'].forEach(function(s){const knee=F.clone().addScaledVector(UPV,.1);
+    ikHinge(B[s+'UpLeg'],B[s+'Leg'],B[s+'Foot'],ft[s],knee,1,s+'Leg',true);setWorldQuat(B[s+'Foot'],ft[s+'q']);});
   const parts=[.34,.36,.30];rig.spine.forEach(function(n,i){rotAxis(B[n],R,-MWALK.lean*parts[i]*w);});
   rotAxis(B.Head,R,MWALK.lean*.6*w);
   ['Left','Right'].forEach(function(s){
@@ -1580,15 +1586,6 @@ function poseMorphWalk(dt,on){
     const dir=UPV.clone().multiplyScalar(-1).addScaledVector(R,sg*MWALK.out).addScaledVector(F,MWALK.fwd+sw).normalize();
     const pole=F.clone().multiplyScalar(-1).addScaledVector(R,sg*.4);
     ikHinge(B[s+'Arm'],B[s+'ForeArm'],B[s+'Hand'],sh.clone().addScaledVector(dir,L*.93),pole,w,s+'Arm');
-    /* palma para a frente: gira o antebraço em volta do próprio eixo até a normal da palma apontar para F */
-    const el=wp(B[s+'ForeArm']),hd=wp(B[s+'Hand']),d=hd.clone().sub(el).normalize();
-    const along=wp(B[s+'HandMiddle1']||B[s+'Hand']).sub(hd),across=wp(B[s+'HandIndex1']).sub(wp(B[s+'HandPinky1']));
-    const palm=new THREE.Vector3().crossVectors(along,across).multiplyScalar(s==='Right'?-1:1);
-    palm.addScaledVector(d,-palm.dot(d));
-    /* palma para a frente girada palmIn (rad) para dentro, na direção do corpo */
-    const tg=F.clone().multiplyScalar(Math.cos(MWALK.palmIn)).addScaledVector(R,-sg*Math.sin(MWALK.palmIn));tg.addScaledVector(d,-tg.dot(d));
-    if(palm.lengthSq()>1e-10&&tg.lengthSq()>1e-10){palm.normalize();tg.normalize();
-      rotAxis(B[s+'ForeArm'],d,Math.atan2(new THREE.Vector3().crossVectors(palm,tg).dot(d),palm.dot(tg))*w);}
   });
 }
 /* animação das garras: c = quanto fecham (-1 abertas e esticadas, 1 cerradas); s = quanto se abrem em leque */

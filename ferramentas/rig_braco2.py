@@ -71,7 +71,7 @@ for n,c in (('RightArm','RightForeArm'),('RightForeArm','RightHand'),('RightHand
 print('escala',round(s_,5))
 # --- proporção do braço antigo: antebraço mais grosso, braço um pouco mais grosso, mão e garras maiores ---
 # (engrossa em volta do eixo ombro-cotovelo-pulso e aumenta a mão a partir do pulso; ombro, peito e costas ficam iguais)
-GROSSO={'braco':1.12,'antebraco':1.45,'mao':1.22,'ombro':1.4}
+GROSSO={'braco':1.12,'antebraco':1.45,'mao':1.5,'ombro':1.4}
 sm0=lambda u:np.clip(u,0,1)**2*(3-2*np.clip(u,0,1))
 def deform(P_):
     P_=np.array(P_,float);A,Bq,C=NJ['RightArm'],NJ['RightForeArm'],NJ['RightHand']
@@ -122,7 +122,7 @@ Xr=deform(Xr)
 Xall=np.vstack([Xr,Xr*mir]).astype(np.float32);Nall=np.vstack([Nr,Nr*mir]).astype(np.float32);UV=np.vstack([UVA,UVA])
 Tall=np.vstack([IA,IA[:,[0,2,1]]+nv]).astype(np.uint32)
 JF=np.vstack([topR,topL]).astype(np.uint8);WFq=np.clip(np.round(np.vstack([tw,tw])*255),0,255).astype(np.int32);WFq[:,0]+=255-WFq.sum(1);WFq=WFq.astype(np.uint8)
-# --- grava (texturas: cor como veio; normal e rugosidade em 2048 JPEG; sem emissão) ---
+# --- grava (texturas: cor em 4096, normal em 2048 e rugosidade em 1024, JPEG; sem emissão) ---
 blobs=[];views=[];accs=[]
 def addb(bb):
     off=sum(len(x) for x in blobs);blobs.append(bb+b'\0'*((4-len(bb)%4)%4));views.append({'buffer':0,'byteOffset':off,'byteLength':len(bb)});return len(views)-1
@@ -134,11 +134,15 @@ def add(arr,typ,ct,minmax=False,normalized=False):
 iP=add(Xall,'VEC3',5126,True);iN=add(Nall,'VEC3',5126);iU=add(UV,'VEC2',5126)
 iJ=add(JF,'VEC4',5121);iW=add(WFq,'VEC4',5121,normalized=True);iI=add(Tall.ravel(),'SCALAR',5125)
 mat=jA['materials'][0];images=[]
-def addimg(k,size,fmt):
+COR={'sat':.62,'brilho':1.06}   # cor: menos saturada (vermelho mais rosado/pálido, como o braço antigo) e um pouco mais clara
+def addimg(k,size,fmt,cor=False):
     im=img(dA,jA,bA,k).convert('RGB')
+    if cor:
+        a=np.asarray(im,np.float32);l=(a@np.array([.3,.59,.11],np.float32))[...,None]
+        im=Image.fromarray(np.clip((l+(a-l)*COR['sat'])*COR['brilho'],0,255).astype(np.uint8))
     if size:im=im.resize((size,size),Image.LANCZOS)
     bb=io.BytesIO();im.save(bb,fmt,**({'quality':88} if fmt=='JPEG' else {}));images.append({'bufferView':addb(bb.getvalue()),'mimeType':'image/'+fmt.lower()});return len(images)-1
-ic=addimg(mat['pbrMetallicRoughness']['baseColorTexture']['index'],2048,'JPEG')
+ic=addimg(mat['pbrMetallicRoughness']['baseColorTexture']['index'],None,'JPEG',True)   # cor em 4096: os tendões e cartilagens brancos são detalhes finos
 inn=addimg(mat['normalTexture']['index'],2048,'JPEG');imr=addimg(mat['pbrMetallicRoughness']['metallicRoughnessTexture']['index'],1024,'JPEG')
 material={'name':'braco','doubleSided':True,'pbrMetallicRoughness':{'baseColorTexture':{'index':0},'metallicRoughnessTexture':{'index':2}},'normalTexture':{'index':1}}
 binb=b''.join(blobs)

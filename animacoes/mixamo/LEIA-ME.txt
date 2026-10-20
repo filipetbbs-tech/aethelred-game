@@ -1,0 +1,3 @@
+Animações só do personagem do Mixamo (aethelred_personagem.glb).
+Um arquivo aqui com o mesmo nome de um de animacoes/ (ex.: flying_kick.glb) substitui a animação
+comum só para esse personagem; o modelo original continua usando a de animacoes/.

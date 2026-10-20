@@ -10,6 +10,11 @@ Conteúdo:
   Ferramentas em ferramentas/rosto/: regions.py (regiões por osso), paint.py (pinta peças por região 3D),
   build.py (projeta a foto do rosto), writeglb.py (grava o GLB).
 
+Perfis de personagem (cada modelo é independente):
+- aethelred_personagem.glb (Mixamo) usa o perfil "mixamo"; os outros usam "original".
+- Animação de combate alterada para um perfil fica em animacoes/<perfil>/ e só vale para ele.
+- Ajuste no código para um perfil usa PF(valorOriginal, valorMixamo); o outro modelo não muda.
+
 Como executar no computador:
 1. Abra um terminal na pasta do projeto.
 2. Execute: python -m http.server 8000

@@ -1684,8 +1684,11 @@ const ARM_KEEP=.22;
 /* textura de músculo (musculo.jpg, tirada do braço mutante) aplicada em projeção tripla sobre o ombro humano que sobra
    na transformação, com a cor do músculo. MUSC.mm: tamanho de um ladrilho da textura em milímetros */
 const MUSC={mm:140,tex:null,uni:[],on:0,pc:null};
-/* ombreira na transformação: escala em volta do ombro e quanto sobe (unidades da malha) */
+/* ombreira na transformação: escala em volta do ombro e quanto sobe (unidades da malha); cada braço mutante pode ter o seu
+   tamanho (ARMS[].pauld), porque o ombro de cada um ocupa um espaço diferente */
 const PAULD={k:1.22,up:.0001,out:.0002};
+function curPauld(){return (ARMS[armAt]&&ARMS[armAt].pauld)||PAULD;}
+function setPauld(u){const P=curPauld();u.uPK.value=P.k;u.uPUp.value=P.up;u.uPOut.value=P.out;}
 loadBinary('musculo.jpg',function(buf){const img=new Image();img.onload=function(){const t=new THREE.Texture(img);t.wrapS=t.wrapT=THREE.MirroredRepeatWrapping;t.encoding=THREE.sRGBEncoding;t.needsUpdate=true;MUSC.tex=t;MUSC.uni.forEach(function(u){u.uMuscTex.value=t;});};img.src=URL.createObjectURL(new Blob([buf],{type:'image/jpeg'}));},function(){});
 function addMuscleSkin(mesh){
   const sc=mesh.getWorldScale(new THREE.Vector3()).x/hero.getWorldScale(new THREE.Vector3()).x;
@@ -1693,7 +1696,7 @@ function addMuscleSkin(mesh){
     const prev=mat.onBeforeCompile;
     mat.onBeforeCompile=function(sh,r){
       if(prev)prev.call(this,sh,r);
-      sh.uniforms.uPC={value:MUSC.pc||new THREE.Vector3()};sh.uniforms.uPK={value:PAULD.k};sh.uniforms.uPUp={value:PAULD.up};sh.uniforms.uPOut={value:PAULD.out};
+      sh.uniforms.uPC={value:MUSC.pc||new THREE.Vector3()};sh.uniforms.uPK={value:0};sh.uniforms.uPUp={value:0};sh.uniforms.uPOut={value:0};setPauld(sh.uniforms);
       sh.uniforms.uMuscTex={value:MUSC.tex};sh.uniforms.uMuscOn={value:MUSC.on};sh.uniforms.uMuscS={value:sc*1000/MUSC.mm};MUSC.uni.push(sh.uniforms);
       sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute float aMusc,aPauld;uniform float uMuscOn,uPK,uPUp,uPOut;uniform vec3 uPC;varying float vMusc;varying vec3 vMP,vMN;')
         .replace('#include <begin_vertex>','#include <begin_vertex>\nvMusc=aMusc;vMP=position;vMN=normal;\nif(aPauld*uMuscOn>.5){transformed=uPC+(transformed-uPC)*uPK;transformed.y+=uPUp;transformed.x+=sign(uPC.x)*uPOut;}');
@@ -1748,7 +1751,7 @@ function loadArmForms(root){
   loadArmModel();
 }
 /* modelos de braço mutante: o botão "Braço mutante" alterna entre eles (a escolha fica lembrada neste navegador) */
-const ARMS=[{file:'aethelred_braco_mutante_rig.glb',nome:'novo'},{file:'aethelred_braco_mutante_antigo.glb',nome:'antigo'},{file:'aethelred_braco_mutante_misto.glb',nome:'antigo + ombro novo'}],armBtn=document.getElementById('armBtn');
+const ARMS=[{file:'aethelred_braco_mutante_rig.glb',nome:'novo'},{file:'aethelred_braco_mutante_antigo.glb',nome:'antigo'},{file:'aethelred_braco_mutante_misto.glb',nome:'antigo + ombro novo',pauld:{k:1.45,up:.00015,out:.0004}}],armBtn=document.getElementById('armBtn');
 let armAt=0;try{const k=+localStorage.getItem('aeth_braco');if(ARMS[k])armAt=k;}catch(e){}
 armBtn.textContent='Braço mutante: '+ARMS[armAt].nome;
 function loadArmModel(){
@@ -1762,7 +1765,7 @@ armBtn.onclick=function(){armAt=(armAt+1)%ARMS.length;armBtn.textContent='Braço
 function applyArmForm(){
   if(!armForm||!armForm.body)return;
   const mon=st.morph>=.5&&!!armForm.claws;if(armForm.shown===mon)return;armForm.shown=mon;
-  armForm.body.geometry.setIndex(mon?armForm.noArm:armForm.full);MUSC.on=mon?1:0;MUSC.uni.forEach(function(u){u.uMuscOn.value=MUSC.on;});if(armForm.claws)armForm.claws.visible=mon;
+  armForm.body.geometry.setIndex(mon?armForm.noArm:armForm.full);MUSC.on=mon?1:0;MUSC.uni.forEach(function(u){u.uMuscOn.value=MUSC.on;setPauld(u);});if(armForm.claws)armForm.claws.visible=mon;
 }
 /* modelos que acompanham o jogo; o botão "Modelo" alterna entre eles (a escolha fica lembrada neste navegador) */
 const MODELOS=[{file:'aethelred_personagem.glb',nome:'Mixamo'},{file:'aethelred_rig_rosto.glb',nome:'original'}],modelBuf={};

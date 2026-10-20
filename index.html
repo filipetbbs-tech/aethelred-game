@@ -1565,19 +1565,12 @@ function poseMorphRun(dt){
   });
 }
 /* caminhada transformada: o contrário da corrida. Tronco só um pouco inclinado, braços ao lado do corpo, afastados
-   para as garras não encostarem nas pernas, mão e antebraço na rotação do idle, e joelhos levemente flexionados.
-   MWALK: inclinação, afastamento, balanço, quanto o quadril desce (m) */
-const MWALK={lean:.38,out:.6,fwd:.08,sway:.1,crouch:.09};
+   para as garras não encostarem nas pernas, e mão e antebraço na rotação do idle. MWALK: inclinação, afastamento, balanço */
+const MWALK={lean:.6,out:.6,fwd:.08,sway:.1};
 let mWalkW=0;
 function poseMorphWalk(dt,on){
   mWalkW+=((on?1:0)-mWalkW)*Math.min(1,dt*(on?5:8));if(mWalkW<.01)return;
   const B=rig.B,w=sm(mWalkW),F=new THREE.Vector3(Math.sin(st.rot),0,Math.cos(st.rot)),R=new THREE.Vector3().crossVectors(F,UPV).normalize();
-  /* joelhos: o quadril desce e as pernas dobram para os pés continuarem onde a animação os pôs */
-  const ft={};['Left','Right'].forEach(function(s){ft[s]=wp(B[s+'Foot']);B[s+'Foot'].getWorldQuaternion(_cq);ft[s+'q']=_cq.clone();});
-  if(!B.Hips._p){B.Hips._p=B.Hips.position.clone();touchedP.push(B.Hips);}
-  const hw=wp(B.Hips).addScaledVector(UPV,-MWALK.crouch*w);B.Hips.position.copy(B.Hips.parent.worldToLocal(hw));B.Hips.updateMatrixWorld(true);
-  ['Left','Right'].forEach(function(s){const knee=F.clone().addScaledVector(UPV,.1);
-    ikHinge(B[s+'UpLeg'],B[s+'Leg'],B[s+'Foot'],ft[s],knee,1,s+'Leg',true);setWorldQuat(B[s+'Foot'],ft[s+'q']);});
   const parts=[.34,.36,.30];rig.spine.forEach(function(n,i){rotAxis(B[n],R,-MWALK.lean*parts[i]*w);});
   rotAxis(B.Head,R,MWALK.lean*.6*w);
   ['Left','Right'].forEach(function(s){

@@ -10,6 +10,8 @@ Conteúdo:
   Ferramentas em ferramentas/rosto/: regions.py (regiões por osso), paint.py (pinta peças por região 3D),
   build.py (projeta a foto do rosto), writeglb.py (grava o GLB).
 
+Botão "Modelo": alterna entre o personagem do Mixamo e o modelo original (a escolha fica lembrada no navegador).
+
 Perfis de personagem (cada modelo é independente):
 - aethelred_personagem.glb (Mixamo) usa o perfil "mixamo"; os outros usam "original".
 - Animação de combate alterada para um perfil fica em animacoes/<perfil>/ e só vale para ele.

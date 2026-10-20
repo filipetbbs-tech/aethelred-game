@@ -14,9 +14,7 @@ canvas{display:block}
 #state{color:#d44;transition:color .3s}
 .btn{position:fixed;bottom:calc(22px + env(safe-area-inset-bottom,0px));border:1px solid #6b5a4a;background:rgba(20,16,16,.7);color:var(--bone);font:inherit;font-size:16px;padding:12px 18px;border-radius:6px;cursor:pointer}
 .btn:active{background:var(--blood)}
-#morph{right:18px}
-#jump{right:18px;bottom:calc(84px + env(safe-area-inset-bottom,0px))}
-#atk{right:18px;bottom:calc(146px + env(safe-area-inset-bottom,0px))}
+#atk{right:18px;bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 #vida{color:var(--bone);transition:color .1s}
 #combo{color:var(--bone);min-height:1.5em}
 #glbBtn{right:18px;top:calc(14px + env(safe-area-inset-top,0px));bottom:auto}
@@ -25,13 +23,12 @@ canvas{display:block}
 #soundBtn{right:18px;top:calc(200px + env(safe-area-inset-top,0px));bottom:auto}
 #musicBtn{right:18px;top:calc(262px + env(safe-area-inset-top,0px));bottom:auto}
 #godBtn{right:18px;top:calc(324px + env(safe-area-inset-top,0px));bottom:auto}
-#dodgeBtn{right:18px;top:calc(386px + env(safe-area-inset-top,0px));bottom:auto}
+#modelBtn{right:18px;top:calc(386px + env(safe-area-inset-top,0px));bottom:auto}
 #mapBtn{right:18px;top:calc(448px + env(safe-area-inset-top,0px));bottom:auto}
 #obj{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);max-width:min(560px,calc(100% - 32px));text-align:center;pointer-events:none;font-size:15px;line-height:1.45;text-shadow:0 1px 5px #000;color:var(--bone);display:none}
 #obj b{color:#f0d68a;font-weight:normal}
 #pmsg{position:fixed;left:50%;top:32%;transform:translate(-50%,-50%);max-width:calc(100% - 32px);text-align:center;pointer-events:none;font-size:24px;text-shadow:0 2px 8px #000;color:#f0d68a;opacity:0;transition:opacity .4s}
 #mini{position:fixed;left:16px;bottom:calc(170px + env(safe-area-inset-bottom,0px));pointer-events:none;display:none;opacity:.85}
-#dodgeBtn.on{border-color:#d8b25a;color:#f0d68a}
 #godBtn.on{border-color:#d8b25a;color:#f0d68a}
 #glbMsg{margin-top:8px;font-size:13px;color:var(--bone);opacity:.85}
 #pad{position:fixed;left:22px;bottom:calc(26px + env(safe-area-inset-bottom,0px));width:120px;height:120px;border-radius:50%;border:1px solid #6b5a4a;background:rgba(20,16,16,.45);display:none}
@@ -46,7 +43,6 @@ canvas{display:block}
 <div id="soundHint">Som bloqueado pelo navegador: clique uma vez na tela (ou aperte uma tecla) para liberar.</div>
 <div id="hud">
   <h1>Aethelred, protótipo de blocos</h1>
-  <p>WASD move, Shift corre, Espaço pula. Correndo, o ataque vira um chute voador. Pule perto de uma pilastra ou parede para escalar (W/S/A/D na parede, Espaço salta dela).<br>J ou clique ataca: combo de 5 golpes de garra, mão direita e esquerda alternadas. No ar (pulo ou salto da parede), o ataque vira um golpe aéreo que esmaga o chão. Aperte de novo durante o golpe para encadear o próximo.<br>F transforma, e na forma transformada as garras cortam mais longe e mais fundo.<br>Arraste para girar a câmera e use a rodinha do mouse para aproximar ou afastar.<br>I liga e desliga os inimigos. T coloca a personagem na posição T. E agarra o inimigo à frente (E de novo solta; J enquanto segura dá um gancho). K esquiva na direção que você estiver apertando (frente, trás, lados; sem direção, para trás); L ou o botão "Esquiva" alterna entre a esquiva nova e a original. G liga e desliga a invencibilidade (os golpes ainda empurram e atordoam, mas a vida não cai). P pausa a personagem (a câmera continua livre). O liga e desliga o som.</p>
   <p id="state">Forma normal</p>
   <p id="vida">Vida 100   Abatidos 0</p>
   <p id="combo"></p>
@@ -56,7 +52,6 @@ canvas{display:block}
 <div id="pmsg"></div>
 <canvas id="mini" width="96" height="300"></canvas>
 <div id="pad"><div id="knob"></div></div>
-<button class="btn" id="jump">Pular</button>
 <button class="btn" id="atk">Atacar</button>
 <button class="btn" id="glbBtn">Carregar modelo GLB</button>
 <button class="btn" id="foesBtn">Inimigos: ligados</button>
@@ -65,9 +60,8 @@ canvas{display:block}
 <button class="btn" id="musicBtn">Música: ligada</button>
 <button class="btn" id="mapBtn">Ir para a Prisão</button>
 <button class="btn" id="godBtn">Invencível: não</button>
-<button class="btn" id="dodgeBtn">Esquiva: nova</button>
+<button class="btn" id="modelBtn">Modelo: Mixamo</button>
 <input type="file" id="glbIn" accept=".glb" hidden>
-<button class="btn" id="morph">Transformar</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -352,9 +346,7 @@ addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDe
 addEventListener('keyup',e=>{keys[e.code]=false;});
 const stateEl=document.getElementById('state');
 function toggle(){if(!abil.morph&&!st.morphOn){flashMsg('A transformação ainda está selada. Procure o altar.',1.6);return;}st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
-document.getElementById('morph').onclick=toggle;
 function jump(){if(st.y<=groundY(st.x,st.z)+.001&&st.vy<=0&&!combo.active&&!tpose&&!death&&!climb){st.vy=8;SOUND.voice('jump');}}
-document.getElementById('jump').onpointerdown=jump;
 document.getElementById('atk').onpointerdown=function(){attack();};
 
 /* câmera por arraste; um toque curto sem arrastar ataca */
@@ -811,10 +803,9 @@ const DODGES_V1={
   left:{name:'aerial',c0:.62,c1:3.2,speed:1.75,dist:1,inv:.6,mirror:true,turn:-.42}
 };
 let DODGES=DODGES_V2,dodge=null;
-const dodgeBtn=document.getElementById('dodgeBtn');
+const dodgeBtn={textContent:'',classList:{toggle:function(){}},blur:function(){}};  /* o botão saiu; a tecla L continua alternando */
 function toggleDodgeVer(){DODGES=DODGES===DODGES_V2?DODGES_V1:DODGES_V2;dodgeBtn.textContent='Esquiva: '+(DODGES===DODGES_V2?'nova':'original');dodgeBtn.classList.toggle('on',DODGES===DODGES_V1);dodgeBtn.blur();
   comboEl.textContent=DODGES===DODGES_V2?'Esquiva nova (a que recebe os ajustes)':'Esquiva original (congelada)';msgHold=2.5;}
-dodgeBtn.onclick=toggleDodgeVer;
 /* direção para onde o quadril aponta num quadro da animação (para desfazer o giro que sobra no fim) */
 function clipYaw(name,t){
   const R=clipSrc[name];R.action.time=Math.max(0,Math.min(t,R.clip.duration));R.mixer.update(0);R.src.updateMatrixWorld(true);
@@ -1508,10 +1499,20 @@ function loadBinary(url,onBuf,onFail,onProg){
   }
   tryLoad(0);
 }
-/* carrega o modelo que acompanha o jogo */
-loadBinary('aethelred_personagem.glb',function(buf){parseGLB(buf,'aethelred_personagem.glb');},
-  function(){say('Não encontrei o modelo da personagem. Arraste um arquivo .glb para a tela ou toque em “Carregar modelo GLB”.');},
-  function(f){say('Carregando o modelo da personagem... '+Math.round(f*100)+'%');});
+/* modelos que acompanham o jogo; o botão "Modelo" alterna entre eles (a escolha fica lembrada neste navegador) */
+const MODELOS=[{file:'aethelred_personagem.glb',nome:'Mixamo'},{file:'aethelred_rig_rosto.glb',nome:'original'}],modelBuf={};
+const modelBtn=document.getElementById('modelBtn');
+let modeloAt=0;try{const k=+localStorage.getItem('aeth_modelo');if(MODELOS[k])modeloAt=k;}catch(e){}
+function carregaModelo(i){
+  modeloAt=i;const M=MODELOS[i];modelBtn.textContent='Modelo: '+M.nome;
+  try{localStorage.setItem('aeth_modelo',String(i));}catch(e){}
+  if(modelBuf[M.file]){parseGLB(modelBuf[M.file].slice(0),M.file);return;}
+  loadBinary(M.file,function(buf){modelBuf[M.file]=buf.slice(0);if(modeloAt===i)parseGLB(buf,M.file);},
+    function(){say('Não encontrei o modelo da personagem. Arraste um arquivo .glb para a tela ou toque em “Carregar modelo GLB”.');},
+    function(f){say('Carregando o modelo '+M.nome+'... '+Math.round(f*100)+'%');});
+}
+modelBtn.onclick=function(){carregaModelo((modeloAt+1)%MODELOS.length);modelBtn.blur();};
+carregaModelo(modeloAt);
 /* remove quadros-chave com tempo repetido: as animações do modelo têm alguns, e o Three.js
    devolve uma pose errada por um quadro perto deles (o "tranco" periódico no idle) */
 function cleanClip(clip){
@@ -2714,7 +2715,7 @@ function prisonRespawn(){
   msgT=2.5;plantFeet();
 }
 /* ---------- entrar e sair ---------- */
-const helpEl=document.querySelector('#hud p'),mapBtn=document.getElementById('mapBtn'),miniEl=document.getElementById('mini'),miniCtx=miniEl.getContext('2d');
+const helpEl={style:{}},mapBtn=document.getElementById('mapBtn'),miniEl=document.getElementById('mini'),miniCtx=miniEl.getContext('2d');
 const ARENA_TORCH=torches.map(function(l){return l.position.clone();});
 function clearWorld(){
   if(heroThrown&&heroThrown.e)heroThrown.e.throwing=false;heroThrown=null;

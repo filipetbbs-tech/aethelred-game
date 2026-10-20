@@ -1625,7 +1625,8 @@ function poseMorphGuard(dt,on){
     const along=wp(B[s+'HandMiddle1']).sub(hd),across=wp(B[s+'HandIndex1']).sub(wp(B[s+'HandPinky1']));
     const palm=new THREE.Vector3().crossVectors(along,across).multiplyScalar(sg>0?-1:1).normalize(),outv=R.clone().multiplyScalar(sg);
     const a=MGUARD.palmOut*w,pa=palm.clone().applyAxisAngle(d,a).dot(outv),pb=palm.clone().applyAxisAngle(d,-a).dot(outv);
-    rotAxis(B[s+'ForeArm'],d,pa>=pb?-a:a);});
+    /* o giro fica dividido entre antebraço e mão (como rádio e ulna), em vez de torcer tudo no cotovelo */
+    const ang=pa>=pb?-a:a;rotAxis(B[s+'ForeArm'],d,ang*.45);rotAxis(B[s+'Hand'],d,ang*.55);});
 }
 /* animação das garras: c = quanto fecham (-1 abertas e esticadas, 1 cerradas); s = quanto se abrem em leque */
 const CLAW={base:.18,curl:[.55,.65,.45],spread:.14};

@@ -1680,10 +1680,22 @@ function loadSkinned(url,mesh,cb){
     },function(){});
   },function(){});
 }
+const ARM_KEEP=.45;
 function loadArmForms(root){
   let mesh=null;root.traverse(function(o){if(o.isSkinnedMesh&&!mesh)mesh=o;});if(!mesh)return;
   const g=mesh.geometry,full=g.index,n=g.attributes.position.count,bin=atob((mesh.userData&&mesh.userData.armHide)||''),hide=new Uint8Array(n);
   for(let i=0;i<n;i++)hide[i]=(bin.charCodeAt(i>>3)>>(i&7))&1;
+  /* o braço humano só some do meio do braço para baixo: o ombro e o começo do braço ficam, e preenchem os vãos entre o
+     braço mutante e o tronco (como se a pele fosse caindo dos dedos para os ombros). ARM_KEEP: fração do ombro ao
+     cotovelo que continua humana */
+  const sk=mesh.skeleton,pos=g.attributes.position,si=g.attributes.skinIndex,sw=g.attributes.skinWeight,v=new THREE.Vector3();
+  const jp=function(nm){const k=sk.bones.findIndex(function(b){return b.name.replace(/^mixamorig[:_]?/,'')===nm;});return k<0?null:new THREE.Vector3().setFromMatrixPosition(sk.boneInverses[k].clone().invert());};
+  ['Left','Right'].forEach(function(s){
+    const A=jp(s+'Arm'),E=jp(s+'ForeArm');if(!A||!E)return;const d=E.clone().sub(A),dd=d.lengthSq();
+    for(let i=0;i<n;i++){if(!hide[i])continue;v.fromBufferAttribute(pos,i).applyMatrix4(mesh.bindMatrix);
+      if((s==='Left')!==(v.x>0))continue;
+      const t=v.clone().sub(A).dot(d)/dd;if(t<ARM_KEEP)hide[i]=0;}
+  });
   const a=full.array,keep=[];for(let t=0;t<a.length;t+=3)if(!hide[a[t]]&&!hide[a[t+1]]&&!hide[a[t+2]])keep.push(a[t],a[t+1],a[t+2]);
   armForm={mesh:mesh,body:mesh,full:full,noArm:new THREE.BufferAttribute(new Uint32Array(keep),1),shown:null};
   loadArmModel();

@@ -1550,6 +1550,7 @@ let mRunW=0;
 function poseMorphRun(dt){
   const free=PERFIL==='mixamo'&&armForm&&armForm.shown&&!combo.active&&aboveGround()<.05&&!grab&&!climb&&!dodge&&!tpose&&rig;
   poseMorphWalk(dt,free&&st.speed>.5&&!(runHeld()&&st.speed>5));
+  poseMorphGuard(dt,free&&st.speed<=.5&&(combo.hold>0||combo.outDur>0));
   const on=free&&runHeld()&&st.speed>5;
   mRunW+=((on?1:0)-mRunW)*Math.min(1,dt*(on?5:8));if(mRunW<.01||!rig)return;
   const B=rig.B,w=sm(mRunW),F=new THREE.Vector3(Math.sin(st.rot),0,Math.cos(st.rot)),R=new THREE.Vector3().crossVectors(F,UPV).normalize();
@@ -1583,6 +1584,39 @@ function poseMorphWalk(dt,on){
   ['Left','Right'].forEach(function(s){const sg=s==='Right'?1:-1;
     rotAxis(B[s+'Arm'],F,-sg*MWALK.open*w);
     rotAxis(B[s+'Arm'],R,Math.sin(mWalkPh+(s==='Left'?0:Math.PI))*MWALK.sway*w);});
+}
+/* guarda com garras (transformado, parado depois dos golpes): pés bem afastados e quase lado a lado, quadril e ombros de
+   frente, tronco inclinado, cotovelos junto ao tronco e as garras à frente do corpo, abertas para os lados.
+   MGUARD: inclinação, distância dos pés ao centro (m), descida do quadril (m), mão à frente/abaixo/para fora (em braços) */
+const MGUARD={lean:.3,width:.34,drop:.1,fwd:.62,down:.38,out:.32,breathe:.02};
+let mGuardW=0;
+function poseMorphGuard(dt,on){
+  mGuardW+=((on?1:0)-mGuardW)*Math.min(1,dt*(on?5:8));if(mGuardW<.01)return;
+  const B=rig.B,w=sm(mGuardW),F=new THREE.Vector3(Math.sin(st.rot),0,Math.cos(st.rot)),R=new THREE.Vector3().crossVectors(F,UPV).normalize();
+  /* quadril de frente (a guarda é de lado) */
+  const hl=wp(B.LeftUpLeg).sub(wp(B.RightUpLeg));hl.y=0;
+  let hy=0;if(hl.lengthSq()>1e-8){const tgt=R.clone().negate();hl.normalize();hy=Math.atan2(_x.crossVectors(hl,tgt).dot(UPV),hl.dot(tgt))*w;}
+  const fq={};['Left','Right'].forEach(function(s){B[s+'Foot'].getWorldQuaternion(_cq);fq[s]=new THREE.Quaternion().setFromAxisAngle(UPV,hy).multiply(_cq);});
+  rotAxis(B.Hips,UPV,hy);
+  if(!B.Hips._p){B.Hips._p=B.Hips.position.clone();touchedP.push(B.Hips);}
+  const hw=wp(B.Hips).addScaledVector(UPV,-MGUARD.drop*w);B.Hips.position.copy(B.Hips.parent.worldToLocal(hw));B.Hips.updateMatrixWorld(true);
+  /* pés lado a lado, bem afastados */
+  const hp=wp(B.Hips),gy=hero.localToWorld(rig.restP.LeftFoot.clone()).y;
+  ['Left','Right'].forEach(function(s){const sg=s==='Right'?1:-1;
+    const t=new THREE.Vector3(hp.x,gy,hp.z).addScaledVector(R,sg*MGUARD.width).addScaledVector(F,sg*.04).lerp(wp(B[s+'Foot']),1-w);
+    ikHinge(B[s+'UpLeg'],B[s+'Leg'],B[s+'Foot'],t,F.clone().addScaledVector(R,sg*.5).addScaledVector(UPV,.1),1,s+'Leg',true);
+    setWorldQuat(B[s+'Foot'],fq[s]);});
+  /* ombros de frente e tronco inclinado, com respiração */
+  const sl=wp(B.LeftArm).sub(wp(B.RightArm));sl.y=0;
+  if(sl.lengthSq()>1e-8){const tgt=R.clone().negate();sl.normalize();rotAxis(B[rig.spine[0]],UPV,Math.atan2(_x.crossVectors(sl,tgt).dot(UPV),sl.dot(tgt))*w);}
+  const lean=MGUARD.lean+MGUARD.breathe*Math.sin(st.t*2.2),parts=[.34,.36,.30];
+  rig.spine.forEach(function(n,i){rotAxis(B[n],R,-lean*parts[i]*w);});
+  rotAxis(B.Head,R,lean*.6*w);
+  /* braços: cotovelo junto ao tronco, antebraço para a frente, garras à frente e um pouco abertas */
+  ['Left','Right'].forEach(function(s){const sg=s==='Right'?1:-1,sh=wp(B[s+'Arm']),L=rig.armLen,b=Math.sin(st.t*1.6+(sg>0?0:1.3))*.02;
+    const t=sh.clone().addScaledVector(F,(MGUARD.fwd+b)*L).addScaledVector(UPV,-MGUARD.down*L).addScaledVector(R,sg*MGUARD.out*L);
+    const pole=F.clone().multiplyScalar(-1).addScaledVector(UPV,-.6).addScaledVector(R,sg*.25);
+    ikHinge(B[s+'Arm'],B[s+'ForeArm'],B[s+'Hand'],t,pole,w,s+'Arm');});
 }
 /* animação das garras: c = quanto fecham (-1 abertas e esticadas, 1 cerradas); s = quanto se abrem em leque */
 const CLAW={base:.18,curl:[.55,.65,.45],spread:.14};
@@ -2423,7 +2457,8 @@ function updateModel(dt){
     wasAir=air;
     if(landT>0)landT-=dt;
     if(!air&&landT<=0){
-      const guard=acts['guarda']&&PERFIL==='mixamo'&&!combo.active&&(combo.hold>0||combo.outDur>0)?acts['guarda']:null;
+      /* perfil mixamo: a guarda depois dos golpes; transformado, o parado também é a guarda (e a guarda de garras vem por cima) */
+      const guard=acts['guarda']&&PERFIL==='mixamo'&&!combo.active&&(combo.hold>0||combo.outDur>0||(armForm&&armForm.shown))?acts['guarda']:null;
       /* transformado andando (perfil mixamo): a base é a postura de guarda, e os passos são feitos em poseMorphWalk */
       const gWalk=acts.morphwalk&&PERFIL==='mixamo'&&armForm&&armForm.shown&&!combo.active&&st.speed>.5&&!(runHeld()&&st.speed>5)?acts.morphwalk:null;
       const want=gWalk||(st.speed>5.5?(run||walk):(st.speed>.5?(walk||run):(guard||idle)));
@@ -3005,7 +3040,7 @@ function drawMini(){
 if(/prisao|prison/i.test(location.hash))setTimeout(enterPrison,0);
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},CLAW:CLAW,MRUN:MRUN,MWALK:MWALK,get armForm(){return armForm;},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes};
+window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},CLAW:CLAW,MRUN:MRUN,MWALK:MWALK,MGUARD:MGUARD,get armForm(){return armForm;},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes};
 frame();
 })();
 </script>

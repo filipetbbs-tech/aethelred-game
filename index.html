@@ -1567,8 +1567,9 @@ function poseMorphRun(dt){
 /* caminhada transformada: inspirada na postura de ataque (guarda). A base é a animação Guarda (pernas flexionadas e
    afastadas, braços em guarda); por cima, os pés dão passos por IK mantendo a base larga, o quadril balança de leve,
    o tronco inclina e os braços abrem mais, longe do corpo. MWALK: inclinação do tronco, abertura extra dos braços (rad),
-   passo (m), altura do pé (m), balanço dos braços */
-const MWALK={lean:.25,open:.38,stride:.36,lift:.13,sway:.08,width:.2};
+   passo (m), altura do pé (m), balanço dos braços, distância dos pés ao centro (m), quanto o quadril desce a mais (m)
+   e quanto os joelhos abrem para fora (pernas arqueadas) */
+const MWALK={lean:.25,open:.38,stride:.85,lift:.16,sway:.1,width:.3,drop:.07,bow:.6};
 let mWalkW=0,mWalkPh=0;
 function poseMorphWalk(dt,on){
   mWalkW+=((on?1:0)-mWalkW)*Math.min(1,dt*(on?6:8));if(mWalkW<.01){mWalkPh=0;return;}
@@ -1588,10 +1589,10 @@ function poseMorphWalk(dt,on){
     ft[s]={p:base.addScaledVector(F,-Math.cos(ph)*MWALK.stride*.5*w).addScaledVector(UPV,Math.max(0,Math.sin(ph))*MWALK.lift*w),
       q:fq0[s]};});
   if(!B.Hips._p){B.Hips._p=B.Hips.position.clone();touchedP.push(B.Hips);}
-  const hw=wp(B.Hips).addScaledVector(UPV,-Math.abs(Math.cos(mWalkPh))*.025*w);
+  const hw=wp(B.Hips).addScaledVector(UPV,-(MWALK.drop+Math.abs(Math.cos(mWalkPh))*.03)*w);
   B.Hips.position.copy(B.Hips.parent.worldToLocal(hw));B.Hips.updateMatrixWorld(true);
   rotAxis(B.Hips,UPV,Math.sin(mWalkPh)*.06*w);
-  ['Left','Right'].forEach(function(s){const sg=s==='Right'?1:-1,knee=F.clone().addScaledVector(R,sg*.35).addScaledVector(UPV,.1);
+  ['Left','Right'].forEach(function(s){const sg=s==='Right'?1:-1,knee=F.clone().addScaledVector(R,sg*MWALK.bow).addScaledVector(UPV,.1);
     ikHinge(B[s+'UpLeg'],B[s+'Leg'],B[s+'Foot'],ft[s].p,knee,1,s+'Leg',true);setWorldQuat(B[s+'Foot'],ft[s].q);});
   /* ombros também de frente (a guarda torce o tronco) */
   const sl=wp(B.LeftArm).sub(wp(B.RightArm));sl.y=0;

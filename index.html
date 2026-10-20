@@ -1666,16 +1666,17 @@ let armForm=null;
 function loadSkinned(url,mesh,cb){
   loadBinary(url,function(buf){
     new THREE.GLTFLoader().parse(buf,'',function(g){
-      let src=null;g.scene.traverse(function(o){if(o.isMesh&&!src)src=o;});if(!src)return;
-      const ib=src.userData.inverseBind||[],bones=mesh.skeleton.bones.slice(),inv=bones.map(function(b,i){return new THREE.Matrix4().fromArray(ib,i*16);});
-      const mat=src.material;mat.skinning=true;mat.needsUpdate=true;
-      const sm=new THREE.SkinnedMesh(src.geometry,mat);sm.castShadow=true;sm.receiveShadow=true;sm.frustumCulled=false;
-      mesh.parent.add(sm);sm.position.copy(mesh.position);sm.quaternion.copy(mesh.quaternion);sm.scale.copy(mesh.scale);
-      sm.updateMatrixWorld(true);
-      const fingers=src.userData.fingerJoints?addClawBones(src.userData,bones,inv,mesh.bindMatrix):null;
-      sm.bind(new THREE.Skeleton(bones,inv),mesh.bindMatrix);
-      sm.userData.fingers=fingers;
-      cb(sm,src.userData);
+      /* o arquivo pode ter várias partes (ex.: braço antigo + ombro novo); todas usam o mesmo esqueleto */
+      const srcs=[];g.scene.traverse(function(o){if(o.isMesh)srcs.push(o);});if(!srcs.length)return;
+      let ud=null;srcs.forEach(function(o){let p=o;while(p&&!(p.userData&&p.userData.inverseBind))p=p.parent;if(p&&!ud)ud=p.userData;});ud=ud||{};
+      const ib=ud.inverseBind||[],bones=mesh.skeleton.bones.slice(),inv=bones.map(function(b,i){return new THREE.Matrix4().fromArray(ib,i*16);});
+      const grp=new THREE.Group();mesh.parent.add(grp);grp.position.copy(mesh.position);grp.quaternion.copy(mesh.quaternion);grp.scale.copy(mesh.scale);grp.updateMatrixWorld(true);
+      const fingers=ud.fingerJoints?addClawBones(ud,bones,inv,mesh.bindMatrix):null;
+      const skel=new THREE.Skeleton(bones,inv);
+      srcs.forEach(function(src){const mat=src.material;mat.skinning=true;mat.needsUpdate=true;
+        const sm=new THREE.SkinnedMesh(src.geometry,mat);sm.castShadow=true;sm.receiveShadow=true;sm.frustumCulled=false;grp.add(sm);sm.updateMatrixWorld(true);sm.bind(skel,mesh.bindMatrix);});
+      grp.userData.fingers=fingers;
+      cb(grp,ud);
     },function(){});
   },function(){});
 }
@@ -1688,7 +1689,7 @@ function loadArmForms(root){
   loadArmModel();
 }
 /* modelos de braço mutante: o botão "Braço mutante" alterna entre eles (a escolha fica lembrada neste navegador) */
-const ARMS=[{file:'aethelred_braco_mutante_rig.glb',nome:'novo'},{file:'aethelred_braco_mutante_antigo.glb',nome:'antigo'}],armBtn=document.getElementById('armBtn');
+const ARMS=[{file:'aethelred_braco_mutante_rig.glb',nome:'novo'},{file:'aethelred_braco_mutante_antigo.glb',nome:'antigo'},{file:'aethelred_braco_mutante_misto.glb',nome:'antigo + ombro novo'}],armBtn=document.getElementById('armBtn');
 let armAt=0;try{const k=+localStorage.getItem('aeth_braco');if(ARMS[k])armAt=k;}catch(e){}
 armBtn.textContent='Braço mutante: '+ARMS[armAt].nome;
 function loadArmModel(){

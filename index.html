@@ -1564,36 +1564,16 @@ function poseMorphRun(dt){
     ikHinge(B[s+'Arm'],B[s+'ForeArm'],B[s+'Hand'],sh.clone().addScaledVector(dir,L*.95),pole,w,s+'Arm');
   });
 }
-/* caminhada transformada: inspirada na postura de ataque (guarda). A base é a animação Guarda (pernas flexionadas e
-   afastadas, braços em guarda); por cima, os pés dão passos por IK mantendo a base larga, o quadril balança de leve,
-   o tronco inclina e os braços abrem mais, longe do corpo. MWALK: inclinação do tronco, abertura extra dos braços (rad),
-   passo (m), altura do pé (m), balanço dos braços, distância dos pés ao centro (m), quanto o quadril desce a mais (m)
-   e quanto os joelhos abrem para fora (pernas arqueadas) */
-const MWALK={lean:.25,open:.38,stride:.85,lift:.16,sway:.1,width:.3,drop:.07,bow:.6};
+/* caminhada transformada: as pernas e o quadril são os da caminhada normal; o tronco e os braços ficam na postura de
+   guarda (clipe MorphWalk, montado ao carregar o modelo), com os ombros de frente, o tronco inclinado e os braços mais
+   abertos, longe do corpo. MWALK: inclinação do tronco, abertura extra dos braços (rad), passo (m, só para o ritmo do
+   balanço dos braços), balanço dos braços */
+const MWALK={lean:.25,open:.38,stride:.6,sway:.1};
 let mWalkW=0,mWalkPh=0;
 function poseMorphWalk(dt,on){
   mWalkW+=((on?1:0)-mWalkW)*Math.min(1,dt*(on?6:8));if(mWalkW<.01){mWalkPh=0;return;}
   const B=rig.B,w=sm(mWalkW),F=new THREE.Vector3(Math.sin(st.rot),0,Math.cos(st.rot)),R=new THREE.Vector3().crossVectors(F,UPV).normalize();
   mWalkPh+=dt*st.speed/(MWALK.stride*2)*Math.PI;
-  /* a guarda é de lado (um pé à frente); andando, o quadril vira para a frente */
-  const hl=wp(B.LeftUpLeg).sub(wp(B.RightUpLeg));hl.y=0;
-  let hy=0;if(hl.lengthSq()>1e-8){const tgt=R.clone().negate();hl.normalize();hy=Math.atan2(_x.crossVectors(hl,tgt).dot(UPV),hl.dot(tgt))*w;}
-  const fq0={};['Left','Right'].forEach(function(s){B[s+'Foot'].getWorldQuaternion(_cq);fq0[s]=new THREE.Quaternion().setFromAxisAngle(UPV,hy).multiply(_cq);});
-  rotAxis(B.Hips,UPV,hy);
-  /* pés: base larga dos dois lados do quadril, na altura do chão, mais o passo (avança no ar, recua apoiado) */
-  const hp=wp(B.Hips),gy=hero.localToWorld(rig.restP.LeftFoot.clone()).y,ft={};
-  ['Left','Right'].forEach(function(s){const sg=s==='Right'?1:-1,ph=mWalkPh+(s==='Left'?Math.PI:0);
-    const cur=wp(B[s+'Foot']);
-    const base=new THREE.Vector3(hp.x,gy,hp.z).addScaledVector(R,sg*MWALK.width);
-    base.lerp(cur,1-w);
-    ft[s]={p:base.addScaledVector(F,-Math.cos(ph)*MWALK.stride*.5*w).addScaledVector(UPV,Math.max(0,Math.sin(ph))*MWALK.lift*w),
-      q:fq0[s]};});
-  if(!B.Hips._p){B.Hips._p=B.Hips.position.clone();touchedP.push(B.Hips);}
-  const hw=wp(B.Hips).addScaledVector(UPV,-(MWALK.drop+Math.abs(Math.cos(mWalkPh))*.03)*w);
-  B.Hips.position.copy(B.Hips.parent.worldToLocal(hw));B.Hips.updateMatrixWorld(true);
-  rotAxis(B.Hips,UPV,Math.sin(mWalkPh)*.06*w);
-  ['Left','Right'].forEach(function(s){const sg=s==='Right'?1:-1,knee=F.clone().addScaledVector(R,sg*MWALK.bow).addScaledVector(UPV,.1);
-    ikHinge(B[s+'UpLeg'],B[s+'Leg'],B[s+'Foot'],ft[s].p,knee,1,s+'Leg',true);setWorldQuat(B[s+'Foot'],ft[s].q);});
   /* ombros também de frente (a guarda torce o tronco) */
   const sl=wp(B.LeftArm).sub(wp(B.RightArm));sl.y=0;
   if(sl.lengthSq()>1e-8){const tgt=R.clone().negate();sl.normalize();rotAxis(B[rig.spine[0]],UPV,Math.atan2(_x.crossVectors(sl,tgt).dot(UPV),sl.dot(tgt))*w);}
@@ -1780,6 +1760,14 @@ function useModel(gltf,name){
   if(gltf.animations&&gltf.animations.length){
     mixer=new THREE.AnimationMixer(m);
     gltf.animations.forEach(function(cl,i){acts[(cl.name||('clip'+i)).toLowerCase()]=mixer.clipAction(cleanClip(cl));});
+    /* caminhada transformada: pernas e quadril da caminhada, tronco e braços parados na postura de guarda (1º quadro) */
+    if(acts.guarda&&acts.walk){
+      const wc=acts.walk.getClip(),gc=acts.guarda.getClip(),up=/(Spine|Neck|Head|Shoulder|Arm|Hand)/,tr=[];
+      wc.tracks.forEach(function(t){if(!up.test(t.name))tr.push(t);});
+      gc.tracks.forEach(function(t){if(!up.test(t.name))return;const n=t.getValueSize(),v=Array.from(t.values.slice(0,n));
+        tr.push(new t.constructor(t.name,[0,wc.duration],v.concat(v)));});
+      acts.morphwalk=mixer.clipAction(new THREE.AnimationClip('MorphWalk',wc.duration,tr));
+    }
     say(rig?'Personagem carregada. Ataque com J, clique ou o botão Atacar.':name+' carregado, mas o esqueleto não segue o padrão Mixamo, então os golpes de garra ficam desligados.');
   }else say(name+' carregado. O arquivo não tem animações, então o corpo só balança ao andar.');
 }
@@ -2437,10 +2425,11 @@ function updateModel(dt){
     if(!air&&landT<=0){
       const guard=acts['guarda']&&PERFIL==='mixamo'&&!combo.active&&(combo.hold>0||combo.outDur>0)?acts['guarda']:null;
       /* transformado andando (perfil mixamo): a base é a postura de guarda, e os passos são feitos em poseMorphWalk */
-      const gWalk=acts['guarda']&&PERFIL==='mixamo'&&armForm&&armForm.shown&&!combo.active&&st.speed>.5&&!(runHeld()&&st.speed>5)?acts['guarda']:null;
+      const gWalk=acts.morphwalk&&PERFIL==='mixamo'&&armForm&&armForm.shown&&!combo.active&&st.speed>.5&&!(runHeld()&&st.speed>5)?acts.morphwalk:null;
       const want=gWalk||(st.speed>5.5?(run||walk):(st.speed>.5?(walk||run):(guard||idle)));
       playAct(want||any,false);
       if(curAct===walk&&walk)walk.timeScale=Math.max(.55,Math.min(1.2,st.speed/3.6));
+      if(gWalk)gWalk.timeScale=Math.max(.55,Math.min(1.2,st.speed/3.6));
     }
     restoreRig();
     if(rig)restoreBase();

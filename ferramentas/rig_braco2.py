@@ -63,29 +63,36 @@ Sb,Eb,Wb=BP['RightArm'],BP['RightForeArm'],BP['RightHand']
 s_=(nrm(Eb-Sb)+nrm(Wb-Eb))/(nrm(Ea-Sa)+nrm(Wa-Ea))
 toB=lambda P_:(np.asarray(P_)-Sa)@Rm.T*s_+Sb
 NJ={'RightArm':toB(Sa),'RightForeArm':toB(Ea),'RightHand':toB(Wa),'RightHandMiddle1':toB(Ha+(Ha-Wa)*.6)}
-IBa=IB.copy()
-for n,c in (('RightArm','RightForeArm'),('RightForeArm','RightHand'),('RightHand','RightHandMiddle1')):
-    for side,mir in (('Right',np.array([1,1,1.])),('Left',np.array([-1,1,1.]))):
-        nn=n.replace('Right',side);cc=c.replace('Right',side)
-        do=BP[cc]-BP[nn];dn=(NJ[c]-NJ[n])*mir;M=np.eye(4);M[:3,:3]=rot_between(do,dn)@BW[bi[nn]][:3,:3];M[:3,3]=NJ[n]*mir;IBa[bi[nn]]=np.linalg.inv(M)
 print('escala',round(s_,5))
+# --- proporções do braço antigo: as juntas do braço novo vão para onde estão as do antigo (mesmo comprimento de braço
+# e antebraço, mesma direção), e a mão é escalada para alcançar o mesmo ponto que a mão antiga ---
+dO,jO_,bO_,accO=loadglb(os.path.join(ROOT,'aethelred_braco_mutante_antigo.glb'))
+IBO=np.array(jO_['meshes'][0]['extras']['inverseBind']).reshape(-1,4,4).transpose(0,2,1)
+OJ={n:np.linalg.inv(IBO[bi[n]])[:3,3] for n in ('RightArm','RightForeArm','RightHand')}
+PO=accO(jO_['meshes'][0]['primitives'][0]['attributes']['POSITION']).astype(float);PO=PO[PO[:,0]<0]
+dOw=np.linalg.norm(PO-OJ['RightHand'],axis=1);far=PO[dOw>np.percentile(dOw,99.5)]
+OHdir=far.mean(0)-OJ['RightHand'];OHreach=np.percentile(dOw,99.9)
+NJ0=dict(NJ)
 # --- proporção do braço antigo: antebraço mais grosso, braço um pouco mais grosso, mão e garras maiores ---
 # (engrossa em volta do eixo ombro-cotovelo-pulso e aumenta a mão a partir do pulso; ombro, peito e costas ficam iguais)
-GROSSO={'braco':1.12,'antebraco':1.45,'mao':1.5,'ombro':1.4}
+GROSSO={'braco':1.12,'antebraco':1.45,'mao':0.8,'ombro':1.4}   # mao: multiplica a escala que iguala o alcance da mão antiga
 sm0=lambda u:np.clip(u,0,1)**2*(3-2*np.clip(u,0,1))
-def deform(P_):
-    P_=np.array(P_,float);A,Bq,C=NJ['RightArm'],NJ['RightForeArm'],NJ['RightHand']
-    out=P_.copy()
-    for a,e,k0,k1 in ((A,Bq,GROSSO['braco'],GROSSO['antebraco']),(Bq,C,GROSSO['antebraco'],GROSSO['antebraco'])):
+def deform(P_,N_=None):
+    P_=np.array(P_,float);No=None if N_ is None else np.array(N_,float);A,Bq,C=NJ0['RightArm'],NJ0['RightForeArm'],NJ0['RightHand']
+    oA,oB,oC=OJ['RightArm'],OJ['RightForeArm'],OJ['RightHand']
+    out=P_+(oA-A)
+    for a,e,oa,oe,k0,k1 in ((A,Bq,oA,oB,GROSSO['braco'],GROSSO['antebraco']),(Bq,C,oB,oC,GROSSO['antebraco'],GROSSO['antebraco'])):
         d=e-a;t=((P_-a)@d)/(d@d);inside=(t>=0)&(t<1)
         k=k0+(k1-k0)*sm0(t)
-        if a is A:k=GROSSO['ombro']+(k-GROSSO['ombro'])*sm0(t/.35)   # ombro mais volumoso (preenche junto às costas e ao peito)
-        foot=a+np.outer(t,d);out=np.where(inside[:,None],foot+(P_-foot)*k[:,None],out)
-    # peito e costas (antes do ombro): crescem a partir do ombro, mais perto dele
+        if a is A:k=GROSSO['ombro']+(k-GROSSO['ombro'])*sm0(t/.35)
+        Rr=rot_between(d,oe-oa);foot=a+np.outer(t,d);perp=(P_-foot)@Rr.T
+        out=np.where(inside[:,None],oa+np.outer(t,oe-oa)+perp*k[:,None],out)
+        if No is not None:No=np.where(inside[:,None],N_@Rr.T,No)
     d=Bq-A;t=((P_-A)@d)/(d@d);before=t<0;k=1+(GROSSO['ombro']-1)*np.clip(1+t/.35,0,1)
-    out=np.where(before[:,None],A+(P_-A)*k[:,None],out)
+    out=np.where(before[:,None],oA+(P_-A)*k[:,None],out)
     d=C-Bq;t=((P_-Bq)@d)/(d@d);beyond=t>=1
-    out=np.where(beyond[:,None],C+(P_-C)*GROSSO['mao'],out)
+    out=np.where(beyond[:,None],oC+((P_-C)@HR.T)*HS,out)
+    if No is not None:No=np.where(beyond[:,None],N_@HR.T,No);return out,No
     return out
 # --- pesos ---
 Xr=toB(X);Nr=NA@Rm.T
@@ -111,6 +118,9 @@ def leftOf(b):
 Wv=WF[inv];top=np.argsort(-Wv,axis=1)[:,:4];tw=np.take_along_axis(Wv,top,1);tw/=np.maximum(tw.sum(1,keepdims=True),1e-9)
 topR=np.array(bonesR)[top];topL=np.vectorize(leftOf)(topR)
 # juntas dos dedos no espaço do jogo (centro das fatias em 0, 30%, 55% e na ponta)
+dNw=np.linalg.norm(Xr-NJ0['RightHand'],axis=1);hand=((Xr-NJ0['RightForeArm'])@(NJ0['RightHand']-NJ0['RightForeArm']))>((NJ0['RightHand']-NJ0['RightForeArm'])@(NJ0['RightHand']-NJ0['RightForeArm']))
+NHdir=Xr[hand&(dNw>np.percentile(dNw[hand],99.5))].mean(0)-NJ0['RightHand'];NHreach=np.percentile(dNw[hand],99.9)
+HR=rot_between(NHdir,OHdir);HS=OHreach/NHreach*GROSSO['mao'];print('mão: escala',round(HS,3))
 FJ={'Right':{},'Left':{}}
 for k,f in enumerate(FN):
     pts=[]
@@ -118,7 +128,14 @@ for k,f in enumerate(FN):
         m=(fown==k)&((np.abs(fpar-fr)<.04) if fr<1 else (fpar>.97));pts.append(deform(toB(Xq[m].mean(0))[None])[0])
     FJ['Right'][f]=[p.tolist() for p in pts];FJ['Left'][f]=[(p*np.array([-1,1,1.])).tolist() for p in pts]
 mir=np.array([-1,1,1.]);nv=len(X)
-Xr=deform(Xr)
+Xr,Nr=deform(Xr,Nr)
+NJ={'RightArm':OJ['RightArm'],'RightForeArm':OJ['RightForeArm'],'RightHand':OJ['RightHand'],'RightHandMiddle1':deform(NJ0['RightHandMiddle1'][None])[0]}
+IBa=IB.copy()
+for n,c in (('RightArm','RightForeArm'),('RightForeArm','RightHand'),('RightHand','RightHandMiddle1')):
+    for side,mir in (('Right',np.array([1,1,1.])),('Left',np.array([-1,1,1.]))):
+        nn=n.replace('Right',side);cc=c.replace('Right',side)
+        do=BP[cc]-BP[nn];dn=(NJ[c]-NJ[n])*mir;M=np.eye(4);M[:3,:3]=rot_between(do,dn)@BW[bi[nn]][:3,:3];M[:3,3]=NJ[n]*mir;IBa[bi[nn]]=np.linalg.inv(M)
+
 Xall=np.vstack([Xr,Xr*mir]).astype(np.float32);Nall=np.vstack([Nr,Nr*mir]).astype(np.float32);UV=np.vstack([UVA,UVA])
 Tall=np.vstack([IA,IA[:,[0,2,1]]+nv]).astype(np.uint32)
 JF=np.vstack([topR,topL]).astype(np.uint8);WFq=np.clip(np.round(np.vstack([tw,tw])*255),0,255).astype(np.int32);WFq[:,0]+=255-WFq.sum(1);WFq=WFq.astype(np.uint8)

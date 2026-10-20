@@ -25,6 +25,8 @@ canvas{display:block}
 #godBtn{right:18px;top:calc(324px + env(safe-area-inset-top,0px));bottom:auto}
 #modelBtn{right:18px;top:calc(386px + env(safe-area-inset-top,0px));bottom:auto}
 #mapBtn{right:18px;top:calc(448px + env(safe-area-inset-top,0px));bottom:auto}
+#slowBtn{right:18px;top:calc(510px + env(safe-area-inset-top,0px));bottom:auto}
+#slowBtn.on{border-color:#d8b25a;color:#f0d68a}
 #obj{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);max-width:min(560px,calc(100% - 32px));text-align:center;pointer-events:none;font-size:15px;line-height:1.45;text-shadow:0 1px 5px #000;color:var(--bone);display:none}
 #obj b{color:#f0d68a;font-weight:normal}
 #pmsg{position:fixed;left:50%;top:32%;transform:translate(-50%,-50%);max-width:calc(100% - 32px);text-align:center;pointer-events:none;font-size:24px;text-shadow:0 2px 8px #000;color:#f0d68a;opacity:0;transition:opacity .4s}
@@ -58,6 +60,7 @@ canvas{display:block}
 <button class="btn" id="pauseBtn">Pausar</button>
 <button class="btn" id="soundBtn">Som: ligado</button>
 <button class="btn" id="musicBtn">Música: ligada</button>
+<button class="btn" id="slowBtn">Câmera lenta: não</button>
 <button class="btn" id="mapBtn">Ir para a Prisão</button>
 <button class="btn" id="godBtn">Invencível: não</button>
 <button class="btn" id="modelBtn">Modelo: Mixamo</button>
@@ -342,7 +345,7 @@ musicBtn.onclick=toggleMusic;
 let tpose=false;
 const st={x:0,z:8,y:0,vy:0,rot:Math.PI,rotT:Math.PI,yaw:0,pitch:.35,camD:6.5,t:0,speed:0,morph:0,morphOn:false};
 const keys={};const joy={x:0,y:0};
-addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyG')toggleGod();if(e.code==='KeyK')dodgeKey=true;if(e.code==='KeyE')grabKey();if(e.code==='KeyL')toggleDodgeVer();if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();if(e.code==='KeyM')toggleMusic();if(e.code==='KeyN')toggleWorld();if(WORLD==='prison'&&/^Digit[1-6]$/.test(e.code))prisonWarp(+e.code.slice(5)-1);});
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyG')toggleGod();if(e.code==='KeyK')dodgeKey=true;if(e.code==='KeyE')grabKey();if(e.code==='KeyL')toggleDodgeVer();if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();if(e.code==='KeyM')toggleMusic();if(e.code==='KeyB')toggleSlow();if(e.code==='KeyN')toggleWorld();if(WORLD==='prison'&&/^Digit[1-6]$/.test(e.code))prisonWarp(+e.code.slice(5)-1);});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 const stateEl=document.getElementById('state');
 function toggle(){if(!abil.morph&&!st.morphOn){flashMsg('A transformação ainda está selada. Procure o altar.',1.6);return;}st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
@@ -433,6 +436,7 @@ function pollGamepad(raw){
     if(hit(3))toggle();
     if(hit(1)){if(climb)dropFromWall();else dodgeKey=true;}
   }
+  if(hit(6))toggleSlow();
   if(hit(14))toggleGod();
   if(hit(8))toggleFoes();
   if(hit(15))toggleMusic();
@@ -2539,6 +2543,10 @@ const slash=new THREE.Group();slash.position.y=1.1;slash.rotation.y=-Math.PI/2;h
 const clock=new THREE.Clock();
 /* pausa: congela a personagem e os inimigos; a câmera continua livre */
 let paused=false,camDist=6.5;
+/* câmera lenta: L2 no controle, B no teclado ou o botão; o jogo inteiro roda a SLOW.k da velocidade (a câmera não) */
+const SLOW={on:false,k:1,rate:.3},slowBtn=document.getElementById('slowBtn');
+function toggleSlow(){SLOW.on=!SLOW.on;SLOW.k=SLOW.on?SLOW.rate:1;slowBtn.textContent='Câmera lenta: '+(SLOW.on?'sim':'não');slowBtn.classList.toggle('on',SLOW.on);slowBtn.blur();}
+slowBtn.onclick=toggleSlow;
 const pauseBtn=document.getElementById('pauseBtn');
 function togglePause(){paused=!paused;pauseBtn.textContent=paused?'Continuar':'Pausar';pauseBtn.blur();}
 pauseBtn.onclick=togglePause;
@@ -2546,7 +2554,7 @@ function frame(){
   requestAnimationFrame(frame);
   const raw=Math.min(clock.getDelta(),.05);
   pollGamepad(raw);
-  if(!paused)tick(raw);
+  if(!paused)tick(raw*SLOW.k);
   if(keys.ArrowLeft)st.yaw+=raw*1.8;if(keys.ArrowRight)st.yaw-=raw*1.8;
   if(climb&&!drag){const F=wallFrame(climb);let a=Math.atan2(F.n.x,F.n.z),dd=a-st.yaw;while(dd>Math.PI)dd-=Math.PI*2;while(dd<-Math.PI)dd+=Math.PI*2;st.yaw+=dd*Math.min(1,raw*3);}
   /* câmera, com tremor no impacto */

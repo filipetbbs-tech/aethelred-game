@@ -133,6 +133,7 @@ personagem na posição T, com dedos esticados, e T de novo volta ao jogo;
 G (ou o botão "Invencível") liga e desliga a invencibilidade: a vida não cai, mas os
 golpes dos inimigos continuam interrompendo, empurrando e atordoando; P (ou o botão
 "Pausar") congela a personagem e os inimigos, com a câmera livre para girar e dar zoom;
+B (ou L2 no controle, ou o botão "Câmera lenta") liga e desliga a câmera lenta (o jogo a 30% da velocidade).
 O (ou o botão "Som") liga e desliga o som. M (ou o botão "Música", ou o direcional para a direita no
 controle) liga e desliga a música de fundo (musica/confronto_no_escuro.mp3, em loop; começa no primeiro toque
 ou tecla, porque o navegador só libera áudio depois de uma interação).

@@ -1680,7 +1680,7 @@ function loadSkinned(url,mesh,cb){
     },function(){});
   },function(){});
 }
-const ARM_KEEP=.45;
+const ARM_KEEP=.22;
 function loadArmForms(root){
   let mesh=null;root.traverse(function(o){if(o.isSkinnedMesh&&!mesh)mesh=o;});if(!mesh)return;
   const g=mesh.geometry,full=g.index,n=g.attributes.position.count,bin=atob((mesh.userData&&mesh.userData.armHide)||''),hide=new Uint8Array(n);

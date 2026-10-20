@@ -1547,9 +1547,9 @@ const PERFIS={'aethelred_personagem.glb':'mixamo'};
 let PERFIL='original';
 function PF(orig,mixamo){return PERFIL==='mixamo'&&mixamo!==undefined?mixamo:orig;}
 /* pele mais realista (só no perfil mixamo): poros e microrrelevo calculados na placa de vídeo, em 3D sobre o corpo
-   (sem emendas da textura), só onde a cor é de pele; somem com a distância para não cintilar. SKIN.mm: tamanho
+   (sem emendas da textura), só nos braços e mãos (o rosto fica como está) e só onde a cor é de pele; somem com a distância para não cintilar. SKIN.mm: tamanho
    médio do poro em milímetros; SKIN.amp: profundidade do relevo; SKIN.rough: rugosidade da pele */
-const SKIN={mm:1.8,amp:1.0,rough:.52};
+const SKIN={mm:1.8,amp:2.2,rough:.5};
 function addSkinDetail(m){
   m.updateMatrixWorld(true);hero.updateMatrixWorld(true);
   m.traverse(function(o){
@@ -1558,7 +1558,7 @@ function addSkinDetail(m){
     [].concat(o.material).forEach(function(mat){
       mat.extensions=mat.extensions||{};mat.extensions.derivatives=true;
       mat.onBeforeCompile=function(sh){
-        sh.uniforms.uPoreF={value:sc*1000/SKIN.mm};sh.uniforms.uPoreAmp={value:SKIN.amp};sh.uniforms.uSkinRough={value:SKIN.rough};sh.uniforms.uPoreDepth={value:SKIN.mm*.00011*SKIN.amp};
+        sh.uniforms.uPoreF={value:sc*1000/SKIN.mm};sh.uniforms.uPoreAmp={value:SKIN.amp};sh.uniforms.uSkinRough={value:SKIN.rough};sh.uniforms.uPoreDepth={value:SKIN.mm*.00011};
         sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vSkinP;')
           .replace('#include <begin_vertex>','#include <begin_vertex>\nvSkinP=position;');
         sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
@@ -1573,13 +1573,13 @@ float skNoise(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
 vec3 skPerturb(vec3 sp,vec3 n,vec2 dH,float fd){vec3 sx=dFdx(sp),sy=dFdy(sp),r1=cross(sy,n),r2=cross(n,sx);float det=dot(sx,r1)*fd;
   return normalize(abs(det)*n-sign(det)*(dH.x*r1+dH.y*r2));}`)
         .replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
-float skinM=smoothstep(.10,.22,max(diffuseColor.r,max(diffuseColor.g,diffuseColor.b)))*smoothstep(.025,.07,diffuseColor.r-diffuseColor.b)*smoothstep(.05,.0,abs(diffuseColor.g/max(diffuseColor.r,.001)-.55)-.25);
+float skinM=smoothstep(.0016*uPoreF,.0021*uPoreF,abs(vSkinP.x*uPoreF))*smoothstep(.10,.22,max(diffuseColor.r,max(diffuseColor.g,diffuseColor.b)))*smoothstep(.025,.07,diffuseColor.r-diffuseColor.b)*smoothstep(.05,.0,abs(diffuseColor.g/max(diffuseColor.r,.001)-.55)-.25);
 vec3 skP=vSkinP*uPoreF;
 float skLod=1.-smoothstep(.3,.7,length(fwidth(skP)));          /* tamanho de um pixel em poros: some de longe */
 float skLod2=1.-smoothstep(.55,1.1,length(fwidth(skP*.18)));
-float skH=(1.-smoothstep(.0,.3,skPores(skP)))*-.6*skLod+(skNoise(skP*.18)-.5)*1.2*skLod2+(skNoise(skP*.045)-.5)*1.4;
+float skH=(1.-smoothstep(.0,.24,skPores(skP)))*-.35*skLod+(skNoise(skP*.18)-.5)*1.2*skLod2+(skNoise(skP*.045)-.5)*1.4;
 skH*=skinM*uPoreAmp;
-diffuseColor.rgb*=1.-skinM*skLod*.06*(1.-smoothstep(.0,.3,skPores(skP)));
+diffuseColor.rgb*=1.-skinM*skLod*.025*(1.-smoothstep(.0,.24,skPores(skP)));
 roughnessFactor=mix(roughnessFactor,uSkinRough+(skNoise(skP*.05)-.5)*.16-skH*.08,skinM);`)
         .replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
 normal=skPerturb(-vViewPosition,normal,vec2(dFdx(skH),dFdy(skH))*uPoreDepth,faceDirection);`);

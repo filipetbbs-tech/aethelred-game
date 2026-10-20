@@ -2,6 +2,25 @@ import numpy as np, json, struct, io
 from PIL import Image
 from glb import load, acc
 j,b0=load('/home/user/aethelred-game/aethelred_rig_leve.glb'); b0=bytes(b0); b=bytearray(b0)
+# queixo: rosto e queixo 100% no osso da cabeça (antes ~30% ia para pescoço/coluna e esticava o queixo)
+def fixchin():
+    at0=j['meshes'][0]['primitives'][0]['attributes']
+    P=acc(j,b0,at0['POSITION']); J=acc(j,b0,at0['JOINTS_0']).copy(); W=acc(j,b0,at0['WEIGHTS_0']).astype(np.float32).copy()
+    HEAD=[k for k,n in enumerate(j['skins'][0]['joints']) if j['nodes'][n].get('name','').endswith('Head')][0]
+    ry=(0.7453922-P[:,1])/0.0004; rx=(P[:,0]+0.09093996)/0.0004
+    t=np.clip((505-ry)/40,0,1)*(P[:,2]>-0.13)*np.clip((250-np.abs(rx-290))/40,0,1)
+    idx=np.nonzero(t>0)[0]
+    for i in idx:
+        sl=np.nonzero(J[i]==HEAD)[0]
+        if len(sl)==0: k=int(np.argmin(W[i])); J[i,k]=HEAD; W[i,k]=0; sl=[k]
+        oh=np.zeros(4,np.float32); oh[sl[0]]=1
+        W[i]=W[i]*(1-t[i])+oh*t[i]; W[i]/=W[i].sum()
+    for k,arr in (('JOINTS_0',J),('WEIGHTS_0',W)):
+        a=j['accessors'][at0[k]]; v=j['bufferViews'][a['bufferView']]; off=v.get('byteOffset',0)+a.get('byteOffset',0)
+        st=v.get('byteStride',0) or arr.dtype.itemsize*4; arr=arr.astype(acc(j,b0,at0[k]).dtype); isz=arr.dtype.itemsize*4
+        for i in idx: b[off+i*st:off+i*st+isz]=arr[i].tobytes()
+    print('queixo: vértices ajustados',len(idx))
+fixchin(); b0=bytes(b)
 f=np.load('facesel.npz'); sel,IMG=f['sel'],f['IMG']
 pr=j['meshes'][0]['primitives'][0]; at=pr['attributes']
 I=acc(j,b0,pr['indices']).copy().ravel(); tris=I.reshape(-1,3)

@@ -1546,43 +1546,64 @@ function cleanClip(clip){
 const PERFIS={'aethelred_personagem.glb':'mixamo'};
 let PERFIL='original';
 function PF(orig,mixamo){return PERFIL==='mixamo'&&mixamo!==undefined?mixamo:orig;}
-/* pele mais realista (só no perfil mixamo): poros e microrrelevo calculados na placa de vídeo, em 3D sobre o corpo
-   (sem emendas da textura), só nos braços e mãos (o rosto fica como está) e só onde a cor é de pele; somem com a distância para não cintilar. SKIN.mm: tamanho
-   médio do poro em milímetros; SKIN.amp: profundidade do relevo; SKIN.rough: rugosidade da pele */
-const SKIN={mm:1.8,amp:2.2,rough:.5};
+/* pele dos braços (só no perfil mixamo): variação de cor como a do rosto, calculada na placa de vídeo em 3D sobre o corpo
+   (sem emendas da textura), só nos braços e mãos e só onde a cor é de pele. Lado de fora/dorso mais bronzeado, lado de
+   dentro mais claro e rosado, manchas avermelhadas suaves, vermelhidão no cotovelo, nos nós dos dedos e nas mãos, e
+   sardas discretas no lado do sol. SKIN.forca: intensidade geral (0 desliga, 1 normal) */
+const SKIN={forca:1};
 function addSkinDetail(m){
   m.updateMatrixWorld(true);hero.updateMatrixWorld(true);
   m.traverse(function(o){
     if(!o.isMesh)return;
     const sc=o.getWorldScale(new THREE.Vector3()).x/hero.getWorldScale(new THREE.Vector3()).x;   /* metros por unidade da malha */
+    /* posição de repouso (espaço da malha) de ombro, cotovelo, pulso e nós dos dedos, pelo esqueleto */
+    const bx=function(n){if(!o.skeleton)return 0;const i=o.skeleton.bones.findIndex(function(bn){return bn.name.replace(/^mixamorig[:_]?/,'')===n;});
+      return i<0?0:Math.abs(new THREE.Vector3().setFromMatrixPosition(o.skeleton.boneInverses[i].clone().invert()).x);};
+    const J=[bx('LeftArm'),bx('LeftForeArm'),bx('LeftHand'),bx('LeftHandMiddle1')];
+    if(!J[1])return;
     [].concat(o.material).forEach(function(mat){
       mat.extensions=mat.extensions||{};mat.extensions.derivatives=true;
       mat.onBeforeCompile=function(sh){
-        sh.uniforms.uPoreF={value:sc*1000/SKIN.mm};sh.uniforms.uPoreAmp={value:SKIN.amp};sh.uniforms.uSkinRough={value:SKIN.rough};sh.uniforms.uPoreDepth={value:SKIN.mm*.00011};
-        sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vSkinP;')
-          .replace('#include <begin_vertex>','#include <begin_vertex>\nvSkinP=position;');
+        sh.uniforms.uMM={value:sc*1000};sh.uniforms.uArmJ={value:new THREE.Vector4(J[0],J[1],J[2],J[3])};sh.uniforms.uSkinK={value:SKIN.forca};
+        sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vSkinP,vSkinN;')
+          .replace('#include <begin_vertex>','#include <begin_vertex>\nvSkinP=position;vSkinN=normal;');
         sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
-varying vec3 vSkinP;uniform float uPoreF,uPoreAmp,uSkinRough,uPoreDepth;
+varying vec3 vSkinP,vSkinN;uniform float uMM,uSkinK;uniform vec4 uArmJ;
 vec3 skHash(vec3 p){p=fract(p*vec3(.1031,.1030,.0973));p+=dot(p,p.yxz+33.33);return fract((p.xxy+p.yxx)*p.zyx);}
-float skPores(vec3 p){vec3 i=floor(p),f=fract(p);float d=1.;
-  for(int x=-1;x<=1;x++)for(int y=-1;y<=1;y++)for(int z=-1;z<=1;z++){vec3 g=vec3(x,y,z),o=skHash(i+g);d=min(d,length(g+o-f));}
-  return d;}
 float skNoise(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
   return mix(mix(mix(skHash(i).x,skHash(i+vec3(1,0,0)).x,f.x),mix(skHash(i+vec3(0,1,0)).x,skHash(i+vec3(1,1,0)).x,f.x),f.y),
              mix(mix(skHash(i+vec3(0,0,1)).x,skHash(i+vec3(1,0,1)).x,f.x),mix(skHash(i+vec3(0,1,1)).x,skHash(i+vec3(1,1,1)).x,f.x),f.y),f.z);}
-vec3 skPerturb(vec3 sp,vec3 n,vec2 dH,float fd){vec3 sx=dFdx(sp),sy=dFdy(sp),r1=cross(sy,n),r2=cross(n,sx);float det=dot(sx,r1)*fd;
-  return normalize(abs(det)*n-sign(det)*(dH.x*r1+dH.y*r2));}`)
+float skCell(vec3 p,out float id){vec3 i=floor(p),f=fract(p);float d=9.;id=0.;
+  for(int x=-1;x<=1;x++)for(int y=-1;y<=1;y++)for(int z=-1;z<=1;z++){vec3 g=vec3(x,y,z),h=skHash(i+g);float e=length(g+h-f);if(e<d){d=e;id=fract(h.x*7.13+h.y*3.7);}}
+  return d;}`)
         .replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
-float skinM=smoothstep(.0016*uPoreF,.0021*uPoreF,abs(vSkinP.x*uPoreF))*smoothstep(.10,.22,max(diffuseColor.r,max(diffuseColor.g,diffuseColor.b)))*smoothstep(.025,.07,diffuseColor.r-diffuseColor.b)*smoothstep(.05,.0,abs(diffuseColor.g/max(diffuseColor.r,.001)-.55)-.25);
-vec3 skP=vSkinP*uPoreF;
-float skLod=1.-smoothstep(.3,.7,length(fwidth(skP)));          /* tamanho de um pixel em poros: some de longe */
-float skLod2=1.-smoothstep(.55,1.1,length(fwidth(skP*.18)));
-float skH=(1.-smoothstep(.0,.24,skPores(skP)))*-.35*skLod+(skNoise(skP*.18)-.5)*1.2*skLod2+(skNoise(skP*.045)-.5)*1.4;
-skH*=skinM*uPoreAmp;
-diffuseColor.rgb*=1.-skinM*skLod*.025*(1.-smoothstep(.0,.24,skPores(skP)));
-roughnessFactor=mix(roughnessFactor,uSkinRough+(skNoise(skP*.05)-.5)*.16-skH*.08,skinM);`)
-        .replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
-normal=skPerturb(-vViewPosition,normal,vec2(dFdx(skH),dFdy(skH))*uPoreDepth,faceDirection);`);
+{
+  float ax=abs(vSkinP.x);
+  vec3 pm=vSkinP*uMM;                                            /* em milímetros */
+  float armM=smoothstep(uArmJ.x*.78,uArmJ.x*.98,ax)
+    *smoothstep(.10,.22,max(diffuseColor.r,max(diffuseColor.g,diffuseColor.b)))*smoothstep(.025,.07,diffuseColor.r-diffuseColor.b)
+    *smoothstep(.05,.0,abs(diffuseColor.g/max(diffuseColor.r,.001)-.55)-.25)*uSkinK;
+  if(armM>.001){
+    vec3 nn=normalize(vSkinN);
+    float n150=skNoise(pm/150.),n50=skNoise(pm/45.+7.),n15=skNoise(pm/14.+3.);
+    float sun=clamp(nn.y*.7+.3,0.,1.);                            /* pose T, palma para baixo: dorso/lado de fora para cima */
+    vec3 c=diffuseColor.rgb;
+    c*=mix(vec3(1.),vec3(.84,.74,.64),sun*(.35+.55*n150));         /* bronzeado do lado do sol */
+    c=mix(c,c*vec3(1.05,.99,1.0)+.008,(1.-sun)*.6);               /* lado de dentro mais claro e rosado */
+    float elbow=smoothstep(32.,0.,abs(ax-uArmJ.y)*uMM)*smoothstep(-.05,-.6,nn.z);
+    float hand=smoothstep(uArmJ.z-.012/uMM*1000.,uArmJ.z+.02/uMM*1000.,ax);
+    float knuck=smoothstep(14.,0.,abs(ax-uArmJ.w)*uMM)*sun;
+    float red=smoothstep(.45,.8,n50)*.8+smoothstep(.55,.85,n15)*.3+elbow*.7+hand*.35+knuck*.6;
+    c=mix(c,c*vec3(1.16,.82,.8),clamp(red,0.,1.)*.65);            /* vermelhidão */
+    c*=1.+(n15-.5)*.22+(skNoise(pm/6.+5.)-.5)*.08;                                           /* manchas claras e escuras médias */
+    float fid;float fd=skCell(pm/4.,fid);
+    float fl=1.-smoothstep(.6,1.4,length(fwidth(pm/4.)));         /* sardas somem de longe */
+    float fr=(1.-smoothstep(.12,.3,fd))*step(.62,fid)*sun*smoothstep(uArmJ.x*1.3,uArmJ.y,ax)*fl;
+    c=mix(c,c*vec3(.8,.69,.6),fr*.55);
+    diffuseColor.rgb=mix(diffuseColor.rgb,c,armM);
+    roughnessFactor=mix(roughnessFactor,roughnessFactor*(.92+.16*n50),armM);
+  }
+}`);
       };
       mat.needsUpdate=true;
     });

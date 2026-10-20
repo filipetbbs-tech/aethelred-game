@@ -1712,16 +1712,20 @@ function loadArmForms(root){
   /* o braço humano só some do meio do braço para baixo: o ombro e o começo do braço ficam, e preenchem os vãos entre o
      braço mutante e o tronco (como se a pele fosse caindo dos dedos para os ombros). ARM_KEEP: fração do ombro ao
      cotovelo que continua humana */
-  const sk=mesh.skeleton,pos=g.attributes.position,si=g.attributes.skinIndex,sw=g.attributes.skinWeight,v=new THREE.Vector3();
+  const sk=mesh.skeleton,pos=g.attributes.position,si=g.attributes.skinIndex,sw=g.attributes.skinWeight,v=new THREE.Vector3(),tArm=new Float32Array(n).fill(-1);
   const jp=function(nm){const k=sk.bones.findIndex(function(b){return b.name.replace(/^mixamorig[:_]?/,'')===nm;});return k<0?null:new THREE.Vector3().setFromMatrixPosition(sk.boneInverses[k].clone().invert());};
   ['Left','Right'].forEach(function(s){
     const A=jp(s+'Arm'),E=jp(s+'ForeArm');if(!A||!E)return;const d=E.clone().sub(A),dd=d.lengthSq();
     for(let i=0;i<n;i++){if(!hide[i])continue;v.fromBufferAttribute(pos,i).applyMatrix4(mesh.bindMatrix);
       if((s==='Left')!==(v.x>0))continue;
-      const t=v.clone().sub(A).dot(d)/dd;if(t<ARM_KEEP)hide[i]=0;}
+      const t=v.clone().sub(A).dot(d)/dd;tArm[i]=t;
+      /* só some o que está dentro do braço (perto do eixo); costelas e axila ficam */
+      const r=v.clone().sub(A).addScaledVector(d,-t).length()/Math.sqrt(dd);
+      if(t<ARM_KEEP||r>.42)hide[i]=0;}
   });
   /* o pedaço de pele humana que fica (ombro) ganha textura de músculo na transformação: marca esses vértices */
-  const mus=new Float32Array(n);for(let i=0;i<n;i++)mus[i]=((bin.charCodeAt(i>>3)>>(i&7))&1)&&!hide[i]?1:0;
+  /* transição: pele humana junto ao tronco, músculo em direção ao braço */
+  const mus=new Float32Array(n);for(let i=0;i<n;i++)if(((bin.charCodeAt(i>>3)>>(i&7))&1)&&!hide[i]&&tArm[i]>-.5){const u=Math.max(0,Math.min(1,(tArm[i]+.05)/(ARM_KEEP+.05)));mus[i]=u*u*(3-2*u);}
   g.setAttribute('aMusc',new THREE.BufferAttribute(mus,1));addMuscleSkin(mesh);
   const a=full.array,keep=[];for(let t=0;t<a.length;t+=3)if(!hide[a[t]]&&!hide[a[t+1]]&&!hide[a[t+2]])keep.push(a[t],a[t+1],a[t+2]);
   armForm={mesh:mesh,body:mesh,full:full,noArm:new THREE.BufferAttribute(new Uint32Array(keep),1),shown:null};

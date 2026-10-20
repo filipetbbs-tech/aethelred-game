@@ -1685,7 +1685,7 @@ const ARM_KEEP=.22;
    na transformação, com a cor do músculo. MUSC.mm: tamanho de um ladrilho da textura em milímetros */
 const MUSC={mm:140,tex:null,uni:[],on:0,pc:null};
 /* ombreira na transformação: escala em volta do ombro e quanto sobe (unidades da malha) */
-const PAULD={k:1.6,up:.0002,out:.0005};
+const PAULD={k:1.22,up:.0001,out:.0002};
 loadBinary('musculo.jpg',function(buf){const img=new Image();img.onload=function(){const t=new THREE.Texture(img);t.wrapS=t.wrapT=THREE.MirroredRepeatWrapping;t.encoding=THREE.sRGBEncoding;t.needsUpdate=true;MUSC.tex=t;MUSC.uni.forEach(function(u){u.uMuscTex.value=t;});};img.src=URL.createObjectURL(new Blob([buf],{type:'image/jpeg'}));},function(){});
 function addMuscleSkin(mesh){
   const sc=mesh.getWorldScale(new THREE.Vector3()).x/hero.getWorldScale(new THREE.Vector3()).x;

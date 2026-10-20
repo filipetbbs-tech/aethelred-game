@@ -1565,8 +1565,9 @@ function poseMorphRun(dt){
   });
 }
 /* caminhada transformada: o contrário da corrida. Tronco só um pouco inclinado, braços ao lado do corpo, afastados
-   para as garras não encostarem nas pernas, e as palmas viradas para a frente. MWALK: inclinação, afastamento, balanço */
-const MWALK={lean:.2,out:.3,fwd:.08,sway:.1};
+   para as garras não encostarem nas pernas, e as palmas para a frente, giradas para dentro. MWALK: inclinação, afastamento,
+   balanço, giro da palma para dentro (rad) */
+const MWALK={lean:.2,out:.45,fwd:.08,sway:.1,palmIn:.785};
 let mWalkW=0;
 function poseMorphWalk(dt,on){
   mWalkW+=((on?1:0)-mWalkW)*Math.min(1,dt*(on?5:8));if(mWalkW<.01)return;
@@ -1583,7 +1584,9 @@ function poseMorphWalk(dt,on){
     const el=wp(B[s+'ForeArm']),hd=wp(B[s+'Hand']),d=hd.clone().sub(el).normalize();
     const along=wp(B[s+'HandMiddle1']||B[s+'Hand']).sub(hd),across=wp(B[s+'HandIndex1']).sub(wp(B[s+'HandPinky1']));
     const palm=new THREE.Vector3().crossVectors(along,across).multiplyScalar(s==='Right'?-1:1);
-    palm.addScaledVector(d,-palm.dot(d));const tg=F.clone().addScaledVector(d,-F.dot(d));
+    palm.addScaledVector(d,-palm.dot(d));
+    /* palma para a frente girada palmIn (rad) para dentro, na direção do corpo */
+    const tg=F.clone().multiplyScalar(Math.cos(MWALK.palmIn)).addScaledVector(R,-sg*Math.sin(MWALK.palmIn));tg.addScaledVector(d,-tg.dot(d));
     if(palm.lengthSq()>1e-10&&tg.lengthSq()>1e-10){palm.normalize();tg.normalize();
       rotAxis(B[s+'ForeArm'],d,Math.atan2(new THREE.Vector3().crossVectors(palm,tg).dot(d),palm.dot(tg))*w);}
   });

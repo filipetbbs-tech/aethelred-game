@@ -1513,6 +1513,57 @@ function loadBinary(url,onBuf,onFail,onProg){
   }
   tryLoad(0);
 }
+/* dedos das mãos mutantes: cada dedo tem 3 juntas próprias (filhas do osso da mão) no caminho do próprio dedo até a
+   ponta da garra (extras.fingerJoints, de ferramentas/dedos_mutantes.py). Em repouso elas não mudam nada (a matriz
+   de ligação compensa a posição); dobrar uma junta gira só o seu dedo, em volta do próprio ponto */
+function addClawBones(ud,bones,inv,bindM){
+  const FN=ud.fingerNames,out={Right:[],Left:[]};let idx=ud.extraBase;
+  ['Right','Left'].forEach(function(side){
+    const hi=bones.findIndex(function(b){return b.name.replace(/^mixamorig[:_]?/,'')===side+'Hand';});if(hi<0)return;
+    const hand=bones[hi],IBh=inv[hi],toQ=new THREE.Matrix4().multiplyMatrices(IBh,bindM);
+    const Q=FN.map(function(f){return ud.fingerJoints[side][f].map(function(p){return new THREE.Vector3(p[0],p[1],p[2]).applyMatrix4(toQ);});});
+    /* lado da palma: para onde as garras curvam, em relação à linha de cada dedo */
+    const palm=new THREE.Vector3();
+    Q.forEach(function(q,i){if(FN[i]==='Thumb')return;const d=q[1].clone().sub(q[0]).normalize(),t=q[3].clone().sub(q[0]);palm.add(t.sub(d.multiplyScalar(t.dot(d))));});
+    palm.normalize();
+    FN.forEach(function(f,fi){
+      const q=Q[fi],chain=[];let parent=hand,prev=new THREE.Vector3();
+      /* um eixo só por dedo: normal do plano da curva do dedo com a garra; girar no sentido + curva mais o dedo */
+      const ax=new THREE.Vector3().crossVectors(q[1].clone().sub(q[0]),q[3].clone().sub(q[0]));
+      if(ax.lengthSq()<1e-20){const d=q[1].clone().sub(q[0]).normalize();ax.crossVectors(d,palm);}
+      ax.normalize();
+      for(let k=0;k<3;k++){
+        const bn=new THREE.Bone();bn.name='garra_'+side+f+(k+1);bn.position.copy(q[k]).sub(prev);parent.add(bn);bn.updateMatrixWorld(true);
+        bones[idx]=bn;inv[idx]=new THREE.Matrix4().makeTranslation(-q[k].x,-q[k].y,-q[k].z).multiply(IBh);idx++;
+        chain.push({b:bn,axis:ax});prev=q[k];parent=bn;
+      }
+      out[side].push({name:f,chain:chain,spreadAxis:palm.clone()});
+    });
+  });
+  return out;
+}
+/* animação das garras: c = quanto fecham (-1 abertas e esticadas, 1 cerradas); s = quanto se abrem em leque */
+const CLAW={base:.18,curl:[.55,.65,.45],spread:.14};
+const _cq1=new THREE.Quaternion(),_cq2=new THREE.Quaternion();
+function animClaws(){
+  if(!armForm||!armForm.shown||!armForm.claws||!armForm.claws.userData.fingers||CLAW.off)return;
+  let c=CLAW.base+.06*Math.sin(st.t*1.4),s=0;
+  if(combo.active&&combo.cur){const A=combo.cur,p=progA(A,combo.t);
+    if(p<A.kw){const u=sm(p/Math.max(A.kw,.01));c+=(-.55-c)*u;s=u;}
+    else if(p<A.kf){const u=sm((p-A.kw)/Math.max(A.ki-A.kw,.01));c=-.55+(.85+.55)*u;s=1-u;}
+    else{const u=sm((p-A.kf)/.25);c=.85+(CLAW.base-.85)*u;}}
+  else if(airAtk){c=-.5;s=1;}
+  else if(combo.hold>0)c=.35+.05*Math.sin(st.t*2.1);
+  const F=armForm.claws.userData.fingers,off={Pinky:-1.5,Ring:-.5,Middle:.5,Index:1.5,Thumb:0};
+  ['Right','Left'].forEach(function(side){(F[side]||[]).forEach(function(fg,fi){
+    const ph=fi*1.7+(side==='Left'?.9:0),cc=c+.05*Math.sin(st.t*2.3+ph);
+    fg.chain.forEach(function(j,k){
+      _cq1.setFromAxisAngle(j.axis,cc*CLAW.curl[k]*(fg.name==='Thumb'?.6:1));
+      if(k===0&&fg.name!=='Thumb'){_cq2.setFromAxisAngle(fg.spreadAxis,s*CLAW.spread*off[fg.name]*(side==='Left'?-1:1));j.b.quaternion.copy(_cq2).multiply(_cq1);}
+      else j.b.quaternion.copy(_cq1);
+    });
+  });});
+}
 /* perfil mixamo: braços mutantes na transformação. Os braços mutantes ficam em aethelred_braco_mutante_rig.glb (direito e o esquerdo
    espelhado, de ferramentas/rig_braco.py), com JOINTS/WEIGHTS para os ossos deste esqueleto e as próprias matrizes de
    ligação (extras.inverseBind). Na transformação os braços humanos do corpo são escondidos (extras.armHide do corpo:
@@ -1522,11 +1573,14 @@ function loadSkinned(url,mesh,cb){
   loadBinary(url,function(buf){
     new THREE.GLTFLoader().parse(buf,'',function(g){
       let src=null;g.scene.traverse(function(o){if(o.isMesh&&!src)src=o;});if(!src)return;
-      const ib=src.userData.inverseBind||[],bones=mesh.skeleton.bones,inv=bones.map(function(b,i){return new THREE.Matrix4().fromArray(ib,i*16);});
+      const ib=src.userData.inverseBind||[],bones=mesh.skeleton.bones.slice(),inv=bones.map(function(b,i){return new THREE.Matrix4().fromArray(ib,i*16);});
       const mat=src.material;mat.skinning=true;mat.needsUpdate=true;
       const sm=new THREE.SkinnedMesh(src.geometry,mat);sm.castShadow=true;sm.receiveShadow=true;sm.frustumCulled=false;
       mesh.parent.add(sm);sm.position.copy(mesh.position);sm.quaternion.copy(mesh.quaternion);sm.scale.copy(mesh.scale);
-      sm.updateMatrixWorld(true);sm.bind(new THREE.Skeleton(bones,inv),mesh.bindMatrix);
+      sm.updateMatrixWorld(true);
+      const fingers=src.userData.fingerJoints?addClawBones(src.userData,bones,inv,mesh.bindMatrix):null;
+      sm.bind(new THREE.Skeleton(bones,inv),mesh.bindMatrix);
+      sm.userData.fingers=fingers;
       cb(sm,src.userData);
     },function(){});
   },function(){});
@@ -2475,7 +2529,7 @@ function tick(raw){
   updateTrail(dt,clawBase,clawTip,combo.active&&A&&pp>A.kw+.04&&pp<A.kf+.04);
   /* transformação */
   st.morph+=((st.morphOn?1:0)-st.morph)*Math.min(1,dt*6);
-  applyArmForm();
+  applyArmForm();animClaws();
   arms.forEach(a=>{
     a.normal.visible=st.morph<.5;a.blight.visible=st.morph>=.5;
     const k=.6+.4*Math.min(1,(st.morph-.5)*2);
@@ -2897,7 +2951,7 @@ function drawMini(){
 if(/prisao|prison/i.test(location.hash))setTimeout(enterPrison,0);
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},get armForm(){return armForm;},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes};
+window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},CLAW:CLAW,get armForm(){return armForm;},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes};
 frame();
 })();
 </script>

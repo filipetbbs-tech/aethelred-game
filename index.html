@@ -1628,13 +1628,35 @@ function poseMorphGuard(dt,on){
     /* o giro fica dividido entre antebraço e mão (como rádio e ulna), em vez de torcer tudo no cotovelo */
     const ang=pa>=pb?-a:a;rotAxis(B[s+'ForeArm'],d,ang*.45);rotAxis(B[s+'Hand'],d,ang*.55);});
 }
+/* golpes 2 a 4 (Dual Weapon Combo, feito para segurar armas): com as garras, a palma da mão que golpeia fica virada
+   para onde a mão está indo. A mão é medida a cada quadro; quanto mais rápida, mais forte a correção (as duas mãos,
+   então a que golpeia é sempre a mais corrigida). O giro é dividido entre antebraço e mão, como em poseMorphGuard */
+const PALMAIM={clips:{dual:1},v0:1.2,v1:3.5};
+const _pv={Left:null,Right:null};
+function palmVel(s){const B=rig.B,hd=wp(B[s+'Hand']),el=wp(B[s+'ForeArm']),d=hd.clone().sub(el).normalize();
+  const along=wp(B[s+'HandMiddle1']).sub(hd),across=wp(B[s+'HandIndex1']).sub(wp(B[s+'HandPinky1']));
+  return {hd:hd,d:d,palm:new THREE.Vector3().crossVectors(along,across).multiplyScalar(s==='Right'?-1:1).normalize()};}
+function aimPalms(dt){
+  const on=!PALMAIM.off&&PERFIL==='mixamo'&&armForm&&armForm.shown&&combo.active&&combo.cur&&PALMAIM.clips[combo.cur.clip]&&rig&&dt>0;
+  ['Left','Right'].forEach(function(s){
+    const P=palmVel(s),rel=P.hd.clone().sub(hero.position),prev=_pv[s];_pv[s]=on?rel:null;
+    if(!on||!prev)return;
+    const v=rel.clone().sub(prev).divideScalar(dt),sp=v.length(),k=sm((sp-PALMAIM.v0)/(PALMAIM.v1-PALMAIM.v0));if(k<.01)return;
+    const tg=v.normalize().addScaledVector(P.d,-v.dot(P.d)),pp=P.palm.clone().addScaledVector(P.d,-P.palm.dot(P.d));
+    if(tg.lengthSq()<1e-6||pp.lengthSq()<1e-6)return;tg.normalize();pp.normalize();
+    const ang=Math.atan2(new THREE.Vector3().crossVectors(pp,tg).dot(P.d),pp.dot(tg))*k;
+    const B=rig.B;rotAxis(B[s+'ForeArm'],P.d,ang*.45);rotAxis(B[s+'Hand'],P.d,ang*.55);
+    /* a posição medida fica a de depois da correção (a correção não move a mão, só a gira) */
+  });
+}
 /* animação das garras: c = quanto fecham (-1 abertas e esticadas, 1 cerradas); s = quanto se abrem em leque */
 const CLAW={base:.18,curl:[.55,.65,.45],spread:.14};
 const _cq1=new THREE.Quaternion(),_cq2=new THREE.Quaternion();
 function animClaws(){
   if(!armForm||!armForm.shown||!armForm.claws||!armForm.claws.userData.fingers||CLAW.off)return;
   let c=CLAW.base+.06*Math.sin(st.t*1.4),s=0;
-  if(combo.active&&combo.cur){const A=combo.cur,p=progA(A,combo.t);
+  if(combo.active&&combo.cur&&PALMAIM.clips[combo.cur.clip]){c=-.5+.05*Math.sin(st.t*3);s=.7;}
+  else if(combo.active&&combo.cur){const A=combo.cur,p=progA(A,combo.t);
     if(p<A.kw){const u=sm(p/Math.max(A.kw,.01));c+=(-.55-c)*u;s=u;}
     else if(p<A.kf){const u=sm((p-A.kw)/Math.max(A.ki-A.kw,.01));c=-.55+(.85+.55)*u;s=1-u;}
     else{const u=sm((p-A.kf)/.25);c=.85+(CLAW.base-.85)*u;}}
@@ -2493,6 +2515,7 @@ function updateModel(dt){
     poseFull();
     poseHands();
     poseMorphRun(dt);
+    aimPalms(dt);
     if(climbOut){climbOut.t+=dt;inertBlend(climbOut,.35);if(!climbOut.snap)climbOut=null;}
     poseHit(dt);
     poseFlip(dt);
@@ -3050,7 +3073,7 @@ function drawMini(){
 if(/prisao|prison/i.test(location.hash))setTimeout(enterPrison,0);
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},CLAW:CLAW,MRUN:MRUN,MWALK:MWALK,MGUARD:MGUARD,get armForm(){return armForm;},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes};
+window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},CLAW:CLAW,PALMAIM:PALMAIM,MRUN:MRUN,MWALK:MWALK,MGUARD:MGUARD,get armForm(){return armForm;},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes};
 frame();
 })();
 </script>

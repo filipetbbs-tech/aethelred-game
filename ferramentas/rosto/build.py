@@ -2,7 +2,7 @@ import numpy as np, json, struct, io
 from PIL import Image, ImageFilter
 from glb import load, acc
 m=np.load('mesh.npz'); P,N,UV,I=m['P'],m['N'],m['UV'],m['I']
-texI=Image.open('tex.png').convert('RGB'); tex=np.asarray(texI,np.float32); TH,TW=tex.shape[:2]
+texI=Image.open('tex_rec.png').convert('RGB'); tex=np.asarray(texI,np.float32); TH,TW=tex.shape[:2]
 srcI=Image.open('face_src.webp').convert('RGB'); src=np.asarray(srcI,np.float32); SH,SW=src.shape[:2]
 u0,v1,S=-0.09093996,0.7453922,0.0004
 R=np.array([[205,190],[375,190],[290,282],[290,342],[290,462]],float)

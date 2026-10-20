@@ -25,6 +25,8 @@ f=np.load('facesel.npz'); sel,IMG=f['sel'],f['IMG']
 pr=j['meshes'][0]['primitives'][0]; at=pr['attributes']
 I=acc(j,b0,pr['indices']).copy().ravel(); tris=I.reshape(-1,3)
 vid=tris[sel].ravel(); nf=len(vid)
+# atlas com a armadura recolorida (recolor.py) no lugar da textura original
+_ab=io.BytesIO(); Image.open('tex_rec.png').convert('RGB').save(_ab,'JPEG',quality=88); _aj=_ab.getvalue(); print('atlas jpg',len(_aj))
 F=Image.open('face_tex.png').convert('RGB')
 x0,y0=np.floor(IMG[vid].min(0)).astype(int)-4; x1,y1=np.ceil(IMG[vid].max(0)).astype(int)+4
 x0,y0=max(x0,0),max(y0,0); x1,y1=min(x1,F.width),min(y1,F.height)
@@ -54,6 +56,7 @@ rest=tris[~sel].ravel().astype(I.dtype)
 ia=j['accessors'][pr['indices']]; iv=j['bufferViews'][ia['bufferView']]; io_=iv.get('byteOffset',0)+ia.get('byteOffset',0)
 rb=rest.tobytes(); b[io_:io_+len(rb)]=rb; ia['count']=len(rest)  # reaproveita o espaço dos índices antigos
 imv=addview(jpg); j['images'].append({'mimeType':'image/jpeg','bufferView':imv})
+j['images'][0]['bufferView']=addview(_aj)
 j['textures'].append({'source':len(j['images'])-1,'sampler':0})
 mat=json.loads(json.dumps(j['materials'][0])); mat['name']='Rosto'; mat['pbrMetallicRoughness']['baseColorTexture']={'index':len(j['textures'])-1}
 j['materials'].append(mat)

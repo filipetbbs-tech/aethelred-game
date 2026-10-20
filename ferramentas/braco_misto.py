@@ -28,6 +28,8 @@ for s in ('Right','Left'):
     A=np.linalg.inv(IBN[bi[s+'Arm']])[:3,3];E=np.linalg.inv(IBN[bi[s+'ForeArm']])[:3,3];d=E-A
     side=(P[:,0]<0) if s=='Right' else (P[:,0]>0)
     t=((P-A)@d)/(d@d);keep|=side&(t<CORTE)
+keep&=(J<len(IBO)).all(1)|(W<=0).all(1)   # só ossos do esqueleto (os dos dedos não entram no ombro)
+keep&=np.array([all(w<=0 or k<len(IBO) for k,w in zip(jj,ww)) for jj,ww in zip(J,W)])
 tk=keep[T].all(1);T2=T[tk];used=np.unique(T2);remap=-np.ones(len(P),int);remap[used]=np.arange(len(used))
 P2,N2,UV2,J2,W2=P[used],Nn[used],UV[used],J[used],W[used];T2=remap[T2]
 # converte para as matrizes de ligação do antigo, mantendo a posição em repouso

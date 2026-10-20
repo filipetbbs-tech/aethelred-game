@@ -1572,6 +1572,35 @@ function loadClips(){
     const common=function(){loadBinary(file,use,function(){});};
     if(pf==='original')common();else loadBinary(own,use,common);
   });
+  /* perfil mixamo (teste): andar e correr vindos do modelo original, no lugar dos do Mixamo */
+  if(PERFIL==='mixamo')Object.keys(LOCO_MIX).forEach(function(k){
+    loadBinary(LOCO_MIX[k],function(buf){
+      if(PERFIL!=='mixamo')return;
+      new THREE.GLTFLoader().parse(buf,'',function(g){const nm='_loco_'+k;buildRetarget(nm,g);bakeLoco(nm,k);},function(){});
+    },function(){});
+  });
+}
+const LOCO_MIX={walk:'animacoes/mixamo/walk_original.glb',sprint:'animacoes/mixamo/sprint_original.glb'};
+/* grava uma animação retargetada como clipe comum do mixer (quaternions locais de cada osso + altura do quadril) */
+function bakeLoco(nm,key){
+  const R=clipSrc[nm];if(!R||!mixer)return;
+  const B=rig.B,fps=30,n=Math.max(2,Math.round(R.clip.duration*fps)+1),times=new Float32Array(n);
+  const save=R.list.map(function(b){return B[b].quaternion.clone();}),hp0=B.Hips.position.clone(),hadP=!!B.Hips._p;
+  const qv={},pv=new Float32Array(n*3);R.list.forEach(function(b){qv[b]=new Float32Array(n*4);});
+  for(let i=0;i<n;i++){
+    const t=Math.min(R.clip.duration,i/fps);times[i]=t;
+    B.Hips.position.copy(hp0);applyClip(nm,t,1);
+    R.list.forEach(function(b){B[b].quaternion.toArray(qv[b],i*4);});
+    B.Hips.position.toArray(pv,i*3);
+  }
+  R.list.forEach(function(b,i){B[b].quaternion.copy(save[i]);});B.Hips.position.copy(hp0);
+  if(!hadP&&B.Hips._p){const k=touchedP.indexOf(B.Hips);if(k>=0)touchedP.splice(k,1);B.Hips._p=null;}
+  const tracks=R.list.map(function(b){return new THREE.QuaternionKeyframeTrack(B[b].name+'.quaternion',times,qv[b]);});
+  tracks.push(new THREE.VectorKeyframeTrack(B.Hips.name+'.position',times,pv));
+  const clip=new THREE.AnimationClip(key+'_original',R.clip.duration,tracks);
+  const old=acts[key];if(old)old.stop();
+  acts[key]=mixer.clipAction(clip);
+  delete clipSrc[nm];R.src.parent&&R.src.parent.remove(R.src);
 }
 const _hq=new THREE.Quaternion(),_hqi=new THREE.Quaternion();
 function heroSpace(b,out){b.getWorldQuaternion(out);return out.premultiply(_hqi);}
@@ -2779,7 +2808,7 @@ function drawMini(){
 if(/prisao|prison/i.test(location.hash))setTimeout(enterPrison,0);
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes};
+window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes};
 frame();
 })();
 </script>

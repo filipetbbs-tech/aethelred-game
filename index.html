@@ -1683,7 +1683,9 @@ function loadSkinned(url,mesh,cb){
 const ARM_KEEP=.22;
 /* textura de músculo (musculo.jpg, tirada do braço mutante) aplicada em projeção tripla sobre o ombro humano que sobra
    na transformação, com a cor do músculo. MUSC.mm: tamanho de um ladrilho da textura em milímetros */
-const MUSC={mm:140,tex:null,uni:[],on:0};
+const MUSC={mm:140,tex:null,uni:[],on:0,pc:null};
+/* ombreira na transformação: escala em volta do ombro e quanto sobe (unidades da malha) */
+const PAULD={k:1.6,up:.0002,out:.0005};
 loadBinary('musculo.jpg',function(buf){const img=new Image();img.onload=function(){const t=new THREE.Texture(img);t.wrapS=t.wrapT=THREE.MirroredRepeatWrapping;t.encoding=THREE.sRGBEncoding;t.needsUpdate=true;MUSC.tex=t;MUSC.uni.forEach(function(u){u.uMuscTex.value=t;});};img.src=URL.createObjectURL(new Blob([buf],{type:'image/jpeg'}));},function(){});
 function addMuscleSkin(mesh){
   const sc=mesh.getWorldScale(new THREE.Vector3()).x/hero.getWorldScale(new THREE.Vector3()).x;
@@ -1691,9 +1693,10 @@ function addMuscleSkin(mesh){
     const prev=mat.onBeforeCompile;
     mat.onBeforeCompile=function(sh,r){
       if(prev)prev.call(this,sh,r);
+      sh.uniforms.uPC={value:MUSC.pc||new THREE.Vector3()};sh.uniforms.uPK={value:PAULD.k};sh.uniforms.uPUp={value:PAULD.up};sh.uniforms.uPOut={value:PAULD.out};
       sh.uniforms.uMuscTex={value:MUSC.tex};sh.uniforms.uMuscOn={value:MUSC.on};sh.uniforms.uMuscS={value:sc*1000/MUSC.mm};MUSC.uni.push(sh.uniforms);
-      sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute float aMusc;varying float vMusc;varying vec3 vMP,vMN;')
-        .replace('#include <begin_vertex>','#include <begin_vertex>\nvMusc=aMusc;vMP=position;vMN=normal;');
+      sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute float aMusc,aPauld;uniform float uMuscOn,uPK,uPUp,uPOut;uniform vec3 uPC;varying float vMusc;varying vec3 vMP,vMN;')
+        .replace('#include <begin_vertex>','#include <begin_vertex>\nvMusc=aMusc;vMP=position;vMN=normal;\nif(aPauld*uMuscOn>.5){transformed=uPC+(transformed-uPC)*uPK;transformed.y+=uPUp;transformed.x+=sign(uPC.x)*uPOut;}');
       sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform sampler2D uMuscTex;uniform float uMuscOn,uMuscS;varying float vMusc;varying vec3 vMP,vMN;')
         .replace('#include <map_fragment>',`#include <map_fragment>
 if(vMusc*uMuscOn>.001){
@@ -1725,6 +1728,13 @@ function loadArmForms(root){
       const r=v.clone().sub(A).addScaledVector(d,-t).length()/Math.sqrt(dd);
       if(t<ARM_KEEP||r>.42)hide[i]=0;}
   });
+  /* ombreira de couro (extras.pauldron): continua visível na transformação e cresce em volta do ombro */
+  const pb=atob((mesh.userData&&mesh.userData.pauldron)||''),pau=new Float32Array(n);
+  const pc=new THREE.Vector3();let pn=0;
+  for(let i=0;i<n;i++)if((pb.charCodeAt(i>>3)>>(i&7))&1){pau[i]=1;hide[i]=0;pc.add(v.fromBufferAttribute(pos,i));pn++;}
+  g.setAttribute('aPauld',new THREE.BufferAttribute(pau,1));
+  /* centro da escala: o meio da própria ombreira (no espaço da malha) */
+  if(pn)MUSC.pc=pc.multiplyScalar(1/pn);
   /* o pedaço de pele humana que fica (ombro) ganha textura de músculo na transformação: marca esses vértices */
   /* transição: pele humana junto ao tronco, músculo em direção ao braço */
   /* também a pele do ombro fora do braço (frente e costas do ombro, perto da junta): começa antes, em t=-0,3; no

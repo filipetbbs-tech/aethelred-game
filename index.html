@@ -2050,11 +2050,12 @@ function useModel(gltf,name){
       /* o quadril do pulo do Mixamo anda para o lado e para a frente: fica só a altura, senão o modelo desliza no pouso */
       let hb=null;m.traverse(function(o){if(o.isBone&&/Hips$/.test(o.name)&&!hb)hb=o;});
       if(hb)acts.jump.getClip().tracks.forEach(function(t){if(t.name===hb.name+'.position')for(let i=0;i<t.values.length;i+=3){t.values[i]=hb.position.x;t.values[i+2]=hb.position.z;}});
+      if(JUMP_REC.modo==='invertido'){
       const jc=acts.jump.getClip(),R=JUMP_REC,N=10,tr=jc.tracks.map(function(t){const n=t.getValueSize(),ip=t.createInterpolant(),T=new Float32Array(N+2),V=new Float32Array((N+2)*n);
         for(let i=0;i<=N;i++){T[i]=R.dur*i/N;V.set(ip.evaluate(R.de*(1-i/N)),i*n);}
         T[N+1]=R.dur+R.segura;V.set(V.slice(N*n,N*n+n),(N+1)*n);
         return new t.constructor(t.name,T,V);});
-      acts['jump land']=mixer.clipAction(new THREE.AnimationClip('JumpRecover',R.dur+R.segura,tr));
+      acts['jump land']=mixer.clipAction(new THREE.AnimationClip('JumpRecover',R.dur+R.segura,tr));}
     }
     say(rig?'Personagem carregada. Ataque com J, clique ou o botão Atacar.':name+' carregado, mas o esqueleto não segue o padrão Mixamo, então os golpes de garra ficam desligados.');
   }else say(name+' carregado. O arquivo não tem animações, então o corpo só balança ao andar.');
@@ -2695,12 +2696,46 @@ function playAct(a,once){
   curAct=a;
 }
 let wasAir=false,landT=0,landHard=false,airTop=0;
-const JUMP_REC={de:.07,dur:.22,segura:.2};
+/* pulo do perfil mixamo: modo 'mao' = impulso e pouso feitos à mão (poseJumpFx); 'invertido' = pouso com o começo do
+   impulso do Mixamo tocado ao contrário (de, dur e segura em segundos) */
+const JUMP_REC={modo:'mao',de:.07,dur:.22,segura:.2};
 /* pouso em movimento: só a parte de cima da animação de pouso (coluna, ombros, braços, cabeça), misturada por cima do
    andar ou da corrida e sumindo aos poucos; a curva LAND_RUN dá o peso ao longo do tempo (sobe, segura, solta) */
 const LAND_RUN={peso:1,sobe:.06,segura:.18,solta:.55};
 let landRun=null,landUpAct=null;
 const LAND_UP=/(Spine|Neck|Head|Shoulder|Arm|Hand)/;
+/* impulso e pouso feitos à mão por cima do pulo do Mixamo.
+   impulso: sai do chão com os joelhos dobrados e estica as pernas em JFX.impulso.dur s (dobra = ângulo da coxa, rad).
+   pouso: quadril desce (m) com os pés no lugar, tronco inclina (rad) e ombros caem; chega em "sobe" s, segura e volta em
+   "volta" s. Andando o pouso é mais leve e curto (as pernas seguem os passos); queda alta é mais funda e trava. */
+const JFX={impulso:{dur:.32,dobra:.75,tronco:.22},
+  parado:{desce:.22,tronco:.45,ombro:.14,sobe:.07,segura:.12,volta:.5},
+  andando:{desce:.09,tronco:.22,ombro:.08,sobe:.05,segura:.05,volta:.3},
+  alto:{desce:.32,tronco:.6,ombro:.16,sobe:.07,segura:.35,volta:.6,trava:.85}};
+let jumpFx=null;
+function poseJumpFx(dt){
+  if(!jumpFx||!rig)return;
+  if(climb||dodge||airAtk||combo.active||grab||heroThrown){jumpFx=null;return;}
+  const J=jumpFx,B=rig.B;J.t+=dt;
+  const F=new THREE.Vector3(Math.sin(st.rot),0,Math.cos(st.rot)),R=new THREE.Vector3().crossVectors(F,UPV).normalize();
+  if(J.ph==='start'){const P=JFX.impulso;if(J.t>=P.dur||aboveGround()<.03&&J.t>.1){jumpFx=null;return;}
+    const c=1-sm(J.t/P.dur),a=P.dobra*c;
+    ['Left','Right'].forEach(function(s){rotAxis(B[s+'UpLeg'],R,a);rotAxis(B[s+'Leg'],R,-a*1.9);rotAxis(B[s+'Foot'],R,a*.9);});
+    rig.spine.forEach(function(n){rotAxis(B[n],R,-P.tronco*c/3);});
+    return;}
+  const P=J.P,end=P.sobe+P.segura+P.volta;if(J.t>=end||aboveGround()>.03){jumpFx=null;return;}
+  const e=J.t<P.sobe?sm(J.t/P.sobe):1-sm((J.t-P.sobe-P.segura)/P.volta);
+  /* pés ficam onde a animação os pôs; o quadril desce e as pernas dobram para alcançá-los */
+  const fp={},fq={};['Left','Right'].forEach(function(s){fp[s]=wp(B[s+'Foot']);B[s+'Foot'].getWorldQuaternion(_cq);fq[s]=_cq.clone();});
+  if(!B.Hips._p){B.Hips._p=B.Hips.position.clone();touchedP.push(B.Hips);}
+  const hw=wp(B.Hips).addScaledVector(UPV,-P.desce*e);B.Hips.position.copy(B.Hips.parent.worldToLocal(hw));B.Hips.updateMatrixWorld(true);
+  ['Left','Right'].forEach(function(s){const sg=s==='Right'?1:-1;
+    ikHinge(B[s+'UpLeg'],B[s+'Leg'],B[s+'Foot'],fp[s],F.clone().addScaledVector(R,sg*.25),1,s+'Leg',true);setWorldQuat(B[s+'Foot'],fq[s]);});
+  /* tronco cai para a frente, ombros descem, cabeça compensa para continuar olhando à frente */
+  rig.spine.forEach(function(n){rotAxis(B[n],R,-P.tronco*e/3);});
+  ['Left','Right'].forEach(function(s){if(B[s+'Shoulder'])rotAxis(B[s+'Shoulder'],F,(s==='Right'?1:-1)*P.ombro*e);});
+  rotAxis(B.Head,R,P.tronco*e*.55);
+}
 function startLandRun(jLand,t0,k){if(!jLand)return;
   let a=landUpAct;
   if(!a||a._src!==jLand.getClip()||a.getMixer()!==mixer){const c=jLand.getClip();a=landUpAct=mixer.clipAction(new THREE.AnimationClip('LandUp',c.duration,c.tracks.filter(function(t){return LAND_UP.test(t.name)&&/quaternion/.test(t.name);})));a._src=c;}
@@ -2725,10 +2760,15 @@ function updateModel(dt){
     const any=acts[Object.keys(acts)[0]];
     const air=!climb&&aboveGround()>.03;
     if(air)airTop=wasAir?Math.max(airTop,st.y):st.y;
-    if(air&&!wasAir){playAct(jStart||jMid,true);}
+    if(air&&!wasAir){playAct(jStart||jMid,true);if(!jLand&&st.vy>3)jumpFx={ph:'start',t:0};}
     else if(air&&jStart&&jMid&&curAct===jStart&&jStart.time>=jStart.getClip().duration-.05){playAct(jMid,false);}
     /* pouso: a animação inteira sempre toca, mas depois de um pulo normal não prende a personagem (andar, correr ou
        atacar cortam o pouso); parada até o fim só depois de cair de mais alto (LAND.alto, em metros acima do chão) */
+    /* sem animação de pouso (perfil mixamo, modo 'mao'): pouso feito à mão em poseJumpFx; parado, andando ou de queda alta */
+    if(!air&&wasAir&&!jLand){const fall=airTop-st.y,hard=fall>LAND.alto;
+      jumpFx={ph:'land',t:0,P:hard?JFX.alto:(st.speed>.5?JFX.andando:JFX.parado)};
+      if(hard){landHard=true;landT=JFX.alto.trava;st.speed=0;st.vx=st.vz=0;}
+      playAct(idle||any,false);}
     if(!air&&wasAir&&jLand){const fall=airTop-st.y;
       if(fall>LAND.alto){playAct(jLand,true);landHard=true;landT=jLand.getClip().duration-.12;st.speed=0;st.vx=st.vz=0;}
       /* caiu andando ou correndo: as pernas seguem os passos e o tronco faz o pouso por cima */
@@ -2767,6 +2807,7 @@ function updateModel(dt){
     poseFull();
     poseHands();
     poseMorphRun(dt);
+    poseJumpFx(dt);
     if(climbOut){climbOut.t+=dt;inertBlend(climbOut,.35);if(!climbOut.snap)climbOut=null;}
     poseHit(dt);
     poseFlip(dt);

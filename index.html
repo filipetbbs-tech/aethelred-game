@@ -2048,6 +2048,18 @@ function useModel(gltf,name){
         tr.push(new t.constructor(t.name,[0,wc.duration],v.concat(v)));});
       acts.morphwalk=mixer.clipAction(new THREE.AnimationClip('MorphWalk',wc.duration,tr));
     }
+    /* dedos (perfil mixamo): pose de repouso (esqueleto) e pose da caminhada (1º quadro). A caminhada tem as mãos naturais,
+       levemente fechadas; o eixo de cada falange entre as duas poses é o sentido em que o dedo fecha */
+    FING=null;
+    if(acts.walk){const wc=acts.walk.getClip(),bones=[];
+      m.traverse(function(o){if(o.isBone&&/(Left|Right)Hand(Thumb|Index|Middle|Ring|Pinky)[123]$/.test(o.name))bones.push(o);});
+      const F={list:[]};
+      bones.forEach(function(b){const tr=wc.tracks.find(function(t){return t.name===b.name+'.quaternion';});if(!tr)return;
+        const qw=new THREE.Quaternion().fromArray(tr.createInterpolant().evaluate(0)),qr=b.quaternion.clone();
+        const rel=qr.clone().invert().multiply(qw),ax=new THREE.Vector3(rel.x,rel.y,rel.z);if(rel.w<0)ax.negate();
+        if(ax.lengthSq()<1e-10)ax.set(1,0,0);ax.normalize();
+        const nm=b.name.replace(/^mixamorig[:_]?/,'');F.list.push({b:b,side:/^Left/.test(nm)?'Left':'Right',j:+nm.slice(-1),thumb:/Thumb/.test(nm),rest:qr,walk:qw,ax:ax});});
+      if(F.list.length)FING=F;}
     /* recuperação do pulo (perfil mixamo): o arquivo do Mixamo só traz o impulso (começa agachado e sobe). O pouso é o
        começo desse impulso tocado de trás para frente: de JUMP_REC.de s do original até o agachamento do 1º quadro, em
        JUMP_REC.dur s, e segura agachado JUMP_REC.segura s antes de voltar ao normal */
@@ -2778,17 +2790,22 @@ function poseMorphSeq(){
     ikHinge(B[s+'Arm'],B[s+'ForeArm'],B[s+'Hand'],tg,pole,w,s+'Arm');
     if(!morphSeq.swapped)curlHand(s,w);});
 }
-/* fecha a mão humana (k = 0 aberta como na animação, 1 punho cerrado): cada falange gira em torno do mesmo eixo, o que leva
-   os dedos para a palma; o polegar fecha menos */
-const FIST=[1.05,1.35,.95];
-function curlHand(s,k){
-  if(k<=0)return;const B=rig.B,sg=s==='Right'?1:-1,hd=wp(B[s+'Hand']);if(!B[s+'HandMiddle1']||!B[s+'HandIndex1']||!B[s+'HandPinky1'])return;
-  const along=wp(B[s+'HandMiddle1']).sub(hd).normalize(),across=wp(B[s+'HandIndex1']).sub(wp(B[s+'HandPinky1'])).normalize();
-  const palm=new THREE.Vector3().crossVectors(along,across).multiplyScalar(sg*PALM_SG).normalize(),ax=new THREE.Vector3().crossVectors(along,palm).normalize();
-  ['Index','Middle','Ring','Pinky'].forEach(function(f){for(let j=1;j<=3;j++){const b=B[s+'Hand'+f+j];if(b)rotAxis(b,ax,FIST[j-1]*k);}});
-  for(let j=2;j<=3;j++){const b=B[s+'HandThumb'+j];if(b)rotAxis(b,ax,.45*k);}
+/* mãos humanas (perfil mixamo). FING: falanges com a pose de repouso, a da caminhada e o eixo em que fecham.
+   handIdle: no idle e na guarda os dedos ficam como na caminhada (a animação de idle os deixa esticados, quase virando
+   para trás). curlHand: punho cerrado (k = 0 como está, 1 fechado), girando cada falange no sentido em que ela fecha na
+   caminhada, FIST rad por falange (1ª, 2ª, 3ª); o polegar fecha menos */
+let FING=null;
+const FIST=[1.25,1.5,1.0],FIST_THUMB=[.25,.5,.6],_fistQ=new THREE.Quaternion();
+function handIdle(w){
+  if(!FING||w<=0)return;
+  FING.list.forEach(function(f){f.b.quaternion.slerp(f.walk,Math.min(1,w));});
 }
-let PALM_SG=1;
+function curlHand(s,k){
+  if(!FING||k<=0)return;
+  FING.list.forEach(function(f){if(f.side!==s)return;
+    _fistQ.setFromAxisAngle(f.ax,(f.thumb?FIST_THUMB:FIST)[f.j-1]);f.b.quaternion.slerp(f.rest.clone().multiply(_fistQ),Math.min(1,k));});
+  rig.B[s+'Hand'].updateMatrixWorld(true);
+}
 let jumpFx=null;
 function poseJumpFx(dt){
   if(!jumpFx||!rig)return;
@@ -2883,6 +2900,8 @@ function updateModel(dt){
     if(window.CLIP_PREVIEW&&clipSrc[CLIP_PREVIEW.name]){applyClip(CLIP_PREVIEW.name,CLIP_PREVIEW.t,1);poseHands();return;}
     poseFull();
     poseHands();
+    /* mãos naturais no idle e na guarda da forma humana */
+    if(PERFIL==='mixamo'&&!(armForm&&armForm.shown)){const iw=(acts.idle?acts.idle.getEffectiveWeight():0)+(acts.guarda?acts.guarda.getEffectiveWeight():0);handIdle(iw);if(iw>0&&rig){rig.B.LeftHand.updateMatrixWorld(true);rig.B.RightHand.updateMatrixWorld(true);}}
     poseMorphRun(dt);
     poseJumpFx(dt);
     poseMorphSeq();

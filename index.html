@@ -1836,11 +1836,10 @@ const ARM_KEEP=.22;
 /* textura de músculo (musculo.jpg, tirada do braço mutante) aplicada em projeção tripla sobre o ombro humano que sobra
    na transformação, com a cor do músculo. MUSC.mm: tamanho de um ladrilho da textura em milímetros */
 const MUSC={mm:140,tex:null,uni:[],on:0,pc:null};
-/* ombreira na transformação: escala em volta do ombro e quanto sobe (unidades da malha); cada braço mutante pode ter o seu
-   tamanho (ARMS[].pauld), porque o ombro de cada um ocupa um espaço diferente */
-const PAULD={k:1,up:0,out:0};
-function curPauld(){return (ARMS[armAt]&&ARMS[armAt].pauld)||PAULD;}
-function setPauld(u){const P=curPauld();u.uPK.value=P.k;u.uPUp.value=P.up;u.uPOut.value=P.out;}
+/* ombreira na transformação: continua presa ao ombro pela borda de dentro (perto do pescoço) e inclina para fora do
+   corpo PAULD.tilt rad, para não ser atravessada pelo ombro mutante, que é mais largo */
+const PAULD={tilt:.35};
+function setPauld(u){u.uPT.value=PAULD.tilt;}
 loadBinary('musculo.jpg',function(buf){const img=new Image();img.onload=function(){const t=new THREE.Texture(img);t.wrapS=t.wrapT=THREE.MirroredRepeatWrapping;t.encoding=THREE.sRGBEncoding;t.needsUpdate=true;MUSC.tex=t;MUSC.uni.forEach(function(u){u.uMuscTex.value=t;});};img.src=URL.createObjectURL(new Blob([buf],{type:'image/jpeg'}));},function(){});
 function addMuscleSkin(mesh){
   const sc=mesh.getWorldScale(new THREE.Vector3()).x/hero.getWorldScale(new THREE.Vector3()).x;
@@ -1848,10 +1847,10 @@ function addMuscleSkin(mesh){
     const prev=mat.onBeforeCompile;
     mat.onBeforeCompile=function(sh,r){
       if(prev)prev.call(this,sh,r);
-      sh.uniforms.uPC={value:MUSC.pc||new THREE.Vector3()};sh.uniforms.uPK={value:0};sh.uniforms.uPUp={value:0};sh.uniforms.uPOut={value:0};setPauld(sh.uniforms);
+      sh.uniforms.uPC={value:MUSC.pc||new THREE.Vector3()};sh.uniforms.uPT={value:0};setPauld(sh.uniforms);
       sh.uniforms.uMuscTex={value:MUSC.tex};sh.uniforms.uMuscOn={value:MUSC.on};sh.uniforms.uMuscS={value:sc*1000/MUSC.mm};MUSC.uni.push(sh.uniforms);
-      sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute float aMusc,aPauld;uniform float uMuscOn,uPK,uPUp,uPOut;uniform vec3 uPC;varying float vMusc;varying vec3 vMP,vMN;')
-        .replace('#include <begin_vertex>','#include <begin_vertex>\nvMusc=aMusc;vMP=position;vMN=normal;\nif(aPauld*uMuscOn>.5){transformed=uPC+(transformed-uPC)*uPK;transformed.y+=uPUp;transformed.x+=sign(uPC.x)*uPOut;}');
+      sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute float aMusc,aPauld;uniform float uMuscOn,uPT;uniform vec3 uPC;varying float vMusc;varying vec3 vMP,vMN;')
+        .replace('#include <begin_vertex>','#include <begin_vertex>\nvMusc=aMusc;vMP=position;vMN=normal;\nif(aPauld*uMuscOn>.5){float pa=sign(uPC.x)*uPT,pcs=cos(pa),psn=sin(pa);vec2 pd=transformed.xy-uPC.xy;transformed.xy=uPC.xy+vec2(pd.x*pcs-pd.y*psn,pd.x*psn+pd.y*pcs);}');
       sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform sampler2D uMuscTex;uniform float uMuscOn,uMuscS;varying float vMusc;varying vec3 vMP,vMN;')
         .replace('#include <map_fragment>',`#include <map_fragment>
 if(vMusc*uMuscOn>.001){
@@ -1883,13 +1882,14 @@ function loadArmForms(root){
       const r=v.clone().sub(A).addScaledVector(d,-t).length()/Math.sqrt(dd);
       if(t<ARM_KEEP||(r>.42&&t<1))hide[i]=0;}
   });
-  /* ombreira de couro (extras.pauldron): continua visível na transformação e cresce em volta do ombro */
+  /* ombreira de couro (extras.pauldron): continua visível na transformação, inclinada para fora (PAULD) */
   const pb=atob((mesh.userData&&mesh.userData.pauldron)||''),pau=new Float32Array(n);
-  const pc=new THREE.Vector3();let pn=0;
-  for(let i=0;i<n;i++)if((pb.charCodeAt(i>>3)>>(i&7))&1){pau[i]=1;hide[i]=0;pc.add(v.fromBufferAttribute(pos,i));pn++;}
+  const pc=new THREE.Vector3(),pmin=new THREE.Vector3(Infinity,-Infinity,0);let pn=0;
+  for(let i=0;i<n;i++)if((pb.charCodeAt(i>>3)>>(i&7))&1){pau[i]=1;hide[i]=0;v.fromBufferAttribute(pos,i);pc.add(v);pn++;
+    if(Math.abs(v.x)<Math.abs(pmin.x))pmin.x=v.x;if(v.y>pmin.y)pmin.y=v.y;}
   g.setAttribute('aPauld',new THREE.BufferAttribute(pau,1));
-  /* centro da escala: o meio da própria ombreira (no espaço da malha) */
-  if(pn)MUSC.pc=pc.multiplyScalar(1/pn);
+  /* eixo da inclinação: a borda de dentro e de cima da ombreira (no espaço da malha), apontando para a frente */
+  if(pn){pc.multiplyScalar(1/pn);MUSC.pc=new THREE.Vector3(pmin.x,pmin.y,pc.z);}
   /* o pedaço de pele humana que fica (ombro) ganha textura de músculo na transformação: marca esses vértices */
   /* transição: pele humana junto ao tronco, músculo em direção ao braço */
   /* também a pele do ombro fora do braço (frente e costas do ombro, perto da junta): começa antes, em t=-0,3; no
@@ -1917,7 +1917,7 @@ function loadArmModel(){
    tamanho normal e cobre o ombro) e as abas soltas que pendem embaixo da axila. TRIM: alcance da busca na ombreira (m),
    quanto o ponto pode estar ao lado do vértice mais próximo e por fora da superfície (m), e as abas: abaixo da junta do
    ombro (fração do braço) até onde ao longo do braço */
-const TRIM={busca:.05,lado:.012,fora:.025,abaixo:.32,ate:.45};
+const TRIM={ombreira:false,busca:.05,lado:.012,fora:.025,abaixo:.32,ate:.45};
 function trimArm(grp,hero){
   const hs=hero.skeleton,bones=hs.bones,save=bones.map(function(b){return [b.position.clone(),b.quaternion.clone(),b.scale.clone()];});
   /* pose de repouso: o skeleton.pose() do three erra quando o pai do quadril tem escala (armature do Mixamo), então cada osso
@@ -1933,7 +1933,7 @@ function trimArm(grp,hero){
   /* ombreira (vértices marcados no corpo) em coordenadas do mundo, numa grade para a busca do mais próximo */
   const hg=hero.geometry,pa=hg.attributes.aPauld,hp=hg.attributes.position,hn=hg.attributes.normal,nm=new THREE.Matrix3().getNormalMatrix(hero.matrixWorld);
   const cell=TRIM.busca,grid=new Map(),key=function(x,y,z){return Math.floor(x/cell)+','+Math.floor(y/cell)+','+Math.floor(z/cell);};
-  if(pa)for(let i=0;i<hp.count;i++){if(pa.getX(i)<.5)continue;v.fromBufferAttribute(hp,i);hero.boneTransform(i,v);v.applyMatrix4(hero.matrixWorld);
+  if(pa&&TRIM.ombreira)for(let i=0;i<hp.count;i++){if(pa.getX(i)<.5)continue;v.fromBufferAttribute(hp,i);hero.boneTransform(i,v);v.applyMatrix4(hero.matrixWorld);
     n.fromBufferAttribute(hn,i).applyMatrix3(nm).normalize();const k=key(v.x,v.y,v.z);if(!grid.has(k))grid.set(k,[]);grid.get(k).push([v.x,v.y,v.z,n.x,n.y,n.z]);}
   let cut=0;
   let mi=-1;
@@ -1950,7 +1950,7 @@ function trimArm(grp,hero){
         for(let q=0;q<L.length;q++){const P=L[q],dx=acc.x-P[0],dy=acc.y-P[1],dz=acc.z-P[2],d=dx*dx+dy*dy+dz*dz;if(d<bd){bd=d;best=P;}}}
       /* em cima da ombreira: o ponto cai sobre a área dela (perto do vértice mais próximo, de lado) e está por dentro ou
          até TRIM.fora por fora da superfície; assim a ombreira, no tamanho normal, aparece por cima do ombro mutante */
-      if(best){const dx=acc.x-best[0],dy=acc.y-best[1],dz=acc.z-best[2],dn=dx*best[3]+dy*best[4]+dz*best[5];
+      if(best&&TRIM.ombreira){const dx=acc.x-best[0],dy=acc.y-best[1],dz=acc.z-best[2],dn=dx*best[3]+dy*best[4]+dz*best[5];
         const tx=dx-dn*best[3],ty=dy-dn*best[4],tz=dz-dn*best[5];if(tx*tx+ty*ty+tz*tz<TRIM.lado*TRIM.lado&&dn<TRIM.fora)drop[i]=1;}
       /* abas embaixo da axila: abaixo da junta do ombro, perto do começo do braço */
       const side=(J.Left[0]&&J.Right[0]&&acc.distanceToSquared(J.Left[0])<acc.distanceToSquared(J.Right[0]))?'Left':'Right',A=J[side][0],E=J[side][1];

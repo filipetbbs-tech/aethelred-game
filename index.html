@@ -1706,9 +1706,9 @@ function addClawBones(ud,bones,inv,bindM){
 const MRUN={lean:.7,back:.72,open:.62,down:.42,sway:.07,head:.45};
 let mRunW=0;
 function poseMorphRun(dt){
-  const free=PERFIL==='mixamo'&&armForm&&armForm.shown&&!combo.active&&aboveGround()<.05&&!grab&&!climb&&!dodge&&!tpose&&rig;
+  const free=PERFIL==='mixamo'&&armForm&&(armForm.shown||morphSeq)&&!combo.active&&aboveGround()<.05&&!grab&&!climb&&!dodge&&!tpose&&rig;
   poseMorphWalk(dt,free&&st.speed>.5&&!(runHeld()&&st.speed>5));
-  poseMorphGuard(dt,free&&st.speed<=.5&&(combo.hold>0||combo.outDur>0));
+  poseMorphGuard(dt,free&&st.speed<=.5&&(combo.hold>0||combo.outDur>0||!!morphSeq));
   const on=free&&runHeld()&&st.speed>5;
   mRunW+=((on?1:0)-mRunW)*Math.min(1,dt*(on?5:8));if(mRunW<.01||!rig)return;
   const B=rig.B,w=sm(mRunW),F=new THREE.Vector3(Math.sin(st.rot),0,Math.cos(st.rot)),R=new THREE.Vector3().crossVectors(F,UPV).normalize();
@@ -1748,7 +1748,7 @@ function poseMorphWalk(dt,on){
    abertos para os lados e para baixo, cotovelos para fora e as garras apontando para fora e para baixo.
    MGUARD: inclinação, distância dos pés ao centro (m), descida do quadril (m), joelhos para fora, mão à frente/abaixo/
    para fora (em braços), ombros encolhidos (rad), cabeça erguida (rad), giro das palmas para fora (rad) */
-const MGUARD={lean:.5,width:.44,drop:.14,bow:.9,fwd:.3,down:.55,out:.72,shrug:.22,headUp:.75,breathe:.025,palmOut:1.75};
+const MGUARD={lean:.5,width:.48,drop:.18,bow:1.15,fwd:.3,down:.55,out:.72,shrug:.22,headUp:.75,breathe:.025,palmOut:1.75};
 let mGuardW=0;
 function poseMorphGuard(dt,on){
   mGuardW+=((on?1:0)-mGuardW)*Math.min(1,dt*(on?5:8));if(mGuardW<.01)return;
@@ -2717,22 +2717,25 @@ const JFX={impulso:{dur:.32,dobra:.75,tronco:.22},
   parado:{desce:.22,tronco:.45,ombro:.14,sobe:.07,segura:.12,volta:.5},
   andando:{desce:.09,tronco:.22,ombro:.08,sobe:.05,segura:.05,volta:.3},
   alto:{desce:.32,tronco:.6,ombro:.16,sobe:.07,segura:.35,volta:.6,trava:.85}};
-/* transformação (perfil mixamo): ergue os braços humanos acima da cabeça cruzando os pulsos, segura, e joga os braços
-   para os lados e para trás, rápido, até o cotovelo passar das costas. No meio da descida os braços viram os monstruosos,
-   escondidos por uma explosão de sangue ao longo dos dois braços. MSEQ: tempos (s) de cada fase e a troca */
-const MSEQ={sobe:.42,segura:.16,desce:.17,troca:.11,fica:.14,volta:.4};
+/* transformação (perfil mixamo): já entra na postura de guarda (pernas arqueadas), traz os braços humanos para a frente
+   e cruza os pulsos na altura do rosto, segura, e joga os braços para baixo e para trás enquanto o tronco desce junto,
+   quase passando as garras no chão; no meio da descida os braços viram os monstruosos, escondidos por uma explosão de
+   sangue ao longo dos dois braços; depois se ajeita e fica na guarda com as garras.
+   MSEQ: tempos (s) de cada fase, momento da troca (dentro da descida), quanto o tronco desce (rad) e o quadril (m) */
+const MSEQ={cruza:.4,segura:.18,desce:.22,troca:.1,baixo:.22,ajeita:.5,tronco:1,quadril:.15};
 let morphSeq=null;
 function startMorphSeq(){
   if(!rig||!armForm||!armForm.claws||PERFIL!=='mixamo'||climb||dodge||airAtk||grab||heroThrown||death||aboveGround()>.05)return false;
-  combo.active=false;combo.queued=false;morphSeq={t:0,swapped:false};st.speed=0;st.vx=st.vz=0;SOUND.voice('growl');return true;}
+  combo.active=false;combo.queued=false;combo.hold=0;combo.outDur=0;morphSeq={t:0,swapped:false};st.speed=0;st.vx=st.vz=0;SOUND.voice('growl');return true;}
 function morphSeqLock(){return !!morphSeq;}
 function updateMorphSeq(dt){
   if(!morphSeq)return;const M=MSEQ,S=morphSeq;S.t+=dt;
-  const tSwap=M.sobe+M.segura+M.troca;
+  const tSwap=M.cruza+M.segura+M.troca;
   if(!S.swapped&&S.t>=tSwap){S.swapped=true;st.morphOn=true;st.morph=1;applyArmForm();morphBurst();
     stateEl.textContent='Transformado: garras e lâmina expostas';stateEl.style.color='#e8e0d0';
     SOUND.impact(true);SOUND.voice('growl');shake=Math.max(shake,.35);rumble(1,.8,260);}
-  if(S.t>=M.sobe+M.segura+M.desce+M.fica+M.volta)morphSeq=null;
+  /* termina já na guarda com as garras (a mesma de depois dos golpes) */
+  if(S.t>=M.cruza+M.segura+M.desce+M.baixo+M.ajeita){morphSeq=null;combo.pose=GUARD_ABS.slice();combo.hold=COMBAT_HOLD;combo.holdT=1;combo.outDur=0;}
 }
 /* pontos ao longo dos dois braços (ombro, braço, antebraço, mão), cada um com a direção para fora do corpo */
 function morphBurst(){
@@ -2742,28 +2745,36 @@ function morphBurst(){
       const d=p.clone().sub(c);d.y=0;d.normalize().add(new THREE.Vector3((Math.random()-.5)*.8,0,(Math.random()-.5)*.8)).normalize();pts.push({p:p,d:d});}});
   BLOOD.burst(pts);
 }
+function bez(a,b,c,e){return a.clone().multiplyScalar((1-e)*(1-e)).addScaledVector(b,2*(1-e)*e).addScaledVector(c,e*e);}
 function poseMorphSeq(){
   if(!morphSeq||!rig)return;
   const M=MSEQ,t=morphSeq.t,B=rig.B,L=rig.armLen,F=new THREE.Vector3(Math.sin(st.rot),0,Math.cos(st.rot)),R=new THREE.Vector3().crossVectors(F,UPV).normalize();
-  const t1=M.sobe,t2=t1+M.segura,t3=t2+M.desce,t4=t3+M.fica,t5=t4+M.volta;
-  /* peso: entra durante a subida, sai na volta */
-  const w=t<t1?sm(t/(t1*.7)):(t<t4?1:1-sm((t-t4)/M.volta));
-  const head=wp(B.Head),tremor=(t>t1&&t<t2)?Math.sin(t*90)*.012:0;
-  /* tronco: arqueia para trás com os braços em cima e estufa o peito ao jogar os braços para trás */
-  const arch=t<t2?.12*sm(t/t1):(t<t3?.12+(-.08-.12)*sm((t-t2)/M.desce):-.08);
-  rig.spine.forEach(function(n){rotAxis(B[n],R,arch*w/3);});
+  const t1=M.cruza,t2=t1+M.segura,t3=t2+M.desce,t4=t3+M.baixo,t5=t4+M.ajeita;
+  /* peso dos braços: entra durante o cruzamento, sai enquanto se ajeita (a guarda de baixo assume) */
+  const w=t<t1?sm(t/(t1*.8)):(t<t4?1:1-sm((t-t4)/M.ajeita));
+  /* tronco e quadril descem junto com os braços, ficam embaixo e voltam ao se ajeitar */
+  const dn=t<t2?0:(t<t3?sm((t-t2)/M.desce):(t<t4?1:1-sm((t-t4)/(M.ajeita*.85))));
+  if(dn>0){
+    const fp={},fq={};['Left','Right'].forEach(function(s){fp[s]=wp(B[s+'Foot']);B[s+'Foot'].getWorldQuaternion(_cq);fq[s]=_cq.clone();});
+    if(!B.Hips._p){B.Hips._p=B.Hips.position.clone();touchedP.push(B.Hips);}
+    const hw=wp(B.Hips).addScaledVector(UPV,-M.quadril*dn);B.Hips.position.copy(B.Hips.parent.worldToLocal(hw));B.Hips.updateMatrixWorld(true);
+    ['Left','Right'].forEach(function(s){const sg=s==='Right'?1:-1;
+      ikHinge(B[s+'UpLeg'],B[s+'Leg'],B[s+'Foot'],fp[s],F.clone().addScaledVector(R,sg*MGUARD.bow),1,s+'Leg',true);setWorldQuat(B[s+'Foot'],fq[s]);});
+    rig.spine.forEach(function(n){rotAxis(B[n],R,-M.tronco*dn/3);});
+    rotAxis(B.Head,R,M.tronco*dn*.6);
+  }
+  const head=wp(B.Head),tremor=(t>t1&&t<t2)?Math.sin(t*80)*.01:0;
   ['Left','Right'].forEach(function(s){const sg=s==='Right'?1:-1,sh=wp(B[s+'Arm']);
-    /* cruzado em cima: as mãos se cruzam acima da cabeça (a direita na frente), cotovelos para fora */
-    const up=new THREE.Vector3(head.x,head.y,head.z).addScaledVector(UPV,.32+tremor).addScaledVector(R,-sg*.05).addScaledVector(F,.06+(sg>0?.035:-.01));
-    /* jogado: mão atrás do quadril, aberta para o lado, cotovelo atrás das costas */
-    const back=sh.clone().addScaledVector(UPV,-.66*L).addScaledVector(F,-.62*L).addScaledVector(R,sg*.32*L);
-    const side=sh.clone().addScaledVector(R,sg*.95*L).addScaledVector(UPV,.1*L);
+    /* cruzado na frente do rosto: a mão de cada lado passa para o outro lado (a direita na frente), cotovelos para fora e para baixo */
+    const face=head.clone().addScaledVector(F,.34+(sg>0?.05:0)).addScaledVector(UPV,-.06+tremor).addScaledVector(R,-sg*.07);
+    /* passa pelo lado, à altura do peito, e desce até perto do chão, aberto e um pouco para trás */
+    const side=sh.clone().addScaledVector(R,sg*.85*L).addScaledVector(F,.15*L).addScaledVector(UPV,-.15*L);
+    const low=sh.clone().addScaledVector(UPV,-.92*L).addScaledVector(F,-.3*L).addScaledVector(R,sg*.42*L);
     let tg,pole;
-    if(t<t2){tg=up;pole=R.clone().multiplyScalar(sg).addScaledVector(UPV,.2).addScaledVector(F,-.2);}
-    else if(t<t3){const u=(t-t2)/M.desce,e=u*u*(1.6-.6*u);   /* acelera */
-      if(e<.5){tg=up.clone().lerp(side,e*2);}else{tg=side.clone().lerp(back,(e-.5)*2);}
-      pole=R.clone().multiplyScalar(sg).addScaledVector(F,-e).addScaledVector(UPV,.3*(1-e));}
-    else{tg=back;pole=F.clone().negate().addScaledVector(R,sg*.4);}
+    if(t<t2){tg=face;pole=R.clone().multiplyScalar(sg).addScaledVector(UPV,-.7);}
+    else if(t<t3){const u=(t-t2)/M.desce,e=u*u*(1.7-.7*u);tg=bez(face,side,low,e);
+      pole=R.clone().multiplyScalar(sg).addScaledVector(UPV,-.7*(1-e)).addScaledVector(F,-e);}
+    else{tg=low.clone().addScaledVector(F,-.04*Math.sin((t-t3)*8));pole=F.clone().negate().addScaledVector(R,sg*.5);}
     ikHinge(B[s+'Arm'],B[s+'ForeArm'],B[s+'Hand'],tg,pole,w,s+'Arm');});
 }
 let jumpFx=null;

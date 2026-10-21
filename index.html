@@ -2762,7 +2762,7 @@ function playAct(a,once){
   if(curAct)curAct.fadeOut(.12);
   curAct=a;
 }
-let wasAir=false,landT=0,landHard=false,airTop=0;
+let wasAir=false,landT=0,landHard=false,airTop=0,airT=0;
 /* pulo do perfil mixamo: modo 'mao' = impulso e pouso feitos à mão (poseJumpFx); 'invertido' = pouso com o começo do
    impulso do Mixamo tocado ao contrário (de, dur e segura em segundos) */
 const JUMP_REC={modo:'mao',de:.07,dur:.22,segura:.2};
@@ -2776,9 +2776,9 @@ const LAND_UP=/(Spine|Neck|Head|Shoulder|Arm|Hand)/;
    pouso: quadril desce (m) com os pés no lugar, tronco inclina (rad) e ombros caem; chega em "sobe" s, segura e volta em
    "volta" s. Andando o pouso é mais leve e curto (as pernas seguem os passos); queda alta é mais funda e trava. */
 const JFX={impulso:{dur:.32,dobra:.75,tronco:.22},
-  parado:{desce:.22,tronco:.45,ombro:.14,sobe:.07,segura:.12,volta:.5},
-  andando:{desce:.09,tronco:.22,ombro:.08,sobe:.05,segura:.05,volta:.3},
-  alto:{desce:.32,tronco:.6,ombro:.16,sobe:.07,segura:.35,volta:.6,trava:.85}};
+  parado:{braco:.45,desce:.22,tronco:.45,ombro:.14,sobe:.07,segura:.12,volta:.5},
+  andando:{braco:.2,desce:.09,tronco:.22,ombro:.08,sobe:.05,segura:.05,volta:.3},
+  alto:{braco:.75,desce:.32,tronco:.6,ombro:.16,sobe:.07,segura:.35,volta:.6,trava:.85}};
 /* transformação (perfil mixamo): já entra na postura de guarda (pernas arqueadas), traz os braços humanos para a frente
    e cruza os pulsos na altura do rosto, segura, e joga os braços para baixo e para trás enquanto o tronco desce junto,
    quase passando as garras no chão; no meio da descida os braços viram os monstruosos, escondidos por uma explosão de
@@ -2879,6 +2879,8 @@ function poseJumpFx(dt){
   rig.spine.forEach(function(n){rotAxis(B[n],R,-P.tronco*e/3);});
   ['Left','Right'].forEach(function(s){if(B[s+'Shoulder'])rotAxis(B[s+'Shoulder'],F,(s==='Right'?1:-1)*P.ombro*e);});
   rotAxis(B.Head,R,P.tronco*e*.55);
+  /* braços vêm para a frente (equilíbrio), senão pendem atrás do quadril agachado */
+  ['Left','Right'].forEach(function(s){rotAxis(B[s+'Arm'],R,P.braco*e);rotAxis(B[s+'ForeArm'],R,P.braco*.6*e);});
 }
 function startLandRun(jLand,t0,k){if(!jLand)return;
   let a=landUpAct;
@@ -2903,13 +2905,14 @@ function updateModel(dt){
     if(!jMid)for(const k in acts)if(/jump/.test(k)&&!/start|land/.test(k)){jMid=acts[k];break;}
     const any=acts[Object.keys(acts)[0]];
     const air=!climb&&aboveGround()>.03;
-    if(air)airTop=wasAir?Math.max(airTop,st.y):st.y;
+    if(air){airTop=wasAir?Math.max(airTop,st.y):st.y;airT=wasAir?airT+dt:0;}
     if(air&&!wasAir){playAct(jStart||jMid,true);if(!jLand&&st.vy>3)jumpFx={ph:'start',t:0};}
     else if(air&&jStart&&jMid&&curAct===jStart&&jStart.time>=jStart.getClip().duration-.05){playAct(jMid,false);}
     /* pouso: a animação inteira sempre toca, mas depois de um pulo normal não prende a personagem (andar, correr ou
        atacar cortam o pouso); parada até o fim só depois de cair de mais alto (LAND.alto, em metros acima do chão) */
     /* sem animação de pouso (perfil mixamo, modo 'mao'): pouso feito à mão em poseJumpFx; parado, andando ou de queda alta */
-    if(!air&&wasAir&&!jLand){const fall=airTop-st.y,hard=fall>LAND.alto;
+    /* só depois de um pulo ou queda de verdade: chegar ao topo da pilastra pela escalada não conta */
+    if(!air&&wasAir&&!jLand&&!climbOut&&(airT>.25||airTop-st.y>.4)){const fall=airTop-st.y,hard=fall>LAND.alto;
       jumpFx={ph:'land',t:0,P:hard?JFX.alto:(st.speed>.5?JFX.andando:JFX.parado)};
       if(hard){landHard=true;landT=JFX.alto.trava;st.speed=0;st.vx=st.vz=0;}
       playAct(idle||any,false);}

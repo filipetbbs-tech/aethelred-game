@@ -2047,6 +2047,9 @@ function useModel(gltf,name){
        começo desse impulso tocado de trás para frente: de JUMP_REC.de s do original até o agachamento do 1º quadro, em
        JUMP_REC.dur s, e segura agachado JUMP_REC.segura s antes de voltar ao normal */
     if(acts.jump&&!findAct(/land/)){
+      /* o quadril do pulo do Mixamo anda para o lado e para a frente: fica só a altura, senão o modelo desliza no pouso */
+      let hb=null;m.traverse(function(o){if(o.isBone&&/Hips$/.test(o.name)&&!hb)hb=o;});
+      if(hb)acts.jump.getClip().tracks.forEach(function(t){if(t.name===hb.name+'.position')for(let i=0;i<t.values.length;i+=3){t.values[i]=hb.position.x;t.values[i+2]=hb.position.z;}});
       const jc=acts.jump.getClip(),R=JUMP_REC,N=10,tr=jc.tracks.map(function(t){const n=t.getValueSize(),ip=t.createInterpolant(),T=new Float32Array(N+2),V=new Float32Array((N+2)*n);
         for(let i=0;i<=N;i++){T[i]=R.dur*i/N;V.set(ip.evaluate(R.de*(1-i/N)),i*n);}
         T[N+1]=R.dur+R.segura;V.set(V.slice(N*n,N*n+n),(N+1)*n);

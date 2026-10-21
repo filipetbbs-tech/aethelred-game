@@ -2043,6 +2043,16 @@ function useModel(gltf,name){
         tr.push(new t.constructor(t.name,[0,wc.duration],v.concat(v)));});
       acts.morphwalk=mixer.clipAction(new THREE.AnimationClip('MorphWalk',wc.duration,tr));
     }
+    /* recuperação do pulo (perfil mixamo): o arquivo do Mixamo só traz o impulso (começa agachado e sobe). O pouso é o
+       começo desse impulso tocado de trás para frente: de JUMP_REC.de s do original até o agachamento do 1º quadro, em
+       JUMP_REC.dur s, e segura agachado JUMP_REC.segura s antes de voltar ao normal */
+    if(acts.jump&&!findAct(/land/)){
+      const jc=acts.jump.getClip(),R=JUMP_REC,N=10,tr=jc.tracks.map(function(t){const n=t.getValueSize(),ip=t.createInterpolant(),T=new Float32Array(N+2),V=new Float32Array((N+2)*n);
+        for(let i=0;i<=N;i++){T[i]=R.dur*i/N;V.set(ip.evaluate(R.de*(1-i/N)),i*n);}
+        T[N+1]=R.dur+R.segura;V.set(V.slice(N*n,N*n+n),(N+1)*n);
+        return new t.constructor(t.name,T,V);});
+      acts['jump land']=mixer.clipAction(new THREE.AnimationClip('JumpRecover',R.dur+R.segura,tr));
+    }
     say(rig?'Personagem carregada. Ataque com J, clique ou o botão Atacar.':name+' carregado, mas o esqueleto não segue o padrão Mixamo, então os golpes de garra ficam desligados.');
   }else say(name+' carregado. O arquivo não tem animações, então o corpo só balança ao andar.');
 }
@@ -2682,12 +2692,13 @@ function playAct(a,once){
   curAct=a;
 }
 let wasAir=false,landT=0,landHard=false,airTop=0;
+const JUMP_REC={de:.07,dur:.22,segura:.2};
 /* pouso em movimento: só a parte de cima da animação de pouso (coluna, ombros, braços, cabeça), misturada por cima do
    andar ou da corrida e sumindo aos poucos; a curva LAND_RUN dá o peso ao longo do tempo (sobe, segura, solta) */
 const LAND_RUN={peso:1,sobe:.06,segura:.18,solta:.55};
 let landRun=null,landUpAct=null;
 const LAND_UP=/(Spine|Neck|Head|Shoulder|Arm|Hand)/;
-function startLandRun(jLand,t0,k){
+function startLandRun(jLand,t0,k){if(!jLand)return;
   let a=landUpAct;
   if(!a||a._src!==jLand.getClip()||a.getMixer()!==mixer){const c=jLand.getClip();a=landUpAct=mixer.clipAction(new THREE.AnimationClip('LandUp',c.duration,c.tracks.filter(function(t){return LAND_UP.test(t.name)&&/quaternion/.test(t.name);})));a._src=c;}
   a.reset();a.setLoop(THREE.LoopOnce,1);a.clampWhenFinished=true;a.time=t0;a.setEffectiveWeight(0);a.play();

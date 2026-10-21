@@ -421,7 +421,9 @@ const keys={};const joy={x:0,y:0};
 addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyG')toggleGod();if(e.code==='KeyK')dodgeKey=true;if(e.code==='KeyE')grabKey();if(e.code==='KeyL')toggleDodgeVer();if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();if(e.code==='KeyM')toggleMusic();if(e.code==='KeyB')toggleSlow();if(e.code==='KeyN')toggleWorld();if(WORLD==='prison'&&/^Digit[1-6]$/.test(e.code))prisonWarp(+e.code.slice(5)-1);});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 const stateEl=document.getElementById('state');
-function toggle(){if(!abil.morph&&!st.morphOn){flashMsg('A transformação ainda está selada. Procure o altar.',1.6);return;}st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
+function toggle(){if(!abil.morph&&!st.morphOn){flashMsg('A transformação ainda está selada. Procure o altar.',1.6);return;}if(morphSeq)return;
+  if(!st.morphOn&&startMorphSeq())return;
+  st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
 function jump(){if(st.y<=groundY(st.x,st.z)+.001&&st.vy<=0&&!combo.active&&!tpose&&!death&&!climb){st.vy=8;SOUND.voice('jump');}}
 document.getElementById('atk').onpointerdown=function(){attack();};
 
@@ -705,7 +707,7 @@ function startAttack(i,A){
   comboEl.textContent=A.run?A.name:'Golpe '+(i+1)+' de '+ATT.length+': '+A.name;
 }
 function attack(){
-  if(paused||death||climb||heroThrown)return;
+  if(paused||death||climb||heroThrown||morphSeq)return;
   if(grab){uppercutFromGrab();return;}
   /* no ar (pulo ou salto da parede): ataque aéreo */
   /* durante o mortal do salto da parede o ataque fica bloqueado; libera quando o mortal termina, já na queda */
@@ -823,7 +825,7 @@ function pushOut(p,R){circles.forEach(function(c){const dx=p.x-c.x,dz=p.z-c.z,d=
    chão e nas paredes onde as gotas caem e somem devagar */
 const BLOOD=(function(){
   let on=true;try{on=localStorage.getItem('aeth_sangue')!=='0';}catch(e){}
-  const N=500,ND=160,NM=24,G=-13;
+  const N=500,ND=160,NM=48,G=-13;
   const drops=new THREE.InstancedMesh(new THREE.SphereGeometry(1,6,4),new THREE.MeshStandardMaterial({color:0x320204,roughness:.2,metalness:0,envMapIntensity:.8}),N);
   drops.instanceMatrix.setUsage(THREE.DynamicDrawUsage);drops.frustumCulled=false;drops.castShadow=false;scene.add(drops);
   const D=[];for(let i=0;i<N;i++)D.push({on:false,p:new THREE.Vector3(),v:new THREE.Vector3(),r:0,t:0});
@@ -875,6 +877,9 @@ const BLOOD=(function(){
     death:function(e){if(!on)return;const s=e.sc||1,p=e.g.position;spray(new THREE.Vector3(p.x,p.y+.9*s,p.z),new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),40,1.2);
       const g=groundAt(p.x,p.z,p.y+.5);decal(new THREE.Vector3(p.x,g,p.z),up,(1.1+Math.random()*.4)*s,Math.random()*6.28,1,1.6);},
     spray:spray,
+    /* explosão contida ao longo dos braços (transformação): cada ponto solta um jato curto para fora e uma névoa maior */
+    burst:function(pts){if(!on)return;pts.forEach(function(q){spray(q.p,q.d,5,.7);
+      const m=mists[mi];mi=(mi+1)%NM;m.s.visible=true;m.t=0;m.k=.9;m.s.position.copy(q.p);m.v.copy(q.d).multiplyScalar(.5);});},
     update:function(dt){
       if(!on)return;
       for(let i=0;i<N;i++){const d=D[i];if(!d.on)continue;d.t+=dt;d.v.y+=G*dt;d.v.multiplyScalar(1-.6*dt);d.p.addScaledVector(d.v,dt);
@@ -2712,6 +2717,55 @@ const JFX={impulso:{dur:.32,dobra:.75,tronco:.22},
   parado:{desce:.22,tronco:.45,ombro:.14,sobe:.07,segura:.12,volta:.5},
   andando:{desce:.09,tronco:.22,ombro:.08,sobe:.05,segura:.05,volta:.3},
   alto:{desce:.32,tronco:.6,ombro:.16,sobe:.07,segura:.35,volta:.6,trava:.85}};
+/* transformação (perfil mixamo): ergue os braços humanos acima da cabeça cruzando os pulsos, segura, e joga os braços
+   para os lados e para trás, rápido, até o cotovelo passar das costas. No meio da descida os braços viram os monstruosos,
+   escondidos por uma explosão de sangue ao longo dos dois braços. MSEQ: tempos (s) de cada fase e a troca */
+const MSEQ={sobe:.42,segura:.16,desce:.17,troca:.11,fica:.14,volta:.4};
+let morphSeq=null;
+function startMorphSeq(){
+  if(!rig||!armForm||!armForm.claws||PERFIL!=='mixamo'||climb||dodge||airAtk||grab||heroThrown||death||aboveGround()>.05)return false;
+  combo.active=false;combo.queued=false;morphSeq={t:0,swapped:false};st.speed=0;st.vx=st.vz=0;SOUND.voice('growl');return true;}
+function morphSeqLock(){return !!morphSeq;}
+function updateMorphSeq(dt){
+  if(!morphSeq)return;const M=MSEQ,S=morphSeq;S.t+=dt;
+  const tSwap=M.sobe+M.segura+M.troca;
+  if(!S.swapped&&S.t>=tSwap){S.swapped=true;st.morphOn=true;st.morph=1;applyArmForm();morphBurst();
+    stateEl.textContent='Transformado: garras e lâmina expostas';stateEl.style.color='#e8e0d0';
+    SOUND.impact(true);SOUND.voice('growl');shake=Math.max(shake,.35);rumble(1,.8,260);}
+  if(S.t>=M.sobe+M.segura+M.desce+M.fica+M.volta)morphSeq=null;
+}
+/* pontos ao longo dos dois braços (ombro, braço, antebraço, mão), cada um com a direção para fora do corpo */
+function morphBurst(){
+  const B=rig.B,c=wp(B[rig.spine[rig.spine.length-1]]),pts=[];
+  ['Left','Right'].forEach(function(s){const a=wp(B[s+'Arm']),e=wp(B[s+'ForeArm']),h=wp(B[s+'Hand']);
+    for(let i=0;i<=8;i++){const u=i/8,p=u<.5?a.clone().lerp(e,u*2):e.clone().lerp(h,(u-.5)*2);
+      const d=p.clone().sub(c);d.y=0;d.normalize().add(new THREE.Vector3((Math.random()-.5)*.8,0,(Math.random()-.5)*.8)).normalize();pts.push({p:p,d:d});}});
+  BLOOD.burst(pts);
+}
+function poseMorphSeq(){
+  if(!morphSeq||!rig)return;
+  const M=MSEQ,t=morphSeq.t,B=rig.B,L=rig.armLen,F=new THREE.Vector3(Math.sin(st.rot),0,Math.cos(st.rot)),R=new THREE.Vector3().crossVectors(F,UPV).normalize();
+  const t1=M.sobe,t2=t1+M.segura,t3=t2+M.desce,t4=t3+M.fica,t5=t4+M.volta;
+  /* peso: entra durante a subida, sai na volta */
+  const w=t<t1?sm(t/(t1*.7)):(t<t4?1:1-sm((t-t4)/M.volta));
+  const head=wp(B.Head),tremor=(t>t1&&t<t2)?Math.sin(t*90)*.012:0;
+  /* tronco: arqueia para trás com os braços em cima e estufa o peito ao jogar os braços para trás */
+  const arch=t<t2?.12*sm(t/t1):(t<t3?.12+(-.08-.12)*sm((t-t2)/M.desce):-.08);
+  rig.spine.forEach(function(n){rotAxis(B[n],R,arch*w/3);});
+  ['Left','Right'].forEach(function(s){const sg=s==='Right'?1:-1,sh=wp(B[s+'Arm']);
+    /* cruzado em cima: as mãos se cruzam acima da cabeça (a direita na frente), cotovelos para fora */
+    const up=new THREE.Vector3(head.x,head.y,head.z).addScaledVector(UPV,.32+tremor).addScaledVector(R,-sg*.05).addScaledVector(F,.06+(sg>0?.035:-.01));
+    /* jogado: mão atrás do quadril, aberta para o lado, cotovelo atrás das costas */
+    const back=sh.clone().addScaledVector(UPV,-.66*L).addScaledVector(F,-.62*L).addScaledVector(R,sg*.32*L);
+    const side=sh.clone().addScaledVector(R,sg*.95*L).addScaledVector(UPV,.1*L);
+    let tg,pole;
+    if(t<t2){tg=up;pole=R.clone().multiplyScalar(sg).addScaledVector(UPV,.2).addScaledVector(F,-.2);}
+    else if(t<t3){const u=(t-t2)/M.desce,e=u*u*(1.6-.6*u);   /* acelera */
+      if(e<.5){tg=up.clone().lerp(side,e*2);}else{tg=side.clone().lerp(back,(e-.5)*2);}
+      pole=R.clone().multiplyScalar(sg).addScaledVector(F,-e).addScaledVector(UPV,.3*(1-e));}
+    else{tg=back;pole=F.clone().negate().addScaledVector(R,sg*.4);}
+    ikHinge(B[s+'Arm'],B[s+'ForeArm'],B[s+'Hand'],tg,pole,w,s+'Arm');});
+}
 let jumpFx=null;
 function poseJumpFx(dt){
   if(!jumpFx||!rig)return;
@@ -2808,6 +2862,7 @@ function updateModel(dt){
     poseHands();
     poseMorphRun(dt);
     poseJumpFx(dt);
+    poseMorphSeq();
     if(climbOut){climbOut.t+=dt;inertBlend(climbOut,.35);if(!climbOut.snap)climbOut=null;}
     poseHit(dt);
     poseFlip(dt);
@@ -2870,6 +2925,7 @@ function tick(raw){
   if(hitStop>0){hitStop-=raw;dt=raw*.06;}
   st.t+=dt;
   BLOOD.update(dt);
+  updateMorphSeq(dt);
   /* entrada */
   let ix=(keys.KeyD?1:0)-(keys.KeyA?1:0)+joy.x;
   let iz=(keys.KeyW?1:0)-(keys.KeyS?1:0)-joy.y;
@@ -2898,7 +2954,7 @@ function tick(raw){
       rotAxis(rig.B.Hips,UPV,-(dodge.phi||0));st.rot=st.rotT=st.rot+(dodge.phi||0);hero.rotation.set(0,st.rot,0);hero.updateMatrixWorld(true);}climbOut={snap:snapBones(),off:null,t:0};dodge=null;plantFeet();}
   }
   /* recuperação da aterrissagem: parado até a animação de pouso terminar */
-  const landing=landT>0&&landHard&&!climb;
+  const landing=(landT>0&&landHard&&!climb)||morphSeqLock();
   if(landing){ix=0;iz=0;}
   if(hitR){
     hitR.t+=dt;
@@ -3372,7 +3428,7 @@ function drawMini(){
 if(/prisao|prison/i.test(location.hash))setTimeout(enterPrison,0);
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},CLAW:CLAW,MRUN:MRUN,MWALK:MWALK,MGUARD:MGUARD,get armForm(){return armForm;},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes,BLOOD:BLOOD};
+window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},CLAW:CLAW,MRUN:MRUN,MWALK:MWALK,MGUARD:MGUARD,get armForm(){return armForm;},get morphSeq(){return morphSeq;},toggleMorph:function(){toggle();},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes,BLOOD:BLOOD};
 frame();
 })();
 </script>

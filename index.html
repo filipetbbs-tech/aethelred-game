@@ -1391,7 +1391,8 @@ function tryClimb(maxD,minToward,dx,dz){
   return true;
 }
 function endClimb(pos,rot,snap){
-  climb=null;st.x=pos.x;st.z=pos.z;st.y=pos.y;st.rot=st.rotT=rot;hero.quaternion.set(0,0,0,1);
+  /* o corpo já sai virado para a direção final (zerar a rotação girava a personagem por um quadro) */
+  climb=null;st.x=pos.x;st.z=pos.z;st.y=pos.y;st.rot=st.rotT=rot;hero.rotation.set(0,rot,0);hero.position.set(pos.x,pos.y,pos.z);hero.updateMatrixWorld(true);
   climbOut={snap:snap,off:null,t:0};climbCD=.35;
 }
 let climbOut=null,climbCD=0;

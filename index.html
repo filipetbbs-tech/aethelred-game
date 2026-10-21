@@ -1881,7 +1881,7 @@ function loadArmForms(root){
       if(!hide[i]){const r=v.clone().sub(A).addScaledVector(d,-t).length()/Math.sqrt(dd);rArm[i]=r;continue;}
       /* só some o que está dentro do braço (perto do eixo); costelas e axila ficam */
       const r=v.clone().sub(A).addScaledVector(d,-t).length()/Math.sqrt(dd);
-      if(t<ARM_KEEP||r>.42)hide[i]=0;}
+      if(t<ARM_KEEP||(r>.42&&t<1))hide[i]=0;}
   });
   /* ombreira de couro (extras.pauldron): continua visível na transformação e cresce em volta do ombro */
   const pb=atob((mesh.userData&&mesh.userData.pauldron)||''),pau=new Float32Array(n);
@@ -2766,7 +2766,7 @@ function poseMorphSeq(){
   const head=wp(B.Head),tremor=(t>t1&&t<t2)?Math.sin(t*80)*.01:0;
   ['Left','Right'].forEach(function(s){const sg=s==='Right'?1:-1,sh=wp(B[s+'Arm']);
     /* cruzado na frente do rosto: a mão de cada lado passa para o outro lado (a direita na frente), cotovelos para fora e para baixo */
-    const face=head.clone().addScaledVector(F,.34+(sg>0?.05:0)).addScaledVector(UPV,-.06+tremor).addScaledVector(R,-sg*.07);
+    const face=head.clone().addScaledVector(F,.3+(sg>0?.13:0)).addScaledVector(UPV,-.08+(sg>0?.05:0)+tremor).addScaledVector(R,-sg*.05);
     /* passa pelo lado, à altura do peito, e desce até perto do chão, aberto e um pouco para trás */
     const side=sh.clone().addScaledVector(R,sg*.85*L).addScaledVector(F,.15*L).addScaledVector(UPV,-.15*L);
     const low=sh.clone().addScaledVector(UPV,-.92*L).addScaledVector(F,-.3*L).addScaledVector(R,sg*.42*L);
@@ -2775,8 +2775,20 @@ function poseMorphSeq(){
     else if(t<t3){const u=(t-t2)/M.desce,e=u*u*(1.7-.7*u);tg=bez(face,side,low,e);
       pole=R.clone().multiplyScalar(sg).addScaledVector(UPV,-.7*(1-e)).addScaledVector(F,-e);}
     else{tg=low.clone().addScaledVector(F,-.04*Math.sin((t-t3)*8));pole=F.clone().negate().addScaledVector(R,sg*.5);}
-    ikHinge(B[s+'Arm'],B[s+'ForeArm'],B[s+'Hand'],tg,pole,w,s+'Arm');});
+    ikHinge(B[s+'Arm'],B[s+'ForeArm'],B[s+'Hand'],tg,pole,w,s+'Arm');
+    if(!morphSeq.swapped)curlHand(s,w);});
 }
+/* fecha a mão humana (k = 0 aberta como na animação, 1 punho cerrado): cada falange gira em torno do mesmo eixo, o que leva
+   os dedos para a palma; o polegar fecha menos */
+const FIST=[1.05,1.35,.95];
+function curlHand(s,k){
+  if(k<=0)return;const B=rig.B,sg=s==='Right'?1:-1,hd=wp(B[s+'Hand']);if(!B[s+'HandMiddle1']||!B[s+'HandIndex1']||!B[s+'HandPinky1'])return;
+  const along=wp(B[s+'HandMiddle1']).sub(hd).normalize(),across=wp(B[s+'HandIndex1']).sub(wp(B[s+'HandPinky1'])).normalize();
+  const palm=new THREE.Vector3().crossVectors(along,across).multiplyScalar(sg*PALM_SG).normalize(),ax=new THREE.Vector3().crossVectors(along,palm).normalize();
+  ['Index','Middle','Ring','Pinky'].forEach(function(f){for(let j=1;j<=3;j++){const b=B[s+'Hand'+f+j];if(b)rotAxis(b,ax,FIST[j-1]*k);}});
+  for(let j=2;j<=3;j++){const b=B[s+'HandThumb'+j];if(b)rotAxis(b,ax,.45*k);}
+}
+let PALM_SG=1;
 let jumpFx=null;
 function poseJumpFx(dt){
   if(!jumpFx||!rig)return;

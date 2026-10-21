@@ -1917,7 +1917,7 @@ function loadArmModel(){
    tamanho normal e cobre o ombro) e as abas soltas que pendem embaixo da axila. TRIM: alcance da busca na ombreira (m),
    quanto o ponto pode estar ao lado do vértice mais próximo e por fora da superfície (m), e as abas: abaixo da junta do
    ombro (fração do braço) até onde ao longo do braço */
-const TRIM={busca:.09,lado:.035,fora:.09,abaixo:.32,ate:.45};
+const TRIM={busca:.05,lado:.012,fora:.025,abaixo:.32,ate:.45};
 function trimArm(grp,hero){
   const hs=hero.skeleton,bones=hs.bones,save=bones.map(function(b){return [b.position.clone(),b.quaternion.clone(),b.scale.clone()];});
   /* pose de repouso: o skeleton.pose() do three erra quando o pai do quadril tem escala (armature do Mixamo), então cada osso
@@ -1936,7 +1936,8 @@ function trimArm(grp,hero){
   if(pa)for(let i=0;i<hp.count;i++){if(pa.getX(i)<.5)continue;v.fromBufferAttribute(hp,i);hero.boneTransform(i,v);v.applyMatrix4(hero.matrixWorld);
     n.fromBufferAttribute(hn,i).applyMatrix3(nm).normalize();const k=key(v.x,v.y,v.z);if(!grid.has(k))grid.set(k,[]);grid.get(k).push([v.x,v.y,v.z,n.x,n.y,n.z]);}
   let cut=0;
-  grp.traverse(function(m){if(!m.isSkinnedMesh||!m.geometry.index)return;
+  let mi=-1;
+  grp.traverse(function(m){if(!m.isSkinnedMesh||!m.geometry.index)return;mi++;
     const sk=m.skeleton,g=m.geometry,pos=g.attributes.position,si=g.attributes.skinIndex,sw=g.attributes.skinWeight,N=pos.count,drop=new Uint8Array(N);
     const M=sk.bones.map(function(b,k){return new THREE.Matrix4().multiplyMatrices(b.matrixWorld,sk.boneInverses[k]);});
     for(let i=0;i<N;i++){v.fromBufferAttribute(pos,i).applyMatrix4(m.bindMatrix);acc.set(0,0,0);
@@ -1953,10 +1954,11 @@ function trimArm(grp,hero){
         const tx=dx-dn*best[3],ty=dy-dn*best[4],tz=dz-dn*best[5];if(tx*tx+ty*ty+tz*tz<TRIM.lado*TRIM.lado&&dn<TRIM.fora)drop[i]=1;}
       /* abas embaixo da axila: abaixo da junta do ombro, perto do começo do braço */
       const side=(J.Left[0]&&J.Right[0]&&acc.distanceToSquared(J.Left[0])<acc.distanceToSquared(J.Right[0]))?'Left':'Right',A=J[side][0],E=J[side][1];
-      if(A&&E){const d=E.clone().sub(A),Lb=d.length();d.normalize();const tt=t.copy(acc).sub(A).dot(d)/Lb;
+      /* abas: só nas partes extras (o ombro novo do braço misto); no braço principal isso abriria a axila */
+      if(mi>0&&A&&E){const d=E.clone().sub(A),Lb=d.length();d.normalize();const tt=t.copy(acc).sub(A).dot(d)/Lb;
         if(tt<TRIM.ate&&acc.y<A.y-TRIM.abaixo*Lb)drop[i]=1;}}
     const idx=g.index.array,keep=[];
-    for(let i=0;i<idx.length;i+=3){if(drop[idx[i]]||drop[idx[i+1]]||drop[idx[i+2]]){cut++;continue;}keep.push(idx[i],idx[i+1],idx[i+2]);}
+    for(let i=0;i<idx.length;i+=3){if(drop[idx[i]]+drop[idx[i+1]]+drop[idx[i+2]]>=2){cut++;continue;}keep.push(idx[i],idx[i+1],idx[i+2]);}
     g.setIndex(keep);});
   bones.forEach(function(b,i){b.position.copy(save[i][0]);b.quaternion.copy(save[i][1]);b.scale.copy(save[i][2]);});hero.parent.updateMatrixWorld(true);
   return cut;

@@ -2905,6 +2905,8 @@ function updateModel(dt){
     if(!jMid)for(const k in acts)if(/jump/.test(k)&&!/start|land/.test(k)){jMid=acts[k];break;}
     const any=acts[Object.keys(acts)[0]];
     const air=!climb&&aboveGround()>.03;
+    /* agarrar a parede não é pousar: zera o estado do ar e qualquer pouso pendente, senão ele toca ao chegar no topo */
+    if(climb){wasAir=false;jumpFx=null;landT=0;landHard=false;}
     if(air){airTop=wasAir?Math.max(airTop,st.y):st.y;airT=wasAir?airT+dt:0;}
     if(air&&!wasAir){playAct(jStart||jMid,true);if(!jLand&&st.vy>3)jumpFx={ph:'start',t:0};}
     else if(air&&jStart&&jMid&&curAct===jStart&&jStart.time>=jStart.getClip().duration-.05){playAct(jMid,false);}

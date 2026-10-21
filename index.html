@@ -2711,6 +2711,23 @@ function playAct(a,once){
   curAct=a;
 }
 let wasAir=false,landT=0,landHard=false,airTop=0;
+/* pouso em movimento: só a parte de cima da animação de pouso (coluna, ombros, braços, cabeça), misturada por cima do
+   andar ou da corrida e sumindo aos poucos; a curva LAND_RUN dá o peso ao longo do tempo (sobe, segura, solta) */
+const LAND_RUN={peso:1,sobe:.06,segura:.18,solta:.55};
+let landRun=null,landUpAct=null;
+const LAND_UP=/(Spine|Neck|Head|Shoulder|Arm|Hand)/;
+function startLandRun(jLand,t0,k){
+  let a=landUpAct;
+  if(!a||a._src!==jLand.getClip()||a.getMixer()!==mixer){const c=jLand.getClip();a=landUpAct=mixer.clipAction(new THREE.AnimationClip('LandUp',c.duration,c.tracks.filter(function(t){return LAND_UP.test(t.name)&&/quaternion/.test(t.name);})));a._src=c;}
+  a.reset();a.setLoop(THREE.LoopOnce,1);a.clampWhenFinished=true;a.time=t0;a.setEffectiveWeight(0);a.play();
+  landRun={a:a,t:t0>0?LAND_RUN.sobe:0,k:k};
+}
+function updateLandRun(dt){
+  if(!landRun)return;const L=LAND_RUN,R=landRun;R.t+=dt;
+  const w=R.t<L.sobe?R.t/L.sobe:(R.t<L.sobe+L.segura?1:Math.max(0,1-(R.t-L.sobe-L.segura)/L.solta));
+  R.a.setEffectiveWeight(w*L.peso*R.k);
+  if(w<=0||combo.active||aboveGround()>.03){R.a.stop();landRun=null;}
+}
 const LAND={alto:2.4};
 function updateModel(dt){
   if(!custom)return;
@@ -2727,10 +2744,15 @@ function updateModel(dt){
     else if(air&&jStart&&jMid&&curAct===jStart&&jStart.time>=jStart.getClip().duration-.05){playAct(jMid,false);}
     /* pouso: a animação inteira sempre toca, mas depois de um pulo normal não prende a personagem (andar, correr ou
        atacar cortam o pouso); parada até o fim só depois de cair de mais alto (LAND.alto, em metros acima do chão) */
-    if(!air&&wasAir&&jLand){const fall=airTop-st.y;playAct(jLand,true);
-      if(fall>LAND.alto){landHard=true;landT=jLand.getClip().duration-.12;st.speed=0;st.vx=st.vz=0;}
-      else{landHard=false;landT=jLand.getClip().duration-.12;}}
-    if(landT>0&&!landHard&&!air&&(st.speed>.5||combo.active))landT=0;
+    if(!air&&wasAir&&jLand){const fall=airTop-st.y;
+      if(fall>LAND.alto){playAct(jLand,true);landHard=true;landT=jLand.getClip().duration-.12;st.speed=0;st.vx=st.vz=0;}
+      /* caiu andando ou correndo: as pernas seguem os passos e o tronco faz o pouso por cima */
+      else if(st.speed>.5){landHard=false;landT=0;startLandRun(jLand,0,1);}
+      else{playAct(jLand,true);landHard=false;landT=jLand.getClip().duration-.12;}}
+    /* pouso parado e o jogador sai andando: troca para o pouso em movimento, do ponto em que estava; ataque corta */
+    if(landT>0&&!landHard&&!air&&combo.active)landT=0;
+    if(landT>0&&!landHard&&!air&&st.speed>.5){startLandRun(jLand,jLand.time,.75);landT=0;}
+    updateLandRun(dt);
     wasAir=air;
     if(landT>0)landT-=dt;
     if(!air&&landT<=0){

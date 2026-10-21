@@ -2711,7 +2711,7 @@ function playAct(a,once){
   curAct=a;
 }
 let wasAir=false,landT=0,landHard=false,airTop=0;
-const LAND={alto:2.4,curto:.3};
+const LAND={alto:2.4};
 function updateModel(dt){
   if(!custom)return;
   procDt=dt;
@@ -2725,12 +2725,12 @@ function updateModel(dt){
     if(air)airTop=wasAir?Math.max(airTop,st.y):st.y;
     if(air&&!wasAir){playAct(jStart||jMid,true);}
     else if(air&&jStart&&jMid&&curAct===jStart&&jStart.time>=jStart.getClip().duration-.05){playAct(jMid,false);}
-    /* pouso: depois de um pulo normal só o começo da animação (o impacto) e já pode sair andando; a recuperação
-       inteira, parada, só depois de cair de mais alto (LAND.alto, em metros acima do chão onde pousou) */
+    /* pouso: a animação inteira sempre toca, mas depois de um pulo normal não prende a personagem (andar, correr ou
+       atacar cortam o pouso); parada até o fim só depois de cair de mais alto (LAND.alto, em metros acima do chão) */
     if(!air&&wasAir&&jLand){const fall=airTop-st.y;playAct(jLand,true);
       if(fall>LAND.alto){landHard=true;landT=jLand.getClip().duration-.12;st.speed=0;st.vx=st.vz=0;}
-      else{landHard=false;landT=LAND.curto;}}
-    if(landT>0&&!landHard&&!air&&st.speed>.5)landT=0;
+      else{landHard=false;landT=jLand.getClip().duration-.12;}}
+    if(landT>0&&!landHard&&!air&&(st.speed>.5||combo.active))landT=0;
     wasAir=air;
     if(landT>0)landT-=dt;
     if(!air&&landT<=0){

@@ -2135,7 +2135,7 @@ function findAct(re){for(const k in acts){if(re.test(k))return acts[k];}return n
    descontando a diferença entre as poses de repouso dos dois esqueletos */
 const CLIPS={finisher:{file:'animacoes/sword_shield_slash.glb'},kick:{file:'animacoes/flying_kick.glb'},die1:{file:'animacoes/dying_1.glb'},die2:{file:'animacoes/dying_2.glb'},die3:{file:'animacoes/dying_3.glb'},die4:{file:'animacoes/dying_4.glb'},die5:{file:'animacoes/dying_5.glb'},crawl:{file:'animacoes/running_crawl.glb'},hang:{file:'animacoes/braced_hang_to_crouch.glb'},aerial:{file:'animacoes/aerial_evade.glb'},qroll:{file:'animacoes/quick_roll_to_run.glb'},sflip:{file:'animacoes/stylish_flip.glb'},jatk:{file:'animacoes/run_jump_attack.glb'},upc:{file:'animacoes/surprise_uppercut.glb'},bh:{file:'animacoes/melee_backhand.glb'},thrown:{file:'animacoes/getting_thrown.glb'},jumpatk:{file:'animacoes/jumping_attack.glb'},
   /* só do perfil mixamo */
-  mswipe:{file:'animacoes/mixamo/mutant_swiping.glb',perfil:'mixamo'},dual:{file:'animacoes/mixamo/dual_weapon_combo.glb',perfil:'mixamo'},mjump:{file:'animacoes/mixamo/mutant_jump_attack.glb',perfil:'mixamo'}};
+  mswipe:{file:'animacoes/mixamo/mutant_swiping.glb',perfil:'mixamo'},dual:{file:'animacoes/mixamo/dual_weapon_combo.glb',perfil:'mixamo'},mjump:{file:'animacoes/mixamo/mutant_jump_attack.glb',perfil:'mixamo'},mland:{file:'animacoes/mixamo/jump_land_original.glb',perfil:'mixamo'}};
 const clipSrc={};
 function loadClips(){
   Object.keys(clipSrc).forEach(function(k){delete clipSrc[k];});
@@ -2185,18 +2185,20 @@ const _rq=new THREE.Quaternion(),_rq2=new THREE.Quaternion();
 /* mirror: espelha a animação (direita vira esquerda): cada osso usa o osso do outro lado, refletido no eixo lateral */
 const _mq=new THREE.Quaternion(),_hv=new THREE.Vector3();
 function mirrorName(n){return n.indexOf('Left')>=0?n.replace('Left','Right'):n.indexOf('Right')>=0?n.replace('Right','Left'):n;}
-function applyClip(name,t,w,mirror,noUp){
+function applyClip(name,t,w,mirror,noUp,only){
   const R=clipSrc[name];if(!R||w<=0)return null;
   R.action.time=Math.max(0,Math.min(t,R.clip.duration));R.mixer.update(0);
   hero.updateMatrixWorld(true);hero.getWorldQuaternion(_hq);_hqi.copy(_hq).invert();
   R.src.updateMatrixWorld(true);
   const B=rig.B;
   R.list.forEach(function(n){
+    if(only&&!only.test(n))return;
     if(mirror){const m=R.S[mirrorName(n)]||R.S[n];heroSpace(m,_rq);_rq.set(_rq.x,-_rq.y,-_rq.z,_rq.w);_rq.multiply(R.off[n]).premultiply(_hq);}
     else heroSpace(R.S[n],_rq).multiply(R.off[n]).premultiply(_hq);
     B[n].getWorldQuaternion(_rq2);
     setWorldQuat(B[n],_rq2.slerp(_rq,w));
   });
+  if(only)return null;
   /* altura do quadril (salto, agachamento); o deslocamento horizontal vira movimento do corpo inteiro */
   const hp=hero.worldToLocal(R.S.Hips.getWorldPosition(new THREE.Vector3()));
   let dy=(hp.y-R.hips0.y)*R.scale;
@@ -2777,9 +2779,9 @@ const LAND_UP=/(Spine|Neck|Head|Shoulder|Arm|Hand)/;
    pouso: quadril desce (m) com os pés no lugar, tronco inclina (rad) e ombros caem; chega em "sobe" s, segura e volta em
    "volta" s. Andando o pouso é mais leve e curto (as pernas seguem os passos); queda alta é mais funda e trava. */
 const JFX={impulso:{dur:.32,dobra:.75,tronco:.22},
-  parado:{braco:.45,desce:.22,tronco:.45,ombro:.14,sobe:.07,segura:.12,volta:.5},
-  andando:{braco:.2,desce:.09,tronco:.22,ombro:.08,sobe:.05,segura:.05,volta:.3},
-  alto:{braco:.75,desce:.32,tronco:.6,ombro:.16,sobe:.07,segura:.35,volta:.6,trava:.85}};
+  parado:{braco:1,desce:.22,tronco:.45,ombro:.14,sobe:.07,segura:.12,volta:.5},
+  andando:{braco:.6,desce:.09,tronco:.22,ombro:.08,sobe:.05,segura:.05,volta:.3},
+  alto:{braco:1,desce:.32,tronco:.6,ombro:.16,sobe:.07,segura:.35,volta:.6,trava:.85}};
 /* transformação (perfil mixamo): já entra na postura de guarda (pernas arqueadas), traz os braços humanos para a frente
    e cruza os pulsos na altura do rosto, segura, e joga os braços para baixo e para trás enquanto o tronco desce junto,
    quase passando as garras no chão; no meio da descida os braços viram os monstruosos, escondidos por uma explosão de
@@ -2878,11 +2880,13 @@ function poseJumpFx(dt){
     ikHinge(B[s+'UpLeg'],B[s+'Leg'],B[s+'Foot'],fp[s],F.clone().addScaledVector(R,sg*.25),1,s+'Leg',true);setWorldQuat(B[s+'Foot'],fq[s]);});
   /* tronco cai para a frente, ombros descem, cabeça compensa para continuar olhando à frente */
   rig.spine.forEach(function(n){rotAxis(B[n],R,-P.tronco*e/3);});
-  ['Left','Right'].forEach(function(s){if(B[s+'Shoulder'])rotAxis(B[s+'Shoulder'],F,(s==='Right'?1:-1)*P.ombro*e);});
   rotAxis(B.Head,R,P.tronco*e*.55);
-  /* braços vêm para a frente (equilíbrio), senão pendem atrás do quadril agachado */
-  ['Left','Right'].forEach(function(s){rotAxis(B[s+'Arm'],R,P.braco*e);rotAxis(B[s+'ForeArm'],R,P.braco*.6*e);});
+  /* braços: os mesmos do pouso do modelo original (Jump Land), só ombros, braços, antebraços e mãos, no tempo real da
+     animação e com o peso da curva do pouso (P.braco) */
+  if(clipSrc.mland)applyClip('mland',J.t,e*P.braco,false,false,LAND_ARMS);
+  else ['Left','Right'].forEach(function(s){rotAxis(B[s+'Arm'],R,.45*e);rotAxis(B[s+'ForeArm'],R,.27*e);});
 }
+const LAND_ARMS=/(Shoulder|Arm|ForeArm|Hand)$/;
 function startLandRun(jLand,t0,k){if(!jLand)return;
   let a=landUpAct;
   if(!a||a._src!==jLand.getClip()||a.getMixer()!==mixer){const c=jLand.getClip();a=landUpAct=mixer.clipAction(new THREE.AnimationClip('LandUp',c.duration,c.tracks.filter(function(t){return LAND_UP.test(t.name)&&/quaternion/.test(t.name);})));a._src=c;}

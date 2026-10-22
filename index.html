@@ -796,14 +796,15 @@ const ETYPE={basic:{hp:3,sc:1,sk:0x6f7f62,cl:0x3a3328,sp:[1.5,2.4],dmg:8},grab:{
   boss:{hp:45,sc:2.2,sk:0x4f4843,cl:0x1a1816,sp:[1.6,1.6],dmg:16},viking:{hp:8,sc:1,sk:0,cl:0,sp:[1.7,2.0],dmg:12}};
 /* inimigo viking: modelo do Meshy rigado no Mixamo, com escudo e machado rígidos e as animações do pack Sword and Shield
    (modelos/viking_rig_armas_rigidas.glb). Cada viking é um clone do modelo com o próprio mixer. VK: animações usadas */
-const VIKING={g:null,clips:{},speed:{},k:1,file:'modelos/viking_rig_armas_rigidas.glb'};
+/* altura: do chão ao topo do elmo (m); com 2,4 os ombros ficam na altura dos do herói (o viking é atarracado) */
+const VIKING={altura:2.4,g:null,clips:{},speed:{},k:1,file:'modelos/viking_rig_armas_rigidas.glb'};
 const VK={idle:'sword and shield idle',run:'sword and shield run',block:'sword and shield block',death:'sword and shield death',
   atk:['sword and shield attack 2','sword and shield attack 3','sword and shield attack 4'],hitAt:.45,alcance:1.5,
   /* corrida: ritmo da animação (1 = como no Mixamo); a velocidade no chão sai da própria animação vezes esse ritmo.
      agarrão: distância, aviso (s) e intervalo mínimo entre agarrões (s) */
   ritmo:1.25,agarra:1.6,aviso:.55,agarraCd:5};
 loadBinary(VIKING.file,function(buf){new THREE.GLTFLoader().parse(buf,'',function(g){
-  const bb=new THREE.Box3().setFromObject(g.scene);VIKING.k=2.0/Math.max(1e-6,bb.max.y-bb.min.y);
+  const bb=new THREE.Box3().setFromObject(g.scene);VIKING.k=VIKING.altura/Math.max(1e-6,bb.max.y-bb.min.y);
   g.scene.traverse(function(o){if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;}});
   /* velocidade natural de cada animação (m/s): o quanto o quadril avança no ciclo, já na escala do jogo; a corrida do
      viking anda nessa velocidade, para os pés não patinarem */

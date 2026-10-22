@@ -1935,6 +1935,49 @@ if(vMusc*uMuscOn>.001){
     mat.needsUpdate=true;
   });
 }
+/* meia capa (capa.glb, do Meshy) presa atrás da ombreira direita, no osso do ombro. CAPA: ponto de fixação e tamanho no
+   espaço da malha do personagem (pose de ligação), comprimento (m), giro em volta do eixo vertical (rad) e a física do
+   balanço: mola (k), amortecimento (c), quanto a corrida/queda levantam a capa e o tremular */
+const CAPA={x:-.00175,y:.01485,z:-.00172,comp:.0098,ry:Math.PI+.25,tilt:.12,k:28,c:5.5,corre:.11,cai:.05,gira:.6,trem:.05,max:1.25};
+const capa={obj:null,uni:null,ax:0,vx:0,az:0,vz:0,rot:0};
+function attachCape(root){
+  let mesh=null;root.traverse(function(o){if(o.isSkinnedMesh&&!mesh)mesh=o;});if(!mesh)return;
+  const sk=mesh.skeleton,k=sk.bones.findIndex(function(b){return b.name.replace(/^mixamorig[:_]?/,'')==='RightShoulder';});if(k<0)return;
+  loadBinary('capa.glb',function(buf){
+    new THREE.GLTFLoader().parse(buf,'',function(g){
+      if(!mesh.parent)return;
+      let cm=null;g.scene.traverse(function(o){if(o.isMesh&&!cm)cm=o;});if(!cm)return;
+      const geo=cm.geometry;geo.computeBoundingBox();const bb=geo.boundingBox,top=bb.max.y,H=top-bb.min.y,cx=(bb.min.x+bb.max.x)/2,cz=(bb.min.z+bb.max.z)/2;
+      /* topo da capa no ponto de fixação; quanto mais para baixo, mais ela balança */
+      geo.translate(-cx,-top,-cz);
+      const pos=geo.attributes.position,dep=new Float32Array(pos.count);for(let i=0;i<pos.count;i++)dep[i]=Math.min(1,Math.max(0,-pos.getY(i)/H));
+      geo.setAttribute('aDep',new THREE.BufferAttribute(dep,1));
+      const mat=cm.material;mat.metalness=0;mat.metalnessMap=null;mat.envMapIntensity=.4;mat.side=THREE.DoubleSide;
+      const U={uSw:{value:new THREE.Vector2()},uT:{value:0},uH:{value:H},uTrem:{value:0}};capa.uni=U;
+      mat.onBeforeCompile=function(sh){Object.assign(sh.uniforms,U);
+        sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute float aDep;uniform vec2 uSw;uniform float uT,uH,uTrem;')
+          .replace('#include <begin_vertex>',`#include <begin_vertex>
+float cd=pow(aDep,1.35);float ax=-uSw.x*cd+uTrem*sin(uT*7.+aDep*6.+position.x*4.)*aDep,az=uSw.y*cd+uTrem*.6*sin(uT*5.3+aDep*5.)*aDep;
+float c1=cos(ax),s1=sin(ax);transformed.yz=vec2(transformed.y*c1-transformed.z*s1,transformed.y*s1+transformed.z*c1);
+float c2=cos(az),s2=sin(az);transformed.xy=vec2(transformed.x*c2-transformed.y*s2,transformed.x*s2+transformed.y*c2);`);};
+      mat.needsUpdate=true;cm.castShadow=true;cm.receiveShadow=true;cm.frustumCulled=false;
+      const grp=new THREE.Group(),C=CAPA,s=C.comp/H;grp.add(cm);cm.position.set(0,0,0);cm.rotation.set(0,0,0);cm.scale.set(1,1,1);
+      const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(C.tilt,C.ry,0,'YXZ'));
+      const T=new THREE.Matrix4().compose(new THREE.Vector3(C.x,C.y,C.z),q,new THREE.Vector3(s,s,s));
+      grp.matrixAutoUpdate=false;grp.matrix.copy(sk.boneInverses[k]).multiply(mesh.bindMatrix).multiply(T);
+      if(capa.obj&&capa.obj.parent)capa.obj.parent.remove(capa.obj);capa.obj=grp;sk.bones[k].add(grp);
+    },function(){});
+  },function(){});
+}
+/* balanço da capa: mola amortecida puxada pela corrida (levanta para trás), pela queda (sobe) e pelo giro do corpo (lado) */
+function updateCape(dt){
+  if(!capa.uni||dt<=0)return;const C=CAPA;
+  let dr=st.rot-capa.rot;while(dr>Math.PI)dr-=Math.PI*2;while(dr<-Math.PI)dr+=Math.PI*2;capa.rot=st.rot;
+  const air=aboveGround()>.05,tx=Math.min(C.max,st.speed*C.corre+(air?Math.max(0,-st.vy)*C.cai:0)),tz=Math.max(-.6,Math.min(.6,-dr/dt*C.gira*.1));
+  capa.vx+=(C.k*(tx-capa.ax)-C.c*capa.vx)*dt;capa.ax+=capa.vx*dt;if(capa.ax<0){capa.ax=0;capa.vx=Math.max(0,capa.vx);}
+  capa.vz+=(C.k*(tz-capa.az)-C.c*capa.vz)*dt;capa.az+=capa.vz*dt;
+  capa.uni.uSw.value.set(capa.ax,capa.az);capa.uni.uT.value+=dt;capa.uni.uTrem.value=C.trem*(.4+Math.min(1,st.speed/5));
+}
 function loadArmForms(root){
   let mesh=null;root.traverse(function(o){if(o.isSkinnedMesh&&!mesh)mesh=o;});if(!mesh)return;
   const g=mesh.geometry,full=g.index,n=g.attributes.position.count,bin=atob((mesh.userData&&mesh.userData.armHide)||''),hide=new Uint8Array(n);
@@ -2154,7 +2197,7 @@ function useModel(gltf,name){
   m.position.x-=c.x*kk;m.position.z-=c.z*kk;m.position.y-=box.min.y*kk;
   m.traverse(function(o){if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;[].concat(o.material).forEach(function(mm){if(mm.metalness>.3)mm.metalness=.3;mm.envMapIntensity=.5;
     ['map','normalMap','roughnessMap','metalnessMap','aoMap'].forEach(function(k){if(mm[k])mm[k].anisotropy=renderer.capabilities.getMaxAnisotropy();});});}});
-  custom.add(m);hero.add(custom);hero.updateMatrixWorld(true);if(PERFIL==='mixamo'){addSkinDetail(m);loadArmForms(m);}buildRig(m);
+  custom.add(m);hero.add(custom);hero.updateMatrixWorld(true);if(PERFIL==='mixamo'){addSkinDetail(m);loadArmForms(m);attachCape(m);}buildRig(m);
   hero.children.forEach(function(o){if(o!==custom&&o!==slash)o.visible=false;});
   renderer.outputEncoding=THREE.sRGBEncoding;
   scene.traverse(function(o){if(o.material){[].concat(o.material).forEach(function(mm){mm.needsUpdate=true;});}});
@@ -3110,6 +3153,7 @@ function tick(raw){
   if(hitStop>0){hitStop-=raw;dt=raw*.06;}
   st.t+=dt;
   BLOOD.update(dt);
+  updateCape(dt);
   if(jumpPre){jumpPre.t+=dt*JC.prep;if(jumpPre.t>=JC.sai){jumpPre=null;st.vy=8;st.y+=.01;SOUND.voice('jump');}
     else if(climb||death||combo.active||!fullJump())jumpPre=null;}
   updateMorphSeq(dt);
@@ -3616,7 +3660,7 @@ function drawMini(){
 if(/prisao|prison/i.test(location.hash))setTimeout(enterPrison,0);
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},CLAW:CLAW,MRUN:MRUN,MWALK:MWALK,MGUARD:MGUARD,get armForm(){return armForm;},get morphSeq(){return morphSeq;},toggleMorph:function(){toggle();},jumpNow:function(){jump();},VIKING:VIKING,spawnViking:function(){const e=makeEnemy('viking');e.g.position.set(st.x+4,0,st.z-3);scene.add(e.g);enemies.push(e);return e;},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes,BLOOD:BLOOD};
+window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},CLAW:CLAW,MRUN:MRUN,MWALK:MWALK,MGUARD:MGUARD,get armForm(){return armForm;},get morphSeq(){return morphSeq;},toggleMorph:function(){toggle();},jumpNow:function(){jump();},VIKING:VIKING,capa:capa,CAPA:CAPA,spawnViking:function(){const e=makeEnemy('viking');e.g.position.set(st.x+4,0,st.z-3);scene.add(e.g);enemies.push(e);return e;},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes,BLOOD:BLOOD};
 frame();
 })();
 </script>

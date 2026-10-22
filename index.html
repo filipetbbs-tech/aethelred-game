@@ -797,12 +797,37 @@ const ETYPE={basic:{hp:3,sc:1,sk:0x6f7f62,cl:0x3a3328,sp:[1.5,2.4],dmg:8},grab:{
 /* inimigo viking: modelo do Meshy rigado no Mixamo, com escudo e machado rígidos e as animações do pack Sword and Shield
    (modelos/viking_rig_armas_rigidas.glb). Cada viking é um clone do modelo com o próprio mixer. VK: animações usadas */
 /* altura: do chão ao topo do elmo (m); com 2,4 os ombros ficam na altura dos do herói (o viking é atarracado) */
-const VIKING={altura:2.4,g:null,clips:{},speed:{},k:1,file:'modelos/viking_rig_armas_rigidas.glb'};
+const VIKING={altura:2.4,g:null,clips:{},speed:{},dx:{},k:1,file:'modelos/viking_rig_armas_rigidas.glb'};
 const VK={idle:'sword and shield idle',run:'sword and shield run',block:'sword and shield block',death:'sword and shield death',
   atk:['sword and shield attack 2','sword and shield attack 3','sword and shield attack 4'],hitAt:.45,alcance:1.5,
   /* corrida: ritmo da animação (1 = como no Mixamo); a velocidade no chão sai da própria animação vezes esse ritmo.
      agarrão: distância, aviso (s) e intervalo mínimo entre agarrões (s) */
-  ritmo:1.25,agarra:1.6,aviso:.55,agarraCd:5};
+  ritmo:1.25,agarra:1.6,aviso:.55,agarraCd:5,
+  /* grupo: raio do cerco (m) para quem espera a vez, quantos atacam ao mesmo tempo, distância mínima entre vikings (m),
+     e a área do golpe que não pode ter companheiro (alcance em m e abertura: cosseno do meio-ângulo) */
+  cerco:3.3,atacantes:2,espaco:1.5,golpe:2.4,abre:.15,strafe:['sword and shield strafe','sword and shield strafe 2']};
+/* cerco: cada viking recebe um lugar na roda em volta do herói (ângulos igualmente espaçados, na ordem em que já estão,
+   para ninguém cruzar a roda), e só os VK.atacantes com mais chance (perto e sem recarga) entram para atacar */
+function vikingPlan(){
+  const L=enemies.filter(function(e){return e.vk&&!e.dead;});if(!L.length)return;
+  L.forEach(function(e){e.vk.ang=Math.atan2(e.g.position.x-st.x,e.g.position.z-st.z);});
+  L.sort(function(a,b){return a.vk.ang-b.vk.ang;});
+  const n=L.length,step=Math.PI*2/n;let sx=0,sy=0;L.forEach(function(e,i){const a=e.vk.ang-i*step;sx+=Math.cos(a);sy+=Math.sin(a);});
+  const base=Math.atan2(sy,sx);L.forEach(function(e,i){e.vk.slot=base+i*step;});
+  const busy=L.filter(function(e){return e.vk.st==='atk'||e.vk.st==='grab';});
+  const rank=L.slice().sort(function(a,b){const da=Math.hypot(a.g.position.x-st.x,a.g.position.z-st.z)+Math.max(0,a.cd)*2,db=Math.hypot(b.g.position.x-st.x,b.g.position.z-st.z)+Math.max(0,b.cd)*2;return da-db;});
+  L.forEach(function(e){e.vk.eng=busy.indexOf(e)>=0;});
+  for(let i=0,k=busy.length;i<rank.length&&k<VK.atacantes;i++)if(!rank[i].vk.eng){rank[i].vk.eng=true;k++;}
+  /* quem ataca fica em lados opostos do herói (assim um não entra no golpe do outro) */
+  const E=L.filter(function(e){return e.vk.eng;});
+  E.forEach(function(e,i){if(i>0)e.vk.slot=E[0].vk.slot+i*Math.PI*2/E.length;});
+}
+/* o golpe (ou o agarrão) acertaria um companheiro? qualquer viking vivo à frente, dentro do alcance do golpe */
+function swingBlocked(e){
+  const p=e.g.position,fx=Math.sin(e.g.rotation.y),fz=Math.cos(e.g.rotation.y);
+  return enemies.some(function(o){if(o===e||o.dead)return false;const vx=o.g.position.x-p.x,vz=o.g.position.z-p.z,d=Math.hypot(vx,vz);
+    return d<VK.golpe&&(d<.6||(vx*fx+vz*fz)/d>VK.abre);});
+}
 loadBinary(VIKING.file,function(buf){new THREE.GLTFLoader().parse(buf,'',function(g){
   const bb=new THREE.Box3().setFromObject(g.scene);VIKING.k=VIKING.altura/Math.max(1e-6,bb.max.y-bb.min.y);
   g.scene.traverse(function(o){if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;}});
@@ -810,7 +835,7 @@ loadBinary(VIKING.file,function(buf){new THREE.GLTFLoader().parse(buf,'',functio
      viking anda nessa velocidade, para os pés não patinarem */
   {const m=g.scene,mx=new THREE.AnimationMixer(m);m.scale.setScalar(VIKING.k);let hb=null;m.traverse(function(o){if(!hb&&/Hips$/.test(o.name))hb=o;});
    g.animations.forEach(function(c){const a=mx.clipAction(c);a.play();const P=function(t){a.time=t;mx.update(0);m.updateMatrixWorld(true);return hb.getWorldPosition(new THREE.Vector3());};
-     const p0=P(0),p1=P(c.duration-1e-3);VIKING.speed[c.name]=Math.hypot(p1.x-p0.x,p1.z-p0.z)/c.duration;a.stop();});
+     const p0=P(0),p1=P(c.duration-1e-3);VIKING.speed[c.name]=Math.hypot(p1.x-p0.x,p1.z-p0.z)/c.duration;VIKING.dx[c.name]=p1.x-p0.x;a.stop();});
    m.scale.setScalar(1);}
   /* o deslocamento das animações fica só na altura (quem anda é o jogo) */
   g.animations.forEach(function(c){c.tracks.forEach(function(t){if(/Hips\.position$/.test(t.name))for(let i=0;i<t.values.length;i+=3){t.values[i]=t.values[0];t.values[i+2]=t.values[2];}});VIKING.clips[c.name]=c;});
@@ -837,10 +862,29 @@ function vikingAI(e,dt,dx,dz,d,face,dy){
   e.gcd-=dt;
   if(V.st==='grab'){V.t+=dt;e.warn=(Math.floor(V.t*12)%2)?1:0;
     if(V.t>=VK.aviso){e.warn=0;V.st='chase';if(d<VK.agarra+.3&&canThrowHero())startHeroThrown(e);e.gcd=VK.agarraCd;}return;}
-  if(d<VK.agarra&&e.gcd<=0&&canThrowHero()&&Math.abs(df)<.8&&Math.random()<.5){V.st='grab';V.t=0;vkPlay(e,VK.block,true,.1);return;}
-  if(d>VK.alcance){const a=vkPlay(e,VK.run);a.timeScale=VK.ritmo;const v=(VIKING.speed[VK.run]||e.sp)*VK.ritmo;p.x+=dx/d*v*dt;p.z+=dz/d*v*dt;}
-  else{vkPlay(e,VK.idle);e.cd-=dt;
-    if(e.cd<=0&&!death&&Math.abs(dy)<1.2&&Math.abs(df)<.6){const n=VK.atk[(Math.random()*VK.atk.length)|0];V.st='atk';V.t=0;V.hit=false;V.a=vkPlay(e,n,true,.1);if(!V.a)V.st='chase';}}
+  e.cd-=dt;
+  const clear=!swingBlocked(e);
+  if(V.eng&&clear&&d<VK.agarra&&e.gcd<=0&&canThrowHero()&&Math.abs(df)<.8&&Math.random()<.5){V.st='grab';V.t=0;vkPlay(e,VK.block,true,.1);return;}
+  if(V.eng&&clear&&d<=VK.alcance+.15&&e.cd<=0&&!death&&Math.abs(dy)<1.2&&Math.abs(df)<.6){const n=VK.atk[(Math.random()*VK.atk.length)|0];V.st='atk';V.t=0;V.hit=false;V.a=vkPlay(e,n,true,.1);if(!V.a)V.st='chase';return;}
+  /* destino: o próprio lugar na roda — perto (alcance) se é a vez dele, longe (cerco) se está esperando; se um companheiro
+     está na frente do golpe, desliza pela roda para abrir a linha */
+  let sa=V.slot===undefined?Math.atan2(-dx,-dz):V.slot;
+  if(V.eng&&!clear)sa+=(V.side||(V.side=Math.random()<.5?-1:1))*.6;else V.side=0;
+  const R=V.eng?VK.alcance*.9:VK.cerco,tx=st.x+Math.sin(sa)*R,tz=st.z+Math.cos(sa)*R;
+  let mx=tx-p.x,mz=tz-p.z;
+  /* espaço: empurra para longe de companheiros próximos */
+  enemies.forEach(function(o){if(o===e||o.dead||!o.vk)return;const ox=p.x-o.g.position.x,oz=p.z-o.g.position.z,od=Math.hypot(ox,oz);
+    if(od<VK.espaco&&od>1e-3){const w=(VK.espaco-od)/VK.espaco*2.5;mx+=ox/od*w;mz+=oz/od*w;}});
+  const md=Math.hypot(mx,mz);
+  if(md>.25){
+    const far=Math.hypot(tx-p.x,tz-p.z)>3.5,th=e.g.rotation.y,lx=(mx*Math.cos(th)-mz*Math.sin(th))/md,lz=(mx*Math.sin(th)+mz*Math.cos(th))/md;
+    let name,v;
+    if(far||lz>.7){name=VK.run;const a=vkPlay(e,name);a.timeScale=VK.ritmo;v=(VIKING.speed[name]||e.sp)*VK.ritmo;
+      if(far){const df2=normAng(Math.atan2(mx,mz)-e.g.rotation.y);e.g.rotation.y+=Math.max(-6*dt,Math.min(6*dt,df2))-Math.max(-5*dt,Math.min(5*dt,df));}}
+    else{/* de lado ou recuando: strafe para o lado certo (o sinal vem do próprio deslocamento da animação) */
+      name=VK.strafe.find(function(n){return VIKING.dx[n]&&Math.sign(VIKING.dx[n])===Math.sign(lx);})||VK.strafe[0];vkPlay(e,name);v=VIKING.speed[name]||1.5;}
+    v=Math.min(v,md/dt);p.x+=mx/md*v*dt;p.z+=mz/md*v*dt;}
+  else vkPlay(e,VK.idle);
 }
 function makeEnemy(type){
   const T=ETYPE[type]||ETYPE.basic;
@@ -1319,6 +1363,7 @@ function updateCombat(dt){
   if(WORLD==='prison')prisonUpdate(dt);
   updateProjs(dt);
   if(WORLD==='arena'&&foesOn&&alive<4&&spawnT<=0){spawnEnemy();spawnT=3;}
+  vikingPlan();
   for(let i=enemies.length-1;i>=0;i--){
     const e=enemies[i],p=e.g.position;
     if(e.held){e.g.rotation.x=.25;continue;}
@@ -1355,7 +1400,8 @@ function updateCombat(dt){
     const a=enemies[i].g.position,b=enemies[j].g.position;
     if(enemies[i].dead||enemies[j].dead)continue;
     const dx=b.x-a.x,dz=b.z-a.z,d=Math.hypot(dx,dz);
-    if(d<.7&&d>0){const m=(.7-d)/2;a.x-=dx/d*m;a.z-=dz/d*m;b.x+=dx/d*m;b.z+=dz/d*m;}
+    const sep=(enemies[i].vk&&enemies[j].vk)?1.1:.7;
+    if(d<sep&&d>0){const m=(sep-d)/2;a.x-=dx/d*m;a.z-=dz/d*m;b.x+=dx/d*m;b.z+=dz/d*m;}
   }
   if(hp<=0&&!death){if(!startDeath())respawn();}
   if(death){death.t+=dt;if(death.t>death.dur+1.6)respawn();}

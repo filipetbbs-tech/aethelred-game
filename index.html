@@ -425,8 +425,9 @@ function toggle(){if(!abil.morph&&!st.morphOn){flashMsg('A transformação ainda
   if(!st.morphOn&&startMorphSeq())return;
   st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
 function jump(){if(st.y<=groundY(st.x,st.z)+.001&&st.vy<=0&&!combo.active&&!tpose&&!death&&!climb&&!jumpPre){
-  /* perfil mixamo com o pulo completo: primeiro a agachada da animação, e só sai do chão no quadro do impulso */
-  if(fullJump()){jumpPre={t:0};playAct(acts.jumping,true);acts.jumping.timeScale=JC.prep;landT=0;landHard=false;return;}
+  /* perfil mixamo com o pulo completo, parado: primeiro a agachada da animação, e só sai do chão no quadro do impulso;
+     em movimento sai na hora (a animação entra já no voo) */
+  if(fullJump()&&st.speed<=.5){jumpPre={t:0};playAct(acts.jumping,true);acts.jumping.timeScale=JC.prep;landT=0;landHard=false;return;}
   st.vy=8;SOUND.voice('jump');}}
 /* pulo completo do Mixamo (Jumping, embutido por ferramentas/anim_pulo.py). JC: tempos da animação (s): saída do chão
    (sai) e toque no chão (toca); prep = velocidade da agachada antes de sair (1 = como na animação) */

@@ -424,7 +424,15 @@ const stateEl=document.getElementById('state');
 function toggle(){if(!abil.morph&&!st.morphOn){flashMsg('A transformação ainda está selada. Procure o altar.',1.6);return;}if(morphSeq)return;
   if(!st.morphOn&&startMorphSeq())return;
   st.morphOn=!st.morphOn;stateEl.textContent=st.morphOn?'Transformado: garras e lâmina expostas':'Forma normal';stateEl.style.color=st.morphOn?'#e8e0d0':'#d44';}
-function jump(){if(st.y<=groundY(st.x,st.z)+.001&&st.vy<=0&&!combo.active&&!tpose&&!death&&!climb){st.vy=8;SOUND.voice('jump');}}
+function jump(){if(st.y<=groundY(st.x,st.z)+.001&&st.vy<=0&&!combo.active&&!tpose&&!death&&!climb&&!jumpPre){
+  /* perfil mixamo com o pulo completo: primeiro a agachada da animação, e só sai do chão no quadro do impulso */
+  if(fullJump()){jumpPre={t:0};playAct(acts.jumping,true);acts.jumping.timeScale=JC.prep;landT=0;landHard=false;return;}
+  st.vy=8;SOUND.voice('jump');}}
+/* pulo completo do Mixamo (Jumping, embutido por ferramentas/anim_pulo.py). JC: tempos da animação (s): saída do chão
+   (sai) e toque no chão (toca); prep = velocidade da agachada antes de sair (1 = como na animação) */
+const JC={sai:.5,toca:1.06,prep:1.6};
+let jumpPre=null;
+function fullJump(){return PERFIL==='mixamo'&&!!(acts&&acts.jumping);}
 document.getElementById('atk').onpointerdown=function(){attack();};
 
 /* câmera por arraste; um toque curto sem arrastar ataca */
@@ -2913,13 +2921,23 @@ function updateModel(dt){
     /* agarrar a parede não é pousar: zera o estado do ar e qualquer pouso pendente, senão ele toca ao chegar no topo */
     if(climb){wasAir=false;jumpFx=null;landT=0;landHard=false;}
     if(air){airTop=wasAir?Math.max(airTop,st.y):st.y;airT=wasAir?airT+dt:0;}
-    if(air&&!wasAir){playAct(jStart||jMid,true);if(!jLand&&st.vy>3)jumpFx={ph:'start',t:0};}
+    const FJ=fullJump()?acts.jumping:null;
+    if(FJ){
+      /* no ar: o tempo da animação segue a velocidade vertical (subindo = começo do voo, ápice = ápice da animação,
+         descendo = perto do toque); cair de uma beirada começa no ápice */
+      if(air){if(curAct!==FJ)playAct(FJ,true);FJ.timeScale=0;const u=Math.max(0,Math.min(1,(8-st.vy)/16));FJ.time=JC.sai+u*(JC.toca-.03-JC.sai);}
+    }
+    else if(air&&!wasAir){playAct(jStart||jMid,true);if(!jLand&&st.vy>3)jumpFx={ph:'start',t:0};}
     else if(air&&jStart&&jMid&&curAct===jStart&&jStart.time>=jStart.getClip().duration-.05){playAct(jMid,false);}
     /* pouso: a animação inteira sempre toca, mas depois de um pulo normal não prende a personagem (andar, correr ou
        atacar cortam o pouso); parada até o fim só depois de cair de mais alto (LAND.alto, em metros acima do chão) */
     /* sem animação de pouso (perfil mixamo, modo 'mao'): pouso feito à mão em poseJumpFx; parado, andando ou de queda alta */
     /* só depois de um pulo ou queda de verdade: chegar ao topo da pilastra pela escalada não conta */
-    if(!air&&wasAir&&!jLand&&!climbOut&&(airT>.25||airTop-st.y>.4)){const fall=airTop-st.y,hard=fall>LAND.alto;
+    /* pouso do pulo completo: o resto da animação, do toque até o fim; não prende (andar, correr ou atacar cortam),
+       a não ser depois de queda alta */
+    if(FJ&&!air&&wasAir){FJ.time=JC.toca;FJ.timeScale=1;const fall=airTop-st.y;landHard=fall>LAND.alto;landT=FJ.getClip().duration-JC.toca-.1;
+      if(landHard){st.speed=0;st.vx=st.vz=0;}}
+    else if(!air&&wasAir&&!jLand&&!climbOut&&(airT>.25||airTop-st.y>.4)){const fall=airTop-st.y,hard=fall>LAND.alto;
       jumpFx={ph:'land',t:0,P:hard?JFX.alto:(st.speed>.5?JFX.andando:JFX.parado)};
       if(hard){landHard=true;landT=JFX.alto.trava;st.speed=0;st.vx=st.vz=0;}
       playAct(idle||any,false);}
@@ -2930,7 +2948,9 @@ function updateModel(dt){
       else{playAct(jLand,true);landHard=false;landT=jLand.getClip().duration-.12;}}
     /* pouso parado e o jogador sai andando: troca para o pouso em movimento, do ponto em que estava; ataque corta */
     if(landT>0&&!landHard&&!air&&combo.active)landT=0;
-    if(landT>0&&!landHard&&!air&&st.speed>.5){startLandRun(jLand,jLand.time,.75);landT=0;}
+    if(FJ&&landT>0&&!landHard&&!air&&st.speed>.5)landT=0;
+    if(jumpPre)landT=Math.max(landT,.05);
+    if(jLand&&landT>0&&!landHard&&!air&&st.speed>.5){startLandRun(jLand,jLand.time,.75);landT=0;}
     updateLandRun(dt);
     wasAir=air;
     if(landT>0)landT-=dt;
@@ -3027,6 +3047,8 @@ function tick(raw){
   if(hitStop>0){hitStop-=raw;dt=raw*.06;}
   st.t+=dt;
   BLOOD.update(dt);
+  if(jumpPre){jumpPre.t+=dt*JC.prep;if(jumpPre.t>=JC.sai){jumpPre=null;st.vy=8;st.y+=.01;SOUND.voice('jump');}
+    else if(climb||death||combo.active||!fullJump())jumpPre=null;}
   updateMorphSeq(dt);
   /* entrada */
   let ix=(keys.KeyD?1:0)-(keys.KeyA?1:0)+joy.x;
@@ -3530,7 +3552,7 @@ function drawMini(){
 if(/prisao|prison/i.test(location.hash))setTimeout(enterPrison,0);
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},CLAW:CLAW,MRUN:MRUN,MWALK:MWALK,MGUARD:MGUARD,get armForm(){return armForm;},get morphSeq(){return morphSeq;},toggleMorph:function(){toggle();},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes,BLOOD:BLOOD};
+window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},CLAW:CLAW,MRUN:MRUN,MWALK:MWALK,MGUARD:MGUARD,get armForm(){return armForm;},get morphSeq(){return morphSeq;},toggleMorph:function(){toggle();},jumpNow:function(){jump();},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes,BLOOD:BLOOD};
 frame();
 })();
 </script>

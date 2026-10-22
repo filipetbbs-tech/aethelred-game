@@ -1864,6 +1864,33 @@ if(vMusc*uMuscOn>.001){
     mat.needsUpdate=true;
   });
 }
+/* cabeça nova (busto do Meshy, cabeca.glb): a pele do rosto do modelo some (extras.headTri, triângulos marcados por
+   ferramentas/cabeca.py) e o busto vai preso ao osso da cabeça, dentro do capuz. CABECA: escala e posição do busto no
+   espaço da malha do personagem (pose de ligação), e giro em volta do eixo vertical (rad) */
+const CABECA={s:.00158,x:0,y:.01606,z:.00022,ry:0};
+function hideFace(root){
+  let mesh=null;root.traverse(function(o){if(o.isSkinnedMesh&&!mesh)mesh=o;});if(!mesh||!mesh.geometry.index)return;
+  const bin=atob((mesh.userData&&mesh.userData.headTri)||'');if(!bin)return;
+  const idx=mesh.geometry.index.array,keep=[];
+  for(let t=0;t<idx.length/3;t++){if((bin.charCodeAt(t>>3)>>(t&7))&1)continue;keep.push(idx[t*3],idx[t*3+1],idx[t*3+2]);}
+  mesh.geometry.setIndex(keep);
+}
+let headObj=null;
+function attachHead(root){
+  let mesh=null;root.traverse(function(o){if(o.isSkinnedMesh&&!mesh)mesh=o;});if(!mesh)return;
+  const sk=mesh.skeleton,k=sk.bones.findIndex(function(b){return b.name.replace(/^mixamorig[:_]?/,'')==='Head';});if(k<0)return;
+  loadBinary('cabeca.glb',function(buf){
+    new THREE.GLTFLoader().parse(buf,'',function(g){
+      if(!mesh.parent)return;
+      const grp=new THREE.Group();g.scene.traverse(function(o){if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;
+        const mm=o.material;mm.metalness=0;mm.metalnessMap=null;mm.envMapIntensity=.5;mm.needsUpdate=true;}});
+      grp.add(g.scene);
+      const C=CABECA,T=new THREE.Matrix4().compose(new THREE.Vector3(C.x,C.y,C.z),new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),C.ry),new THREE.Vector3(C.s,C.s,C.s));
+      grp.matrixAutoUpdate=false;grp.matrix.copy(sk.boneInverses[k]).multiply(mesh.bindMatrix).multiply(T);
+      if(headObj&&headObj.parent)headObj.parent.remove(headObj);headObj=grp;sk.bones[k].add(grp);
+    },function(){});
+  },function(){});
+}
 function loadArmForms(root){
   let mesh=null;root.traverse(function(o){if(o.isSkinnedMesh&&!mesh)mesh=o;});if(!mesh)return;
   const g=mesh.geometry,full=g.index,n=g.attributes.position.count,bin=atob((mesh.userData&&mesh.userData.armHide)||''),hide=new Uint8Array(n);
@@ -2083,7 +2110,7 @@ function useModel(gltf,name){
   m.position.x-=c.x*kk;m.position.z-=c.z*kk;m.position.y-=box.min.y*kk;
   m.traverse(function(o){if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;[].concat(o.material).forEach(function(mm){if(mm.metalness>.3)mm.metalness=.3;mm.envMapIntensity=.5;
     ['map','normalMap','roughnessMap','metalnessMap','aoMap'].forEach(function(k){if(mm[k])mm[k].anisotropy=renderer.capabilities.getMaxAnisotropy();});});}});
-  custom.add(m);hero.add(custom);hero.updateMatrixWorld(true);if(PERFIL==='mixamo'){addSkinDetail(m);loadArmForms(m);}buildRig(m);
+  custom.add(m);hero.add(custom);hero.updateMatrixWorld(true);if(PERFIL==='mixamo'){addSkinDetail(m);hideFace(m);loadArmForms(m);attachHead(m);}buildRig(m);
   hero.children.forEach(function(o){if(o!==custom&&o!==slash)o.visible=false;});
   renderer.outputEncoding=THREE.sRGBEncoding;
   scene.traverse(function(o){if(o.material){[].concat(o.material).forEach(function(mm){mm.needsUpdate=true;});}});

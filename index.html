@@ -845,18 +845,30 @@ loadBinary(VIKING.file,function(buf){new THREE.GLTFLoader().parse(buf,'',functio
 function vkPlay(e,name,once,fade){const V=e.vk,c=VIKING.clips[name];if(!c)return null;const a=V.mixer.clipAction(c);
   if(V.cur===a&&!once)return a;a.reset();a.setLoop(once?THREE.LoopOnce:THREE.LoopRepeat,once?1:Infinity);a.clampWhenFinished=!!once;
   a.fadeIn(fade||.15).play();if(V.cur&&V.cur!==a)V.cur.fadeOut(fade||.15);V.cur=a;return a;}
+/* reação de dano do viking (o pack não tem animação de dano): por cima da animação, o tronco é jogado para trás e para o
+   lado do golpe, a cabeça chicoteia e os joelhos cedem; volta em VK_HIT.dur s. VK_HIT: ângulos (rad) */
+const VK_HIT={dur:.42,tronco:.55,lado:.35,cabeca:.5,quadril:.12};
+function vkHitPose(e,dt){
+  const V=e.vk;if(V.hitT===undefined||V.hitT>VK_HIT.dur)return;V.hitT+=dt;
+  if(!V.bones){V.bones={};e.g.traverse(function(o){const m=/(Hips|Spine|Spine1|Spine2|Head|Neck)$/.exec(o.name||'');if(o.isBone&&m&&!V.bones[m[1]])V.bones[m[1]]=o;});}
+  const u=Math.min(1,V.hitT/VK_HIT.dur),w=(u<.15?u/.15:1-(u-.15)/.85)*V.hitK,B=V.bones,H=VK_HIT;
+  const X=new THREE.Vector3(1,0,0),Z=new THREE.Vector3(0,0,1),q=new THREE.Quaternion();
+  ['Spine','Spine1','Spine2'].forEach(function(n){if(B[n]){B[n].quaternion.multiply(q.setFromAxisAngle(X,-H.tronco*w/3));B[n].quaternion.multiply(q.setFromAxisAngle(Z,H.lado*w*V.hitSide/3));}});
+  if(B.Head)B.Head.quaternion.multiply(q.setFromAxisAngle(X,-H.cabeca*w));
+  if(B.Hips)B.Hips.position.y-=H.quadril*w/(e.g.children[0].scale.y||1);
+}
 function vikingAI(e,dt,dx,dz,d,face,dy){
   const V=e.vk,p=e.g.position;e.g.rotation.x=0;
   if(e.throwing){e.g.rotation.y=face;if(V.cur!==V.thr){V.thr=vkPlay(e,VK.block,true,.08);}return;}
   V.thr=null;
+  if(e.stun>0){if(V.st!=='hit'){V.st='hit';}vkPlay(e,VK.idle,false,.06);return;}
+  if(V.st==='hit')V.st='chase';
   if(V.st==='atk'){V.t+=dt;const D=V.a.getClip().duration;
     if(!V.hit&&V.t>=D*VK.hitAt){V.hit=true;const ex=Math.sin(e.g.rotation.y),ez=Math.cos(e.g.rotation.y);
       if(!death&&!climb&&d<VK.alcance+.5&&Math.abs(dy)<1.2&&(dx*ex+dz*ez)/d>.3&&hurt<=0)takeHit(p.x,p.z,e.dmg);}
     if(V.t>=D*.92){V.st='chase';e.cd=.9+Math.random()*.7;}
     return;}
   if(V.st==='block'){V.t+=dt;if(V.t>.55)V.st='chase';return;}
-  if(e.stun>0){if(V.st!=='hit'){V.st='hit';vkPlay(e,VK.block,true,.08);}return;}
-  if(V.st==='hit')V.st='chase';
   const df=normAng(face-e.g.rotation.y);e.g.rotation.y+=Math.max(-5*dt,Math.min(5*dt,df));
   /* agarrão: avisa (pisca laranja, escudo erguido) e, se o herói ainda estiver perto, agarra e arremessa */
   e.gcd-=dt;
@@ -1025,6 +1037,9 @@ function hitEnemies(A){
     if(e.vk&&!A.finisher&&!st.morphOn&&!(e.stun>0)&&e.vk.st!=='atk'&&Math.random()<.35){const ex=Math.sin(e.g.rotation.y),ez=Math.cos(e.g.rotation.y);
       if(d<.01||(-dx*ex-dz*ez)/d>.35){blocked=true;e.vx=dx/(d||1)*2.5;e.vz=dz/(d||1)*2.5;e.vk.st='block';e.vk.t=0;vkPlay(e,VK.block,true,.08);return;}}
     any=true;e.hp-=dmg;e.flash=.18;
+    /* viking atingido: o golpe ou o agarrão em andamento é cancelado e ele faz a reação de dano */
+    if(e.vk){const V=e.vk;if(V.st==='atk'||V.st==='grab'||V.st==='block'){V.st='hit';e.warn=0;}
+      V.hitT=0;V.hitK=A.finisher?1.4:1;V.hitSide=(dx*Math.cos(e.g.rotation.y)-dz*Math.sin(e.g.rotation.y))>0?1:-1;e.cd=Math.max(e.cd,.7);}
     BLOOD.hit(e,d>0?dx/d:fx,d>0?dz/d:fz,(A.finisher?1.5:1)*(st.morphOn?1.3:1));
     const armor=e.type==='heavy'||e.type==='boss';
     if(!armor||e.groggy>0)e.stun=A.finisher?.9:.45;
@@ -3459,7 +3474,7 @@ function clampEnemy(e){const p=e.g.position;
 function enemyPost(e,dt,idle){const p=e.g.position;
   p.x+=e.vx*dt;p.z+=e.vz*dt;const f=Math.max(0,1-dt*8);e.vx*=f;e.vz*=f;
   if(!idle){e.ph+=dt*e.sp*4;e.L[0].rotation.x=Math.sin(e.ph)*.6;e.L[1].rotation.x=-Math.sin(e.ph)*.6;}
-  e.flash=Math.max(0,e.flash-dt);const em=e.flash>0?0x661111:(e.warn?0x5a2c00:0);e.mats.forEach(function(m){m.emissive.setHex(em);});
+  e.flash=Math.max(0,e.flash-dt);const em=(e.flash>0&&!e.vk)?0x661111:(e.warn?(e.vk?0x2a1400:0x5a2c00):0);e.mats.forEach(function(m){m.emissive.setHex(em);});
   clampEnemy(e);
 }
 function enemyAI(e,dt,dx,dz,d){
@@ -3471,7 +3486,7 @@ function enemyAI(e,dt,dx,dz,d){
   }
   if(e.type==='basic'||e.type==='grab')return false;
   const face=Math.atan2(dx,dz);e.stun-=dt;
-  if(e.type==='viking'){vikingAI(e,dt,dx,dz,d,face,dy);e.vk.mixer.update(dt);enemyPost(e,dt,true);return true;}
+  if(e.type==='viking'){vikingAI(e,dt,dx,dz,d,face,dy);e.vk.mixer.update(dt);vkHitPose(e,dt);enemyPost(e,dt,true);return true;}
   if(e.type==='crawler'){
     if(e.stun<=0){e.g.rotation.y=face;e.g.rotation.x=0;if(d>.8){p.x+=dx/d*e.sp*dt;p.z+=dz/d*e.sp*dt;}
       else if(!death&&!climb&&Math.abs(dy)<1.2){e.cd-=dt;if(e.cd<=0&&hurt<=0){e.cd=.8;takeHit(p.x,p.z,e.dmg);}}}
@@ -3706,7 +3721,7 @@ function drawMini(){
 if(/prisao|prison/i.test(location.hash))setTimeout(enterPrison,0);
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 /* ganchos para testes automáticos */
-window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},CLAW:CLAW,MRUN:MRUN,MWALK:MWALK,MGUARD:MGUARD,get armForm(){return armForm;},get morphSeq(){return morphSeq;},toggleMorph:function(){toggle();},jumpNow:function(){jump();},VIKING:VIKING,capa:capa,CAPA:CAPA,spawnViking:function(){const e=makeEnemy('viking');e.g.position.set(st.x+4,0,st.z-3);scene.add(e.g);enemies.push(e);return e;},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes,BLOOD:BLOOD};
+window.AETH={prog:function(){return combo.cur?progA(combo.cur,combo.t):0;},get heroThrown(){return heroThrown;},spawnGrabber:function(){return spawnEnemy('grab');},get grab(){return grab;},grabNow:function(){grabKey();},RUN_ATT:RUN_ATT,get airAtk(){return airAtk;},get flip(){return flip;},get dodge(){return dodge;},dodgeNow:function(ix,iz){return startDodge(ix,iz);},toggleGod:function(){toggleGod();},get hp(){return hp;},hitMe:function(dx,dz){takeHit(st.x+dx,st.z+dz,8);},get hitR(){return hitR;},get landT(){return landT;},get climb(){return climb;},dropClimb:function(){climb=null;hero.quaternion.set(0,0,0,1);},get death(){return death;},kill:function(){hp=0;},SOUND:SOUND,SFX:SFX,attackNow:function(){const p0=paused;paused=false;attack();paused=p0;},tick:tick,get paused(){return paused;},get hitStop(){return hitStop;},clipSrc:clipSrc,st:st,combo:combo,get ATT(){return ATT;},startAttack:startAttack,enemies:enemies,joy:joy,feet:feet,render:function(){renderer.render(scene,cam);},MUSIC:MUSIC,get rig(){return rig;},get custom(){return custom;},get PERFIL(){return PERFIL;},CLAW:CLAW,MRUN:MRUN,MWALK:MWALK,MGUARD:MGUARD,get armForm(){return armForm;},get morphSeq(){return morphSeq;},toggleMorph:function(){toggle();},jumpNow:function(){jump();},VIKING:VIKING,vkAttack:function(e){const V=e.vk;V.st='atk';V.t=0;V.hit=false;V.a=vkPlay(e,VK.atk[0],true,.1);},capa:capa,CAPA:CAPA,spawnViking:function(){const e=makeEnemy('viking');e.g.position.set(st.x+4,0,st.z-3);scene.add(e.g);enemies.push(e);return e;},get acts(){return acts;},cam:cam,get WORLD(){return WORLD;},enterPrison:function(){enterPrison();},enterArena:function(){enterArena();},prisonWarp:function(i){prisonWarp(i);},prison:prison,abil:abil,boxes:boxes,BLOOD:BLOOD};
 frame();
 })();
 </script>

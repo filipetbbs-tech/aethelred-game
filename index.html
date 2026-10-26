@@ -805,6 +805,9 @@ const VK={idle:'sword and shield idle',run:'sword and shield run',block:'sword a
   ritmo:1.25,agarra:1.6,aviso:.55,agarraCd:5,
   /* grupo: raio do cerco (m) para quem espera a vez, quantos atacam ao mesmo tempo, distância mínima entre vikings (m),
      e a área do golpe que não pode ter companheiro (alcance em m e abertura: cosseno do meio-ângulo) */
+  /* ritmo dos golpes (1 = como no Mixamo); depois de levar dano: tempo atordoado e espera extra até poder atacar (s);
+     perto do herói (menos de VK.anda m do seu lugar) só anda: corrida em ritmo de caminhada (ritmoAnda) */
+  ritmoGolpe:.72,atordoa:1.1,recupera:1.2,anda:6,ritmoAnda:.5,
   cerco:3.3,atacantes:2,espaco:1.5,golpe:2.4,abre:.15,strafe:['sword and shield strafe','sword and shield strafe 2']};
 /* cerco: cada viking recebe um lugar na roda em volta do herói (ângulos igualmente espaçados, na ordem em que já estão,
    para ninguém cruzar a roda), e só os VK.atacantes com mais chance (perto e sem recarga) entram para atacar */
@@ -863,7 +866,7 @@ function vikingAI(e,dt,dx,dz,d,face,dy){
   V.thr=null;
   if(e.stun>0){if(V.st!=='hit'){V.st='hit';}vkPlay(e,VK.idle,false,.06);return;}
   if(V.st==='hit')V.st='chase';
-  if(V.st==='atk'){V.t+=dt;const D=V.a.getClip().duration;
+  if(V.st==='atk'){V.t+=dt*VK.ritmoGolpe;const D=V.a.getClip().duration;
     if(!V.hit&&V.t>=D*VK.hitAt){V.hit=true;const ex=Math.sin(e.g.rotation.y),ez=Math.cos(e.g.rotation.y);
       if(!death&&!climb&&d<VK.alcance+.5&&Math.abs(dy)<1.2&&(dx*ex+dz*ez)/d>.3&&hurt<=0)takeHit(p.x,p.z,e.dmg);}
     if(V.t>=D*.92){V.st='chase';e.cd=.9+Math.random()*.7;}
@@ -877,7 +880,7 @@ function vikingAI(e,dt,dx,dz,d,face,dy){
   e.cd-=dt;
   const clear=!swingBlocked(e);
   if(V.eng&&clear&&d<VK.agarra&&e.gcd<=0&&canThrowHero()&&Math.abs(df)<.8&&Math.random()<.5){V.st='grab';V.t=0;vkPlay(e,VK.block,true,.1);return;}
-  if(V.eng&&clear&&d<=VK.alcance+.15&&e.cd<=0&&!death&&Math.abs(dy)<1.2&&Math.abs(df)<.6){const n=VK.atk[(Math.random()*VK.atk.length)|0];V.st='atk';V.t=0;V.hit=false;V.a=vkPlay(e,n,true,.1);if(!V.a)V.st='chase';return;}
+  if(V.eng&&clear&&d<=VK.alcance+.15&&e.cd<=0&&!death&&Math.abs(dy)<1.2&&Math.abs(df)<.6){const n=VK.atk[(Math.random()*VK.atk.length)|0];V.st='atk';V.t=0;V.hit=false;V.a=vkPlay(e,n,true,.1);if(V.a)V.a.timeScale=VK.ritmoGolpe;else V.st='chase';return;}
   /* destino: o próprio lugar na roda — perto (alcance) se é a vez dele, longe (cerco) se está esperando; se um companheiro
      está na frente do golpe, desliza pela roda para abrir a linha */
   let sa=V.slot===undefined?Math.atan2(-dx,-dz):V.slot;
@@ -889,12 +892,12 @@ function vikingAI(e,dt,dx,dz,d,face,dy){
     if(od<VK.espaco&&od>1e-3){const w=(VK.espaco-od)/VK.espaco*2.5;mx+=ox/od*w;mz+=oz/od*w;}});
   const md=Math.hypot(mx,mz);
   if(md>.25){
-    const far=Math.hypot(tx-p.x,tz-p.z)>3.5,th=e.g.rotation.y,lx=(mx*Math.cos(th)-mz*Math.sin(th))/md,lz=(mx*Math.sin(th)+mz*Math.cos(th))/md;
+    const far=Math.hypot(tx-p.x,tz-p.z)>3.5,longe=d>VK.anda,th=e.g.rotation.y,lx=(mx*Math.cos(th)-mz*Math.sin(th))/md,lz=(mx*Math.sin(th)+mz*Math.cos(th))/md;
     let name,v;
-    if(far||lz>.7){name=VK.run;const a=vkPlay(e,name);a.timeScale=VK.ritmo;v=(VIKING.speed[name]||e.sp)*VK.ritmo;
+    if(far||lz>.7){name=VK.run;const a=vkPlay(e,name),rt=longe?VK.ritmo:VK.ritmoAnda;a.timeScale=rt;v=(VIKING.speed[name]||e.sp)*rt;
       if(far){const df2=normAng(Math.atan2(mx,mz)-e.g.rotation.y);e.g.rotation.y+=Math.max(-6*dt,Math.min(6*dt,df2))-Math.max(-5*dt,Math.min(5*dt,df));}}
     else{/* de lado ou recuando: strafe para o lado certo (o sinal vem do próprio deslocamento da animação) */
-      name=VK.strafe.find(function(n){return VIKING.dx[n]&&Math.sign(VIKING.dx[n])===Math.sign(lx);})||VK.strafe[0];vkPlay(e,name);v=VIKING.speed[name]||1.5;}
+      name=VK.strafe.find(function(n){return VIKING.dx[n]&&Math.sign(VIKING.dx[n])===Math.sign(lx);})||VK.strafe[0];const a=vkPlay(e,name),rt=longe?1:VK.ritmoAnda;a.timeScale=rt;v=(VIKING.speed[name]||1.5)*rt;}
     v=Math.min(v,md/dt);p.x+=mx/md*v*dt;p.z+=mz/md*v*dt;}
   else vkPlay(e,VK.idle);
 }
@@ -1039,7 +1042,7 @@ function hitEnemies(A){
     any=true;e.hp-=dmg;e.flash=.18;
     /* viking atingido: o golpe ou o agarrão em andamento é cancelado e ele faz a reação de dano */
     if(e.vk){const V=e.vk;if(V.st==='atk'||V.st==='grab'||V.st==='block'){V.st='hit';e.warn=0;}
-      V.hitT=0;V.hitK=A.finisher?1.4:1;V.hitSide=(dx*Math.cos(e.g.rotation.y)-dz*Math.sin(e.g.rotation.y))>0?1:-1;e.cd=Math.max(e.cd,.7);}
+      V.hitT=0;V.hitK=A.finisher?1.4:1;e.stun=Math.max(e.stun||0,A.finisher?VK.atordoa*1.5:VK.atordoa);V.hitSide=(dx*Math.cos(e.g.rotation.y)-dz*Math.sin(e.g.rotation.y))>0?1:-1;e.cd=Math.max(e.cd,VK.atordoa+VK.recupera);}
     BLOOD.hit(e,d>0?dx/d:fx,d>0?dz/d:fz,(A.finisher?1.5:1)*(st.morphOn?1.3:1));
     const armor=e.type==='heavy'||e.type==='boss';
     if(!armor||e.groggy>0)e.stun=A.finisher?.9:.45;

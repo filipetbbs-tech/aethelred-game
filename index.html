@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Aethelred – protótipo de blocos</title>
 <style>
 :root{--bg:#0b0a0d;--ink:#e8e0d0;--bone:#e6dcc3;--blood:#8f1d1d;color-scheme:dark}
@@ -41,6 +41,18 @@ canvas{display:block}
 @media (pointer:coarse){#pad{display:block}}
 #soundHint{display:none;position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);max-width:calc(100% - 32px);box-sizing:border-box;padding:10px 16px;border:1px solid #d8b25a;border-radius:6px;background:rgba(20,16,16,.85);color:#f0d68a;font-size:15px;text-align:center;z-index:5;pointer-events:none}
 #dmg{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 50%,rgba(150,10,10,.6) 100%)}
+/* sem a coluna de botões e instruções: as opções ficam no teclado (e no controle físico) */
+#atk,#glbBtn,#foesBtn,#pauseBtn,#soundBtn,#musicBtn,#godBtn,#modelBtn,#mapBtn,#slowBtn,#armBtn,#bloodBtn{display:none}
+#hud h1,#glbMsg{display:none}
+/* controle na tela (celular): analógico à esquerda, botões de ação à direita no layout do DualSense */
+#vpad{display:none;position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));width:210px;height:250px;pointer-events:none}
+.vb{position:absolute;width:64px;height:64px;border-radius:50%;border:1px solid rgba(232,224,208,.35);background:rgba(20,16,16,.5);color:#e8e0d0;font:22px/64px system-ui,sans-serif;text-align:center;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent}
+.vb.on{background:rgba(120,20,20,.75)}
+.vb.sh{width:72px;height:40px;border-radius:12px;font:600 15px/40px system-ui,sans-serif}
+#vbT{left:73px;top:42px;color:#3fd1b0}#vbO{left:146px;top:112px;color:#ff5a6a}#vbX{left:73px;top:182px;color:#7aa8ff}#vbS{left:0;top:112px;color:#e98fd8}
+#vbR1{left:2px;top:0}#vbR2{left:138px;top:0}
+#vbP{position:fixed;right:calc(14px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));width:46px;height:40px;border-radius:10px;font:20px/40px system-ui,sans-serif;display:none}
+@media (pointer:coarse){#vpad,#vbP{display:block}#hud{font-size:13px;padding-left:12px;max-width:60%}#pad{width:140px;height:140px;left:calc(20px + env(safe-area-inset-left,0px))}#knob{left:48px;top:48px;width:44px;height:44px}#mini{bottom:calc(190px + env(safe-area-inset-bottom,0px))}}
 </style>
 </head>
 <body>
@@ -58,6 +70,8 @@ canvas{display:block}
 <div id="pmsg"></div>
 <canvas id="mini" width="96" height="300"></canvas>
 <div id="pad"><div id="knob"></div></div>
+<div id="vpad"><div class="vb sh" id="vbR1">R1</div><div class="vb sh" id="vbR2">R2</div><div class="vb" id="vbT">△</div><div class="vb" id="vbO">○</div><div class="vb" id="vbX">✕</div><div class="vb" id="vbS">□</div></div>
+<div class="vb" id="vbP">❚❚</div>
 <button class="btn" id="atk">Atacar</button>
 <button class="btn" id="glbBtn">Carregar modelo GLB</button>
 <button class="btn" id="foesBtn">Inimigos: ligados</button>
@@ -435,7 +449,6 @@ function jump(){if(st.y<=groundY(st.x,st.z)+.001&&st.vy<=0&&!combo.active&&!tpos
 const JC={sai:.5,toca:1.06,prep:1.6};
 let jumpPre=null;
 function fullJump(){return PERFIL==='mixamo'&&!!(acts&&acts.jumping);}
-document.getElementById('atk').onpointerdown=function(){attack();};
 
 /* câmera por arraste; um toque curto sem arrastar ataca */
 let drag=null;
@@ -483,8 +496,23 @@ let dodgeKey=false;
 const gp={run:false,jump:false,runLatch:false,prev:[],idx:-1,stick:false};
 const GP_DEAD=.16;
 function gpAxis(x,y){const l=Math.hypot(x,y);if(l<GP_DEAD)return [0,0];const k=Math.min(1,(l-GP_DEAD)/(1-GP_DEAD))/l;return [x*k,y*k];}
-function runHeld(){return keys.ShiftLeft||keys.ShiftRight||gp.run;}
-function jumpHeld(){return keys.Space||gp.jump;}
+function runHeld(){return keys.ShiftLeft||keys.ShiftRight||gp.run||vpad.run;}
+function jumpHeld(){return keys.Space||gp.jump||vpad.jump;}
+/* controle na tela: mesmas funções do controle físico (✕ pula, □ ataca, △ transforma, ○ esquiva, R1 agarra, R2 corre segurado) */
+const vpad={run:false,jump:false};
+(function(){
+  function bind(id,down,up){const el=document.getElementById(id);
+    el.addEventListener('pointerdown',function(e){e.preventDefault();e.stopPropagation();el.setPointerCapture(e.pointerId);el.classList.add('on');audioInit();musicKick();down();});
+    function end(e){el.classList.remove('on');if(up)up();}
+    el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);el.addEventListener('contextmenu',function(e){e.preventDefault();});}
+  bind('vbX',function(){vpad.jump=true;},function(){vpad.jump=false;});
+  bind('vbS',function(){if(!paused)attack();});
+  bind('vbT',function(){if(!paused)toggle();});
+  bind('vbO',function(){if(paused)return;if(climb)dropFromWall();else dodgeKey=true;});
+  bind('vbR1',function(){if(!paused)grabKey();});
+  bind('vbR2',function(){vpad.run=true;},function(){vpad.run=false;});
+  bind('vbP',function(){togglePause();});
+})();
 function rumble(strong,weak,ms){
   const g=gp.idx>=0&&navigator.getGamepads?navigator.getGamepads()[gp.idx]:null;
   try{if(g&&g.vibrationActuator)g.vibrationActuator.playEffect('dual-rumble',{duration:ms,strongMagnitude:strong,weakMagnitude:weak});}catch(e){}
@@ -2084,7 +2112,7 @@ function loadArmForms(root){
 }
 /* modelos de braço mutante: o botão "Braço mutante" alterna entre eles (a escolha fica lembrada neste navegador) */
 const ARMS=[{file:'aethelred_braco_mutante_rig.glb',nome:'novo'},{file:'aethelred_braco_mutante_antigo.glb',nome:'antigo'},{file:'aethelred_braco_mutante_misto.glb',nome:'antigo + ombro novo'}],armBtn=document.getElementById('armBtn');
-let armAt=0;try{const k=+localStorage.getItem('aeth_braco');if(ARMS[k])armAt=k;}catch(e){}
+let armAt=1;/* padrão: braço monstruoso antigo */
 armBtn.textContent='Braço mutante: '+ARMS[armAt].nome;
 function loadArmModel(){
   if(!armForm)return;const af=armForm,i=armAt;

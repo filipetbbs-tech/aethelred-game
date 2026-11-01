@@ -1,0 +1,42 @@
+import numpy as np, json, sys
+from PIL import Image
+from scipy.spatial import Delaunay
+# pontos na arte (concept_front.png, 425x665) -> no render ortogonal do modelo (800x800)
+P={
+ 'olhoE':((170,267.5),(305,382)),'olhoD':((295,268.5),(500,382)),
+ 'cantoEext':((145,267.5),(240,380)),'cantoEint':((200,270),(350,390)),
+ 'cantoDint':((270,270),(450,390)),'cantoDext':((322.5,267.5),(560,378)),
+ 'sobrEint':((202.5,237.5),(365,335)),'sobrDint':((260,237.5),(440,335)),
+ 'sobrEext':((137.5,245),(215,338)),'sobrDext':((325,242.5),(585,335)),
+ 'narizPonta':((232.5,335),(405,500)),'narizBase':((232.5,350),(402,525)),
+ 'asaE':((205,345),(345,515)),'asaD':((262.5,345),(455,515)),
+ 'bocaE':((182.5,399),(330,600)),'bocaD':((277.5,399),(480,600)),
+ 'bocaC':((230,400),(405,603)),'labioSup':((230,382.5),(405,575)),'labioInf':((230,420),(405,635)),
+ 'queixo':((230,470),(405,740)),
+}
+src=np.array([v[0] for v in P.values()]); dst=np.array([v[1] for v in P.values()])
+# similaridade global (mínimos quadrados) para pontos de contorno
+def sim(a,b):
+    A=[];B=[]
+    for (x,y),(u,v) in zip(a,b): A+= [[x,-y,1,0],[y,x,0,1]]; B+=[u,v]
+    p=np.linalg.lstsq(np.array(A,float),np.array(B,float),rcond=None)[0]
+    return lambda q: np.stack([p[0]*q[:,0]-p[1]*q[:,1]+p[2], p[1]*q[:,0]+p[0]*q[:,1]+p[3]],1)
+f=sim(src,dst); print('erro sim',np.abs(f(src)-dst).mean())
+# contorno: anel de pontos ao redor do rosto na arte, mapeados pela similaridade
+ang=np.linspace(0,2*np.pi,16,endpoint=False); cx,cy=230,330
+ring=np.stack([cx+150*np.cos(ang),cy+190*np.sin(ang)],1)
+ring2=np.stack([cx+600*np.cos(ang),cy+700*np.sin(ang)],1)
+S=np.vstack([src,ring,ring2]); D=np.vstack([dst,f(ring),f(ring2)])
+tri=Delaunay(D)
+# para cada pixel do destino (800x800), acha triângulo e coordenada baricêntrica -> pixel na arte
+H=W=800; yy,xx=np.mgrid[0:H,0:W]; pts=np.stack([xx.ravel()+.5,yy.ravel()+.5],1)
+s=tri.find_simplex(pts); T=tri.transform[s]
+b=np.einsum('nij,nj->ni',T[:,:2],pts-T[:,2]); bc=np.c_[b,1-b.sum(1)]
+idx=tri.simplices[s]; sp=np.einsum('ni,nij->nj',bc,S[idx])
+im=np.asarray(Image.open('meshy/concept_front.png').convert('RGB')).astype(np.float32)
+# amostragem bilinear
+x=np.clip(sp[:,0]-.5,0,im.shape[1]-1.001); y=np.clip(sp[:,1]-.5,0,im.shape[0]-1.001)
+x0=x.astype(int); y0=y.astype(int); fx=(x-x0)[:,None]; fy=(y-y0)[:,None]
+c=(im[y0,x0]*(1-fx)*(1-fy)+im[y0,x0+1]*fx*(1-fy)+im[y0+1,x0]*(1-fx)*fy+im[y0+1,x0+1]*fx*fy)
+c[s<0]=0
+Image.fromarray(c.reshape(H,W,3).clip(0,255).astype(np.uint8)).save('meshy/concept_warpA.png')

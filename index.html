@@ -51,8 +51,10 @@ canvas{display:block}
 .vb.sh{width:72px;height:40px;border-radius:12px;font:600 15px/40px system-ui,sans-serif}
 #vbT{left:73px;top:42px;color:#3fd1b0}#vbO{left:146px;top:112px;color:#ff5a6a}#vbX{left:73px;top:182px;color:#7aa8ff}#vbS{left:0;top:112px;color:#e98fd8}
 #vbR1{left:2px;top:0}#vbR2{left:138px;top:0}
+#vbF{position:fixed;right:calc(68px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));width:46px;height:40px;border-radius:10px;font:22px/40px system-ui,sans-serif;display:none}
+#vpad{transform-origin:100% 100%}
 #vbP{position:fixed;right:calc(14px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));width:46px;height:40px;border-radius:10px;font:20px/40px system-ui,sans-serif;display:none}
-@media (pointer:coarse){#vpad,#vbP{display:block}#hud{font-size:13px;padding-left:12px;max-width:60%}#pad{width:140px;height:140px;left:calc(20px + env(safe-area-inset-left,0px))}#knob{left:48px;top:48px;width:44px;height:44px}#mini{bottom:calc(190px + env(safe-area-inset-bottom,0px))}}
+@media (pointer:coarse){#vpad,#vbP,#vbF{display:block}:fullscreen #vbF{display:none}#hud{font-size:13px;padding-left:12px;max-width:60%}#pad{width:140px;height:140px;left:calc(20px + env(safe-area-inset-left,0px))}#knob{left:48px;top:48px;width:44px;height:44px}#mini{bottom:calc(190px + env(safe-area-inset-bottom,0px))}}
 </style>
 </head>
 <body>
@@ -71,7 +73,7 @@ canvas{display:block}
 <canvas id="mini" width="96" height="300"></canvas>
 <div id="pad"><div id="knob"></div></div>
 <div id="vpad"><div class="vb sh" id="vbR1">R1</div><div class="vb sh" id="vbR2">R2</div><div class="vb" id="vbT">△</div><div class="vb" id="vbO">○</div><div class="vb" id="vbX">✕</div><div class="vb" id="vbS">□</div></div>
-<div class="vb" id="vbP">❚❚</div>
+<div class="vb" id="vbP">❚❚</div><div class="vb" id="vbF">⛶</div>
 <button class="btn" id="atk">Atacar</button>
 <button class="btn" id="glbBtn">Carregar modelo GLB</button>
 <button class="btn" id="foesBtn">Inimigos: ligados</button>
@@ -512,6 +514,19 @@ const vpad={run:false,jump:false};
   bind('vbR1',function(){if(!paused)grabKey();});
   bind('vbR2',function(){vpad.run=true;},function(){vpad.run=false;});
   bind('vbP',function(){togglePause();});
+  bind('vbF',function(){goFull(true);});
+  /* tela cheia: pedida no primeiro toque (o navegador só permite a partir de um gesto) e trava em paisagem */
+  function goFull(warn){
+    const d=document.documentElement,rq=d.requestFullscreen||d.webkitRequestFullscreen;
+    if(document.fullscreenElement||document.webkitFullscreenElement||!rq)return;
+    try{const r=rq.call(d,{navigationUI:'hide'});
+      if(r&&r.then)r.then(function(){try{screen.orientation.lock('landscape').catch(function(){});}catch(e){}}).catch(function(){if(warn)flashMsg('Tela cheia bloqueada aqui: abra o jogo numa aba própria do navegador.',2.5);});
+    }catch(e){}
+  }
+  if(matchMedia('(pointer:coarse)').matches)addEventListener('pointerdown',function f(){removeEventListener('pointerdown',f,true);goFull(false);},true);
+  /* em telas baixas o controle encolhe para caber abaixo do botão de pausa */
+  function fit(){const k=Math.min(1,(innerHeight-70)/250);document.getElementById('vpad').style.transform=k<1?'scale('+k.toFixed(3)+')':'';}
+  addEventListener('resize',fit);fit();
 })();
 function rumble(strong,weak,ms){
   const g=gp.idx>=0&&navigator.getGamepads?navigator.getGamepads()[gp.idx]:null;

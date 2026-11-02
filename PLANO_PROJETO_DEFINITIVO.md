@@ -84,6 +84,9 @@ Próximos passos pendentes do personagem:
 - Modelo padrão: **Guerreiro** (`aethelred_guerreiro.glb`), o masculino montado da cabeça + corpo do Meshy, no mesmo
   esqueleto Mixamo e com as mesmas animações de `aethelred_personagem.glb` (perfil mixamo). Scripts em
   `ferramentas/guerreiro/`: `juntar_cabeca_corpo.py` (emenda do pescoço), `rig.py` (juntas e pesos), `monta.py` (GLB do jogo).
+  Pescoço: queixo ~8 cm acima da base do pescoço (`MENTON` 0.831; com 10 cm parecia longo). A malha montada fica em
+  `Downloads\guerreiro_pescoco_0.831\guerreiro.glb`; no jogo o modelo é escalado para a mesma altura do antigo, então o
+  corpo cresce ~1% para compensar o pescoço mais curto.
   O botão Modelo (no canto de cima à direita, ou a tecla **H**) alterna entre Guerreiro, Mixamo antigo e original. Capa com ponto de fixação próprio (`MODELOS[i].capa`).
   Mãos: a malha do Meshy vem com a palma para a frente e o polegar para cima; o `rig.py` gira o antebraço (~58°, torção
   que cresce do cotovelo ao pulso) para a palma ficar para baixo como no esqueleto, põe o pulso no ponto mais estreito

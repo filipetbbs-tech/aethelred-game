@@ -5,7 +5,7 @@
 import bpy, json, struct, sys, os, math, heapq, numpy as np, mathutils
 D = os.path.dirname(__file__); OUT = os.path.join(D, 'rig_out'); os.makedirs(OUT, exist_ok=True)
 OLD = r'C:\Jogos\aethelred-game\aethelred_personagem.glb'
-NEW = os.environ.get('NEWGLB', r'C:\Users\Filipe\Downloads\guerreiro_mixamo\guerreiro.glb')
+NEW = os.environ.get('NEWGLB', r'C:\Users\Filipe\Downloads\guerreiro_pescoco_0.831\guerreiro.glb')
 
 def readglb(F):
     d = open(F, 'rb').read(); l = struct.unpack('<I', d[12:16])[0]; j = json.loads(d[20:20 + l])

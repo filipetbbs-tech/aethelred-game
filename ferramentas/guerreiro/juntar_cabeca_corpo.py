@@ -1,14 +1,14 @@
 # junta cabeça + corpo masculinos (Meshy) com proporção anatômica:
-#   cabeça = 13% da altura, queixo ~10 cm acima da base do pescoço; pescoço da cabeça esticado até o corpo,
+#   cabeça = 13% da altura, queixo ~8 cm acima da base do pescoço (com 10 cm o pescoço parecia longo); pescoço da cabeça esticado até o corpo,
 #   base do pescoço do corpo alargada, emenda soldada e suavizada, cor da pele misturada na emenda
 import bpy, bmesh, sys, os, numpy as np, mathutils, math
 D = os.path.dirname(__file__); sys.path.insert(0, D); from rl import *; from common import coords, edges, components, E
 CORPO = r'C:\Users\Filipe\Downloads\Meshy_AI_athletic_male_body_qu_1102030627_texture.glb'
 CABECA = r'C:\Users\Filipe\Downloads\Meshy_AI_warrior_head_quad_gam_1102030637_texture.glb'
-OUTD = os.environ.get('OUTD', r'C:\Users\Filipe\Downloads\guerreiro_mixamo')
+OUTD = os.environ.get('OUTD', r'C:\Users\Filipe\Downloads\guerreiro_pescoco_0.831')
 S = E('S', 0.174)                      # escala da cabeça (altura queixo-topo = 13% da estatura)
 MH = E('MH', -0.52)                    # z do mento (ponta de baixo do queixo) na cabeça original
-DZ = E('MENTON', 0.851) - S * MH       # mento ~10 cm (5,2% da altura) acima da fúrcula do esterno
+DZ = E('MENTON', 0.831) - S * MH       # mento ~8 cm (4,2% da altura) acima da fúrcula do esterno
 BAND, BANDB, K = E('BAND', 0.04), E('BANDB', 0.04), E('K', 0)
 bpy.ops.wm.read_factory_settings(use_empty=True)
 

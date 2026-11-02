@@ -24,7 +24,7 @@ canvas{display:block}
 #soundBtn{right:18px;top:calc(200px + env(safe-area-inset-top,0px));bottom:auto}
 #musicBtn{right:18px;top:calc(262px + env(safe-area-inset-top,0px));bottom:auto}
 #godBtn{right:18px;top:calc(324px + env(safe-area-inset-top,0px));bottom:auto}
-#modelBtn{right:18px;top:calc(386px + env(safe-area-inset-top,0px));bottom:auto}
+#modelBtn{right:18px;top:calc(14px + env(safe-area-inset-top,0px));bottom:auto;font-size:14px;padding:8px 14px}
 #mapBtn{right:18px;top:calc(448px + env(safe-area-inset-top,0px));bottom:auto}
 #slowBtn{right:18px;top:calc(510px + env(safe-area-inset-top,0px));bottom:auto}
 #armBtn{right:18px;top:calc(572px + env(safe-area-inset-top,0px));bottom:auto}
@@ -41,8 +41,8 @@ canvas{display:block}
 @media (pointer:coarse){#pad{display:block}}
 #soundHint{display:none;position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);max-width:calc(100% - 32px);box-sizing:border-box;padding:10px 16px;border:1px solid #d8b25a;border-radius:6px;background:rgba(20,16,16,.85);color:#f0d68a;font-size:15px;text-align:center;z-index:5;pointer-events:none}
 #dmg{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 50%,rgba(150,10,10,.6) 100%)}
-/* sem a coluna de botões e instruções: as opções ficam no teclado (e no controle físico) */
-#atk,#glbBtn,#foesBtn,#pauseBtn,#soundBtn,#musicBtn,#godBtn,#modelBtn,#mapBtn,#slowBtn,#armBtn,#bloodBtn{display:none}
+/* sem a coluna de botões e instruções: as opções ficam no teclado (e no controle físico); só o botão Modelo fica à vista */
+#atk,#glbBtn,#foesBtn,#pauseBtn,#soundBtn,#musicBtn,#godBtn,#mapBtn,#slowBtn,#armBtn,#bloodBtn{display:none}
 #hud h1,#glbMsg{display:none}
 /* controle na tela (celular): analógico à esquerda, botões de ação à direita no layout do DualSense */
 #vpad{display:none;position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));width:210px;height:250px;pointer-events:none}
@@ -54,6 +54,7 @@ canvas{display:block}
 #vbF{position:fixed;right:calc(68px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));width:46px;height:40px;border-radius:10px;font:22px/40px system-ui,sans-serif;display:none}
 #vpad{transform-origin:100% 100%}
 #vbP{position:fixed;right:calc(14px + env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));width:46px;height:40px;border-radius:10px;font:20px/40px system-ui,sans-serif;display:none}
+@media (pointer:coarse){#modelBtn{top:calc(60px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));font-size:13px;padding:7px 12px}}
 @media (pointer:coarse){#vpad,#vbP,#vbF{display:block}:fullscreen #vbF{display:none}#hud{font-size:13px;padding-left:12px;max-width:60%}#pad{width:140px;height:140px;left:calc(20px + env(safe-area-inset-left,0px))}#knob{left:48px;top:48px;width:44px;height:44px}#mini{bottom:calc(190px + env(safe-area-inset-bottom,0px))}}
 </style>
 </head>
@@ -102,7 +103,7 @@ renderer.setSize(innerWidth,innerHeight);
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
 document.body.appendChild(renderer.domElement);
-const cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,200);
+const cam=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,200);
 
 /* luzes */
 const hemi=new THREE.HemisphereLight(0x556080,0x1a1412,.55);scene.add(hemi);
@@ -433,9 +434,9 @@ musicBtn.onclick=toggleMusic;
 
 /* estado */
 let tpose=false;
-const st={x:0,z:8,y:0,vy:0,rot:Math.PI,rotT:Math.PI,yaw:0,pitch:.35,camD:6.5,t:0,speed:0,morph:0,morphOn:false};
+const st={x:0,z:8,y:0,vy:0,rot:Math.PI,rotT:Math.PI,yaw:0,pitch:.2,camD:4,t:0,speed:0,morph:0,morphOn:false};
 const keys={};const joy={x:0,y:0};
-addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyG')toggleGod();if(e.code==='KeyK')dodgeKey=true;if(e.code==='KeyE')grabKey();if(e.code==='KeyL')toggleDodgeVer();if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();if(e.code==='KeyM')toggleMusic();if(e.code==='KeyB')toggleSlow();if(e.code==='KeyN')toggleWorld();if(WORLD==='prison'&&/^Digit[1-6]$/.test(e.code))prisonWarp(+e.code.slice(5)-1);});
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')e.preventDefault();if(e.repeat)return;if(e.code==='KeyF')toggle();if(e.code==='KeyJ')attack();if(e.code==='KeyR'&&custom)custom.rotation.y+=Math.PI;if(e.code==='KeyI')toggleFoes();if(e.code==='KeyT')toggleTPose();if(e.code==='KeyH'&&!e.repeat)modelBtn.onclick();if(e.code==='KeyG')toggleGod();if(e.code==='KeyK')dodgeKey=true;if(e.code==='KeyE')grabKey();if(e.code==='KeyL')toggleDodgeVer();if(e.code==='KeyP')togglePause();if(e.code==='KeyO')toggleSound();if(e.code==='KeyM')toggleMusic();if(e.code==='KeyB')toggleSlow();if(e.code==='KeyN')toggleWorld();if(WORLD==='prison'&&/^Digit[1-6]$/.test(e.code))prisonWarp(+e.code.slice(5)-1);});
 addEventListener('keyup',e=>{keys[e.code]=false;});
 const stateEl=document.getElementById('state');
 function toggle(){if(!abil.morph&&!st.morphOn){flashMsg('A transformação ainda está selada. Procure o altar.',1.6);return;}if(morphSeq)return;
@@ -458,7 +459,7 @@ renderer.domElement.addEventListener('pointerdown',e=>{drag={id:e.pointerId,x:e.
 addEventListener('pointermove',e=>{
   if(!drag||e.pointerId!==drag.id)return;
   st.yaw-=(e.clientX-drag.x)*.006;
-  st.pitch=Math.max(.08,Math.min(1.25,st.pitch+(e.clientY-drag.y)*.005));
+  st.pitch=Math.max(-.2,Math.min(1.25,st.pitch+(e.clientY-drag.y)*.005));
   drag.moved+=Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y);
   drag.x=e.clientX;drag.y=e.clientY;
 });
@@ -553,7 +554,7 @@ function pollGamepad(raw){
   gp.jump=!!b[0];
   /* câmera */
   const R=gpAxis(g.axes[2]||0,g.axes[3]||0);
-  if(R[0]||R[1]){st.yaw-=R[0]*raw*2.8;st.pitch=Math.max(.08,Math.min(1.25,st.pitch+R[1]*raw*1.7));}
+  if(R[0]||R[1]){st.yaw-=R[0]*raw*2.8;st.pitch=Math.max(-.2,Math.min(1.25,st.pitch+R[1]*raw*1.7));}
   if(hit(11)){st.yaw=st.rot+Math.PI;}
   if(b[12])st.camD=Math.max(1.4,st.camD*Math.exp(-raw*1.6));
   if(b[13])st.camD=Math.min(16,st.camD*Math.exp(raw*1.6));
@@ -2069,7 +2070,7 @@ float cd=pow(aDep,1.35);float ax=-uSw.x*cd+uTrem*sin(uT*7.+aDep*6.+position.x*4.
 float c1=cos(ax),s1=sin(ax);transformed.yz=vec2(transformed.y*c1-transformed.z*s1,transformed.y*s1+transformed.z*c1);
 float c2=cos(az),s2=sin(az);transformed.xy=vec2(transformed.x*c2-transformed.y*s2,transformed.x*s2+transformed.y*c2);`);};
       mat.needsUpdate=true;cm.castShadow=true;cm.receiveShadow=true;cm.frustumCulled=false;
-      const grp=new THREE.Group(),C=CAPA,s=C.comp/H;grp.add(cm);cm.position.set(0,0,0);cm.rotation.set(0,0,0);cm.scale.set(1,1,1);
+      const grp=new THREE.Group(),C=Object.assign({},CAPA,MODELOS[modeloAt].capa||{}),s=C.comp/H;grp.add(cm);cm.position.set(0,0,0);cm.rotation.set(0,0,0);cm.scale.set(1,1,1);
       const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(C.tilt,C.ry,0,'YXZ'));
       const T=new THREE.Matrix4().compose(new THREE.Vector3(C.x,C.y,C.z),q,new THREE.Vector3(s,s,s));
       grp.matrixAutoUpdate=false;grp.matrix.copy(sk.boneInverses[k]).multiply(mesh.bindMatrix).multiply(T);
@@ -2192,19 +2193,20 @@ function applyArmForm(){
   const mon=st.morph>=.5&&!!armForm.claws;if(armForm.shown===mon)return;armForm.shown=mon;
   armForm.body.geometry.setIndex(mon?armForm.noArm:armForm.full);MUSC.on=mon?1:0;MUSC.uni.forEach(function(u){u.uMuscOn.value=MUSC.on;setPauld(u);});if(armForm.claws)armForm.claws.visible=mon;
 }
-/* modelos que acompanham o jogo; o botão "Modelo" alterna entre eles (a escolha fica lembrada neste navegador) */
-const MODELOS=[{file:'aethelred_personagem.glb',nome:'Mixamo'},{file:'aethelred_rig_rosto.glb',nome:'original'}],modelBuf={};
+/* modelos que acompanham o jogo; o botão "Modelo" (ou a tecla H) alterna entre eles (a escolha fica lembrada neste navegador) */
+/* capa: ponto de fixação próprio do modelo (sem a ombreira do Mixamo, ela fica colada nas costas do ombro direito) */
+const MODELOS=[{file:'aethelred_guerreiro.glb',nome:'Guerreiro',capa:{x:-.0015,y:.01434,z:-.00157}},{file:'aethelred_personagem.glb',nome:'Mixamo'},{file:'aethelred_rig_rosto.glb',nome:'original'}],modelBuf={};
 const modelBtn=document.getElementById('modelBtn');
 let modeloAt=0;try{const k=+localStorage.getItem('aeth_modelo');if(MODELOS[k])modeloAt=k;}catch(e){}
 function carregaModelo(i){
-  modeloAt=i;const M=MODELOS[i];modelBtn.textContent='Modelo: '+M.nome;
+  modeloAt=i;const M=MODELOS[i];modelBtn.textContent='Modelo: '+M.nome+(matchMedia('(pointer:coarse)').matches?'':' (H)');
   try{localStorage.setItem('aeth_modelo',String(i));}catch(e){}
   if(modelBuf[M.file]){parseGLB(modelBuf[M.file].slice(0),M.file);return;}
   loadBinary(M.file,function(buf){modelBuf[M.file]=buf.slice(0);if(modeloAt===i)parseGLB(buf,M.file);},
     function(){say('Não encontrei o modelo da personagem. Arraste um arquivo .glb para a tela ou toque em “Carregar modelo GLB”.');},
     function(f){say('Carregando o modelo '+M.nome+'... '+Math.round(f*100)+'%');});
 }
-modelBtn.onclick=function(){carregaModelo((modeloAt+1)%MODELOS.length);modelBtn.blur();};
+modelBtn.onclick=function(){carregaModelo((modeloAt+1)%MODELOS.length);modelBtn.blur();flashMsg('Modelo: '+MODELOS[modeloAt].nome,1.5);};
 carregaModelo(modeloAt);
 /* remove quadros-chave com tempo repetido: as animações do modelo têm alguns, e o Three.js
    devolve uma pose errada por um quadro perto deles (o "tranco" periódico no idle) */
@@ -2222,7 +2224,8 @@ function cleanClip(clip){
 /* perfis de personagem: cada modelo tem o seu, e o que for ajustado para um não muda o outro.
    - animações de combate: se existir animacoes/<perfil>/<arquivo>, ela vale só para esse perfil; senão usa a comum de animacoes/
    - ajustes no código: PF(valorOriginal, valorMixamo) devolve o valor do perfil carregado */
-const PERFIS={'aethelred_personagem.glb':'mixamo'};
+/* aethelred_guerreiro.glb: o guerreiro masculino no mesmo esqueleto e com as mesmas animações do Mixamo (ferramentas/guerreiro/) */
+const PERFIS={'aethelred_personagem.glb':'mixamo','aethelred_guerreiro.glb':'mixamo'};
 let PERFIL='original';
 function PF(orig,mixamo){return PERFIL==='mixamo'&&mixamo!==undefined?mixamo:orig;}
 /* pele dos braços (só no perfil mixamo): variação de cor como a do rosto, calculada na placa de vídeo em 3D sobre o corpo
@@ -3221,7 +3224,8 @@ const slash=new THREE.Group();slash.position.y=1.1;slash.rotation.y=-Math.PI/2;h
 /* animação */
 const clock=new THREE.Clock();
 /* pausa: congela a personagem e os inimigos; a câmera continua livre */
-let paused=false,camDist=6.5;
+let paused=false,camDist=4;
+const CAM={ok:false,x:0,y:0,z:0,aD:0,aP:0},_cv=new THREE.Vector3();
 /* câmera lenta: L2 no controle, B no teclado ou o botão; o jogo inteiro roda a SLOW.k da velocidade (a câmera não) */
 const SLOW={on:false,k:1,rate:.3},slowBtn=document.getElementById('slowBtn');
 function toggleSlow(){SLOW.on=!SLOW.on;SLOW.k=SLOW.on?SLOW.rate:1;slowBtn.textContent='Câmera lenta: '+(SLOW.on?'sim':'não');slowBtn.classList.toggle('on',SLOW.on);slowBtn.blur();}
@@ -3238,17 +3242,26 @@ function frame(){
   if(climb&&!drag){const F=wallFrame(climb);let a=Math.atan2(F.n.x,F.n.z),dd=a-st.yaw;while(dd>Math.PI)dd-=Math.PI*2;while(dd<-Math.PI)dd+=Math.PI*2;st.yaw+=dd*Math.min(1,raw*3);}
   /* câmera, com tremor no impacto */
   shake=Math.max(0,shake-raw*1.6);
-  const d=st.camD,tx=st.x,ty=st.y+1.6,tz=st.z,sk=paused?0:shake*shake;
+  /* câmera de ação (como Assassin's Creed): mira o centro do corpo de verdade (o quadril do modelo, que acompanha escalada,
+     salto e cambalhota) e não um ponto fixo acima dos pés, com suavização (mais lenta na vertical, para não balançar com
+     o passo). Na parede ou no ar ela se afasta e fica mais nivelada, para o corpo inteiro e a parede caberem na tela */
+  let bx=st.x,by=st.y+1,bz=st.z;
+  if(rig&&rig.B.Hips){wp(rig.B.Hips,_cv);bx=_cv.x;by=_cv.y;bz=_cv.z;}
+  const air=!climb&&Math.abs(st.vy)>1.2;
+  if(!CAM.ok){CAM.x=bx;CAM.y=by;CAM.z=bz;CAM.ok=true;}
+  CAM.x+=(bx-CAM.x)*Math.min(1,raw*12);CAM.z+=(bz-CAM.z)*Math.min(1,raw*12);CAM.y+=(by-CAM.y)*Math.min(1,raw*(climb||air?9:5));
+  CAM.aD+=((climb?1.8:air?.9:0)-CAM.aD)*Math.min(1,raw*3);CAM.aP+=((climb?-.2:air?-.08:0)-CAM.aP)*Math.min(1,raw*3);
+  const d=st.camD+CAM.aD,pit=Math.max(-.3,Math.min(1.25,st.pitch+CAM.aP)),tx=CAM.x,ty=CAM.y+.5,tz=CAM.z,sk=paused?0:shake*shake;
   /* câmera desvia de pilastras e muralhas: se algo estiver entre ela e a personagem, ela se aproxima */
-  const cdx=Math.sin(st.yaw)*Math.cos(st.pitch),cdy=Math.sin(st.pitch),cdz=Math.cos(st.yaw)*Math.cos(st.pitch);
+  const cdx=Math.sin(st.yaw)*Math.cos(pit),cdy=Math.sin(pit),cdz=Math.cos(st.yaw)*Math.cos(pit);
   let cd=d;
   for(let k=1;k<=24;k++){const r=d*k/24,qx=tx+cdx*r,qy=ty+cdy*r,qz=tz+cdz*r;
     const own=climb?climb.o:null;
     let hit=circles.some(function(c){return c!==own&&qy<c.h+.2&&Math.hypot(qx-c.x,qz-c.z)<(c.vr||c.r)+.25;})||boxes.some(function(b){return b!==own&&qy<b.h+.2&&Math.abs(qx-b.x)<b.hw+.25&&Math.abs(qz-b.z)<b.hd+.25;});
-    if(hit){cd=Math.max(.8,r-d/24);break;}}
+    if(hit){cd=Math.max(1.2,r-d/24);break;}}
   camDist+=(cd-camDist)*Math.min(1,raw*(cd<camDist?20:4));
-  cam.position.set(tx+cdx*camDist+(Math.random()-.5)*sk,Math.max(.6,ty+cdy*camDist)+(Math.random()-.5)*sk,tz+cdz*camDist);
-  cam.lookAt(tx,ty,tz);
+  cam.position.set(tx+cdx*camDist+(Math.random()-.5)*sk,Math.max(.35,ty+cdy*camDist)+(Math.random()-.5)*sk,tz+cdz*camDist);
+  cam.lookAt(tx,ty+.12,tz);
   moon.position.set(st.x-14,st.y+24,st.z+10);moon.target.position.set(st.x,st.y,st.z);moon.target.updateMatrixWorld();
   rim.position.set(st.x-cdx*6,st.y+4,st.z-cdz*6);rim.target.position.set(st.x,st.y+1,st.z);rim.target.updateMatrixWorld();
   DUST.update(st.x,st.y,st.z);

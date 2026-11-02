@@ -1,1 +1,4 @@
 sons/
+
+# saída intermediária do rig do guerreiro (ferramentas/guerreiro/rig.py)
+ferramentas/guerreiro/rig_out/

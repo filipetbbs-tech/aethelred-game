@@ -81,15 +81,37 @@ Próximos passos pendentes do personagem:
 
 - Link de teste (artifact): https://claude.ai/artifact/LeXCghigcRKv5ZvWT3Gpqw — publicado a partir de `index.html`.
   Os modelos/animações vão como arquivos `.b64.txt` (o `loadBinary` cai no `.b64.txt` se o binário falhar).
-- Perfil padrão: Mixamo (`aethelred_personagem.glb`). Braço monstruoso padrão na transformação: o **antigo**
-  (`aethelred_braco_mutante_antigo.glb`).
+- Modelo padrão: **Guerreiro** (`aethelred_guerreiro.glb`), o masculino montado da cabeça + corpo do Meshy, no mesmo
+  esqueleto Mixamo e com as mesmas animações de `aethelred_personagem.glb` (perfil mixamo). Scripts em
+  `ferramentas/guerreiro/`: `juntar_cabeca_corpo.py` (emenda do pescoço), `rig.py` (juntas e pesos), `monta.py` (GLB do jogo).
+  O botão Modelo (no canto de cima à direita, ou a tecla **H**) alterna entre Guerreiro, Mixamo antigo e original. Capa com ponto de fixação próprio (`MODELOS[i].capa`).
+  Mãos: a malha do Meshy vem com a palma para a frente e o polegar para cima; o `rig.py` gira o antebraço (~58°, torção
+  que cresce do cotovelo ao pulso) para a palma ficar para baixo como no esqueleto, põe o pulso no ponto mais estreito
+  do antebraço e aumenta a mão 15% a partir do pulso (variável `MAO`; a malha do Meshy tinha mão pequena e dedos finos).
+  Juntas dos dedos achadas na própria malha: além das membranas cada dedo é um pedaço solto da pele (a membrana entre
+  dois vizinhos é onde eles se separam, o nó fica 0,1 x mão antes); a linha do centro de cada dedo é o centro dos anéis
+  de mesma distância pela pele a partir da base, que segue o dedo mesmo dobrado (o mínimo vem bem curvado). Depois
+  endireita os dedos na direção dos ossos do esqueleto antigo, girando cada falange também em torno do próprio eixo
+  para o eixo de dobra da animação (tirado das animações antigas) cair no eixo de dobra do dedo, e grava essa pose como
+  repouso. Sem isso a falange dobrava de lado e o dedo parecia contorcido. A pele dos 4 dedos não gira falange por
+  falange (ficava em zigue-zague): o dedo é "desenrolado" ao longo da linha do centro até a reta dos ossos. As pontas
+  ficam com o mesmo espaço entre elas (médio e anelar giram até ~6° no plano da palma) e os dedos ficam 20% mais
+  grossos (variável `DEDO`), para ficarem juntos como no modelo antigo.
+  Pesos do tronco: o bone heat deixava um pouco do braço e da clavícula na lateral do peito abaixo da axila (e da coxa
+  nas costelas de baixo); com o braço abaixado a lateral afundava. A cintura logo acima do quadril seguia 45% a coxa
+  (no modelo antigo, 1%), e na voadora e na guarda agachada ela afunilava. O `rig.py` tira esses pesos com transição
+  suave: acima da articulação do quadril nada segue a coxa.
+- Câmera de ação (estilo Assassin's Creed): 4 m (antes 6,5), campo de visão 55°, mira o centro do corpo pelo quadril do
+  modelo (acompanha escalada, salto e cambalhota), suavizada; na parede ou no ar se afasta e fica mais nivelada.
+- Braço monstruoso padrão na transformação: o **antigo** (`aethelred_braco_mutante_antigo.glb`).
 - Combo de 5 golpes (perfil Mixamo): velocidades 1.8 / 1.45 / 1.45 / 1.4 / 1.5. O 5º é cópia do golpe do combo
   original para não mudar o modelo original.
 - Inimigos: só vikings (`modelos/viking_rig_armas_rigidas.glb`), com cerco, revezamento de ataque, agarrão/arremesso,
   reação a golpe que cancela o ataque, ataques mais lentos (`VK.ritmoGolpe`), recuperação após dano, andam quando perto.
 - Celular: controle na tela no layout do DualSense (analógico, △ transformar, ○ esquivar, ✕ pular, □ atacar,
-  R1 agarrar, R2 correr, pausa, ⛶ tela cheia). A coluna de botões de opções está escondida; as opções ficam no teclado
-  (I inimigos, P pausa, O som, M música, B câmera lenta, N mapa, G invencível, L versão da esquiva, T pose T).
+  R1 agarrar, R2 correr, pausa, ⛶ tela cheia). A coluna de botões de opções está escondida (fica só o botão Modelo); as
+  opções ficam no teclado (I inimigos, P pausa, O som, M música, B câmera lenta, N mapa, G invencível, L versão da
+  esquiva, T pose T, H modelo).
 
 ## Modelos novos (testes com Meshy) — estado
 

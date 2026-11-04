@@ -74,7 +74,7 @@ Próximos passos pendentes do personagem:
      `git remote set-url origin https://filipetbbs-tech@github.com/filipetbbs-tech/aethelred-game.git`;
    - no primeiro push, o login no navegador deve ser o do GitHub **pessoal**;
    - não adicionar este projeto no GitHub Desktop.
-3. Copiar as vozes para `sons/` (e `sons/criatura/`): elas não estão no GitHub.
+3. As vozes (`sons/` e `sons/criatura/`) já vêm no clone do GitHub.
 4. Blender (linha de comando) para modelos; Unity 6 HDRP quando começar o projeto definitivo.
 
 ## Estado atual do protótipo (navegador)

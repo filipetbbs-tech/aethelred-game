@@ -7,7 +7,7 @@ Regras do projeto:
 - Conta pessoal sempre: nunca enviar nada deste projeto para a conta de trabalho do GitHub
   nem usar a conta de trabalho do Claude. Antes de todo push, conferir `git config user.email`
   (deve ser o e-mail pessoal) e a conta/credencial usada para o github.com.
-- `sons/` (vozes gravadas) nunca vai para o GitHub (está no `.gitignore`).
+- `sons/` (vozes gravadas) está no GitHub por decisão do usuário (o repositório é público).
 - Esquiva: `DODGES_V1` é a original e fica congelada. Todo ajuste pedido nos botões de esquiva
   é feito só em `DODGES_V2`.
 - Não refazer um push recusado antes de o usuário agir.

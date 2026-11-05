@@ -302,7 +302,11 @@ function audioInit(){
   }catch(e){SFX.ctx=null;}
 }
 /* vozes gravadas (pasta sons/): sorteadas sem repetir em seguida; sem os arquivos, fica a voz sintetizada */
-const VOICE_FILES={golpe:['golpe_1','golpe_2','golpe_3','golpe_4'],dor:['dor_1','dor_2'],pulo:['pulo_1'],morte:['morte_1','morte_2']};
+const VOICE_FILES={golpe:['golpe_1','golpe_2','golpe_3','golpe_4'],dor:['dor_1','dor_2'],pulo:['pulo_1'],morte:['morte_1','morte_2'],
+  /* efeitos gravados (sons/efeitos/): vento = garras cortando o ar, garras = garras acertando o inimigo */
+  vento:[1,2,3,4,5,6,7,8].map(function(i){return 'efeitos/vento_'+i;}),garras:[1,2,3,4,5,6].map(function(i){return 'efeitos/garras_'+i;})};
+/* volume dos efeitos gravados (sem o VOICE_GAIN das vozes) */
+const SFX_REC={vento:.75,garras:.9};
 const VOICE_DIR='sons/';
 /* volume das vozes gravadas em relação aos efeitos (0,38 ≈ -8,4 dB) */
 const VOICE_GAIN=.38;
@@ -373,6 +377,7 @@ function bladePass(f0,fpk,f1,q,peak,dur,delay){
 const SOUND={
   /* garras cortando o ar: três lâminas finas defasadas, assobio metálico sutil e um pouco de corpo grave */
   swish:function(power){if(!sfxOK())return;const p=power||1,dur=.2+.05*p;
+    if(playVoice('vento',1.08-.1*Math.min(p,1.6),SFX_REC.vento*Math.min(1.3,.8+.25*p)/VOICE_GAIN))return;
     for(let k=0;k<3;k++){const r=.92+Math.random()*.16;bladePass(900*r,4200*r*(1+.08*k),1700*r,5.5,.2*p*(1-k*.18),dur,k*.012);}
     bladePass(2600,7000,3000,1.2,.07*p,dur*.9,.01);
     bladePass(260,600,240,1,.12*p,dur*1.1);
@@ -383,6 +388,9 @@ const SOUND={
   /* garras acertando carne: sem nenhum tilintar metálico (é ele que soa como lata ou pedra). Entrada curta do fio,
      "squelch" úmido (ressonância que desce rápido), estalos de fibras rasgando, baque grave macio e um respingo abafado */
   slash:function(heavy){if(!sfxOK())return;const H=heavy?1:0;
+    /* com a gravação das garras, fica só o corpo grave sintetizado por baixo */
+    if(playVoice('garras',heavy?.86:1,SFX_REC.garras*(heavy?1.15:1)/VOICE_GAIN)){
+      noiseHit('lowpass',700,150,.9,.35+H*.15,.008,.14+H*.08,.002);toneDrop('sine',95-H*25,45-H*15,.45+H*.25,.16+H*.16,.004);return;}
     noiseHit('highpass',4500,3000,.7,.05,.001,.03);
     noiseHit('bandpass',1400-H*400,260-H*80,4,.5+H*.1,.004,.16+H*.1);
     noiseHit('lowpass',700,150,.9,.5+H*.15,.008,.14+H*.08,.002);
